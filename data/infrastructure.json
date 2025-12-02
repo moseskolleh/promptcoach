@@ -1,0 +1,94 @@
+{
+  "providers": {
+    "microsoft_azure": {
+      "name": "Microsoft Azure",
+      "pue": 1.12,
+      "wue_onsite_l_per_kwh": 0.30,
+      "wue_offsite_l_per_kwh": 3.142,
+      "cif_kgco2e_per_kwh": 0.3528,
+      "notes": "Used by OpenAI models",
+      "source": "Microsoft 2024 Environmental Sustainability Report"
+    },
+    "aws": {
+      "name": "Amazon Web Services",
+      "pue": 1.14,
+      "wue_onsite_l_per_kwh": 0.18,
+      "wue_offsite_l_per_kwh": 3.142,
+      "cif_kgco2e_per_kwh": 0.385,
+      "notes": "Used by Anthropic and Meta models",
+      "source": "AWS 2023 Sustainability Report"
+    },
+    "deepseek": {
+      "name": "DeepSeek (China)",
+      "pue": 1.27,
+      "wue_onsite_l_per_kwh": 1.20,
+      "wue_offsite_l_per_kwh": 6.016,
+      "cif_kgco2e_per_kwh": 0.6,
+      "notes": "Chinese data center averages",
+      "source": "China Communications Enterprise Association, 2024"
+    }
+  },
+  "hardware_specs": {
+    "dgx_h200_h100": {
+      "name": "NVIDIA DGX H200/H100",
+      "critical_power_kw": 10.20,
+      "gpu_count_per_node": 8,
+      "gpu_model": "H100/H200",
+      "gpu_power_w": 700,
+      "notes": "Latest Hopper architecture"
+    },
+    "dgx_a100": {
+      "name": "NVIDIA DGX A100",
+      "critical_power_kw": 6.50,
+      "gpu_count_per_node": 8,
+      "gpu_model": "A100",
+      "gpu_power_w": 400,
+      "notes": "Previous generation"
+    },
+    "dgx_h800": {
+      "name": "NVIDIA DGX H800",
+      "critical_power_kw": 10.20,
+      "gpu_count_per_node": 8,
+      "gpu_model": "H800",
+      "gpu_power_w": 700,
+      "notes": "Export-compliant version for China"
+    }
+  },
+  "size_classes": {
+    "Nano": {
+      "parameters": "<7B",
+      "gpu_count": 1,
+      "dgpu_h100": "35-65%",
+      "ugpu_total_h100": "0.55-1.00%",
+      "unon_gpu_total": "0.87%"
+    },
+    "Micro": {
+      "parameters": "7-20B",
+      "gpu_count": 1,
+      "dgpu_h100": "50-80%",
+      "ugpu_total_h100": "0.75-1.25%",
+      "unon_gpu_total": "0.87%"
+    },
+    "Small": {
+      "parameters": "20-40B",
+      "gpu_count": 2,
+      "dgpu_h100": "55-80%",
+      "ugpu_total_h100": "1.70-2.50%",
+      "unon_gpu_total": "1.6%"
+    },
+    "Medium": {
+      "parameters": "40-70B",
+      "gpu_count": 4,
+      "dgpu_h100": "50-70%",
+      "ugpu_total_h100": "3.00-4.50%",
+      "unon_gpu_total": "3.125%"
+    },
+    "Large": {
+      "parameters": ">70B",
+      "gpu_count": 8,
+      "dgpu_h100": "45-60%",
+      "ugpu_total_h100": "5.50-7.50%",
+      "unon_gpu_total": "6.25%"
+    }
+  }
+}
