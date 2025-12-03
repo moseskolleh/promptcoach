@@ -1,0 +1,197 @@
+{
+  "energy_conversions": {
+    "led_lightbulb_1w": {
+      "name": "LED lightbulb (1W)",
+      "unit": "minutes",
+      "factor": 60,
+      "description": "Minutes a 1W LED bulb could run",
+      "icon": "💡",
+      "calculation": "wh * 60"
+    },
+    "smartphone_charge": {
+      "name": "Smartphone charge",
+      "unit": "percentage",
+      "factor": 0.1,
+      "wh_per_full_charge": 10,
+      "description": "Percentage of full smartphone charge",
+      "icon": "📱",
+      "calculation": "(wh / 10) * 100"
+    },
+    "coffee_cup": {
+      "name": "Cup of coffee",
+      "unit": "cups",
+      "factor": 0.025,
+      "wh_per_cup": 40,
+      "description": "Cups of coffee that could be made",
+      "icon": "☕",
+      "calculation": "wh / 40"
+    },
+    "laptop_runtime": {
+      "name": "Laptop running time",
+      "unit": "minutes",
+      "factor": 1.2,
+      "wh_per_hour": 50,
+      "description": "Minutes of laptop usage",
+      "icon": "💻",
+      "calculation": "(wh / 50) * 60"
+    },
+    "tv_65inch": {
+      "name": "65-inch LED TV",
+      "unit": "minutes",
+      "factor": 0.462,
+      "wh_per_hour": 130,
+      "description": "Minutes of TV watching",
+      "icon": "📺",
+      "calculation": "(wh / 130) * 60"
+    }
+  },
+  "water_conversions": {
+    "water_drops": {
+      "name": "Water drops",
+      "unit": "drops",
+      "factor": 1,
+      "ml_per_drop": 1,
+      "description": "Drops of water",
+      "icon": "💧",
+      "calculation": "ml / 1"
+    },
+    "coffee_cups": {
+      "name": "Coffee cups",
+      "unit": "cups",
+      "factor": 0.004,
+      "ml_per_cup": 250,
+      "description": "Standard coffee cups",
+      "icon": "☕",
+      "calculation": "ml / 250"
+    },
+    "water_bottles": {
+      "name": "Water bottles",
+      "unit": "bottles",
+      "factor": 0.002,
+      "ml_per_bottle": 500,
+      "description": "500ml water bottles",
+      "icon": "🍶",
+      "calculation": "ml / 500"
+    },
+    "daily_drinking_water": {
+      "name": "Daily drinking water",
+      "unit": "percentage",
+      "factor": 0.0005,
+      "ml_per_day": 2000,
+      "description": "Percentage of daily water intake (2L)",
+      "icon": "🚰",
+      "calculation": "(ml / 2000) * 100"
+    },
+    "olympic_pool": {
+      "name": "Olympic swimming pool",
+      "unit": "percentage",
+      "factor": 4e-7,
+      "ml_per_pool": 2500000000,
+      "description": "Percentage of Olympic pool (2.5M liters)",
+      "icon": "🏊",
+      "calculation": "(ml / 2500000000) * 100"
+    }
+  },
+  "carbon_conversions": {
+    "car_meters": {
+      "name": "Car distance",
+      "unit": "meters",
+      "factor": 5,
+      "gco2e_per_km": 200,
+      "description": "Distance driven by average car",
+      "icon": "🚗",
+      "calculation": "(gco2e / 200) * 1000"
+    },
+    "car_kilometers": {
+      "name": "Car distance",
+      "unit": "kilometers",
+      "factor": 0.005,
+      "gco2e_per_km": 200,
+      "description": "Kilometers driven by average car",
+      "icon": "🚗",
+      "calculation": "gco2e / 200"
+    },
+    "tree_absorption_daily": {
+      "name": "Tree CO2 absorption",
+      "unit": "trees (daily)",
+      "factor": 0.0208,
+      "gco2e_per_tree_day": 48,
+      "description": "Trees needed for one day to offset",
+      "icon": "🌳",
+      "calculation": "gco2e / 48"
+    },
+    "forest_area": {
+      "name": "Forest area needed",
+      "unit": "square meters (yearly)",
+      "factor": 0.1,
+      "gco2e_per_sqm_year": 10,
+      "description": "Forest area to offset annually",
+      "icon": "🌲",
+      "calculation": "gco2e / 10"
+    },
+    "transatlantic_flight": {
+      "name": "Transatlantic flight",
+      "unit": "percentage",
+      "factor": 1.4e-6,
+      "gco2e_per_flight": 700000,
+      "description": "Percentage of Boston-London flight",
+      "icon": "✈️",
+      "calculation": "(gco2e / 700000) * 100"
+    }
+  },
+  "scale_examples": {
+    "daily_usage_8_queries": {
+      "name": "Daily ChatGPT usage (8 queries)",
+      "energy_wh": 3.73,
+      "water_ml": 13.2,
+      "carbon_gco2e": 1.32,
+      "equivalent": "2 smartphone charges"
+    },
+    "gpt4o_annual_700m_daily": {
+      "name": "GPT-4o annual (700M queries/day)",
+      "energy_mwh_min": 391509,
+      "energy_mwh_max": 463269,
+      "water_kl_min": 1334991,
+      "water_kl_max": 1579680,
+      "carbon_tons_min": 138125,
+      "carbon_tons_max": 163441,
+      "equivalents": {
+        "energy": "35,000 U.S. homes",
+        "water": "1.2 million people's annual drinking needs",
+        "carbon": "30,000 cars OR Chicago-sized forest to offset"
+      }
+    }
+  },
+  "units": {
+    "energy": {
+      "base": "Wh",
+      "display": ["Wh", "kWh", "MWh"],
+      "conversions": {
+        "Wh_to_kWh": 0.001,
+        "Wh_to_MWh": 0.000001,
+        "kWh_to_Wh": 1000,
+        "MWh_to_Wh": 1000000
+      }
+    },
+    "water": {
+      "base": "mL",
+      "display": ["mL", "L", "kL"],
+      "conversions": {
+        "mL_to_L": 0.001,
+        "mL_to_kL": 0.000001,
+        "L_to_mL": 1000,
+        "kL_to_mL": 1000000
+      }
+    },
+    "carbon": {
+      "base": "gCO2e",
+      "display": ["gCO2e", "kgCO2e", "tCO2e"],
+      "conversions": {
+        "gCO2e_to_kgCO2e": 0.001,
+        "gCO2e_to_tCO2e": 0.000001,
+        "kgCO2e_to_gCO2e": 1000,
+        "tCO2e_to_gCO2e": 1000000
+      }
+    }
+  }
+}

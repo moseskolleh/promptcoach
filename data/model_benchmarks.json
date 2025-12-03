@@ -1,0 +1,263 @@
+{
+  "models": [
+    {
+      "model_id": "gpt-4o",
+      "name": "GPT-4o (Mar '25)",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-05",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.421,
+          "energy_wh_std": 0.127,
+          "latency_p50": 0.35,
+          "tps_p50": 150
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 1.214,
+          "energy_wh_std": 0.391,
+          "latency_p50": 0.80,
+          "tps_p50": 120
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 1.788,
+          "energy_wh_std": 0.363,
+          "latency_p50": 1.20,
+          "tps_p50": 100
+        }
+      }
+    },
+    {
+      "model_id": "gpt-4o-mini",
+      "name": "GPT-4o mini",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "hardware": "DGX A100",
+      "launch_date": "2024-07",
+      "size_class": "Medium",
+      "gpu_count": 4,
+      "critical_power_kw": 6.50,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.421,
+          "energy_wh_std": 0.082,
+          "latency_p50": 0.40,
+          "tps_p50": 140
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 1.418,
+          "energy_wh_std": 0.332,
+          "latency_p50": 0.90,
+          "tps_p50": 110
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 2.106,
+          "energy_wh_std": 0.477,
+          "latency_p50": 1.35,
+          "tps_p50": 90
+        }
+      }
+    },
+    {
+      "model_id": "gpt-4.1-nano",
+      "name": "GPT-4.1 nano",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2025-04",
+      "size_class": "Small",
+      "gpu_count": 2,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.103,
+          "energy_wh_std": 0.037,
+          "latency_p50": 0.15,
+          "tps_p50": 200
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.271,
+          "energy_wh_std": 0.087,
+          "latency_p50": 0.30,
+          "tps_p50": 180
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.454,
+          "energy_wh_std": 0.208,
+          "latency_p50": 0.50,
+          "tps_p50": 160
+        }
+      }
+    },
+    {
+      "model_id": "claude-3.7-sonnet",
+      "name": "Claude-3.7 Sonnet",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2025-02",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.836,
+          "energy_wh_std": 0.102,
+          "latency_p50": 0.60,
+          "tps_p50": 130
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 2.781,
+          "energy_wh_std": 0.277,
+          "latency_p50": 1.50,
+          "tps_p50": 110
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 5.518,
+          "energy_wh_std": 0.751,
+          "latency_p50": 2.80,
+          "tps_p50": 95
+        }
+      }
+    },
+    {
+      "model_id": "deepseek-r1",
+      "name": "DeepSeek-R1",
+      "provider": "DeepSeek",
+      "host": "DeepSeek",
+      "hardware": "DGX H800",
+      "launch_date": "2025-01",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 23.815,
+          "energy_wh_std": 2.160,
+          "latency_p50": 5.50,
+          "tps_p50": 60
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 29.000,
+          "energy_wh_std": 3.069,
+          "latency_p50": 6.80,
+          "tps_p50": 55
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 33.634,
+          "energy_wh_std": 3.798,
+          "latency_p50": 8.00,
+          "tps_p50": 50
+        }
+      }
+    },
+    {
+      "model_id": "llama-3.3-70b",
+      "name": "LLaMA-3.3 70B",
+      "provider": "Meta",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-12",
+      "size_class": "Medium",
+      "gpu_count": 4,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.247,
+          "energy_wh_std": 0.032,
+          "latency_p50": 0.25,
+          "tps_p50": 170
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.857,
+          "energy_wh_std": 0.113,
+          "latency_p50": 0.70,
+          "tps_p50": 140
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 1.646,
+          "energy_wh_std": 0.220,
+          "latency_p50": 1.30,
+          "tps_p50": 120
+        }
+      }
+    },
+    {
+      "model_id": "llama-3.2-1b",
+      "name": "LLaMA-3.2 1B",
+      "provider": "Meta",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-09",
+      "size_class": "Nano",
+      "gpu_count": 1,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.070,
+          "energy_wh_std": 0.011,
+          "latency_p50": 0.08,
+          "tps_p50": 250
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.218,
+          "energy_wh_std": 0.035,
+          "latency_p50": 0.18,
+          "tps_p50": 220
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.342,
+          "energy_wh_std": 0.056,
+          "latency_p50": 0.30,
+          "tps_p50": 200
+        }
+      }
+    }
+  ]
+}
