@@ -28,6 +28,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ queriesAnalyzed: result.queriesAnalyzed || 0 });
     });
     return true; // Keep message channel open for async response
+  } else if (request.action === 'openPopup') {
+    // Open popup by opening extension in new way
+    // Store analysis for popup to access
+    if (request.analysis) {
+      chrome.storage.local.set({ currentAnalysis: request.analysis });
+    }
+    // Notify user to click extension icon
+    chrome.action.setBadgeText({ text: '!' });
+    chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+
+    // Clear badge after 5 seconds
+    setTimeout(() => {
+      chrome.action.setBadgeText({ text: '' });
+    }, 5000);
+
+    sendResponse({ success: true });
   }
 });
 
