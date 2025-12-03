@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoPrompt Coach - Test Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 800px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      color: #2e7d32;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+
+    .instructions {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      padding: 20px;
+      margin-bottom: 30px;
+      border-radius: 8px;
+    }
+
+    .instructions h2 {
+      color: #2e7d32;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+      color: #333;
+      line-height: 1.8;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    .test-area {
+      margin-bottom: 30px;
+    }
+
+    .test-area h3 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.3s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4caf50;
+    }
+
+    .examples {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .examples h3 {
+      color: #856404;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+
+    .example-prompt {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      border: 1px solid #e0e0e0;
+    }
+
+    .example-prompt:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .example-prompt strong {
+      display: block;
+      color: #2e7d32;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .example-prompt p {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .copy-btn {
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #388e3c;
+    }
+
+    .note {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌱 EcoPrompt Coach Test Page</h1>
+    <p class="subtitle">Test the automatic prompt analysis and optimization features</p>
+
+    <div class="instructions">
+      <h2>How to Test:</h2>
+      <ol>
+        <li>Make sure the EcoPrompt Coach extension is installed and enabled</li>
+        <li>Click on one of the example prompts below to copy it</li>
+        <li>Paste the text into the textarea below</li>
+        <li>Watch for the optimization tooltip to appear automatically</li>
+        <li>Review the token count, task type detection, and optimization tips</li>
+      </ol>
+    </div>
+
+    <div class="test-area">
+      <h3>Paste or Type Your Prompt Here:</h3>
+      <textarea id="prompt-input" placeholder="Paste a prompt here to see EcoPrompt Coach in action..."></textarea>
+    </div>
+
+    <div class="examples">
+      <h3>📝 Example Prompts to Test:</h3>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Image Generation (with polite words)</strong>
+        <p>Could you please generate an image of a sunset over mountains with warm colors? I would really appreciate it if you could make it look realistic. Thank you!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Text Summarization</strong>
+        <p>Please summarize the following article for me. I need a brief overview of the main points. Could you kindly provide this in bullet points? Thank you very much for your help!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Code Generation</strong>
+        <p>Can you please write a Python function that calculates the fibonacci sequence? I would appreciate if you could add comments. Thanks!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Question Answering</strong>
+        <p>Could you please explain to me what is quantum computing and how does it work? I would really appreciate a simple explanation. Thank you so much!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Translation</strong>
+        <p>Please could you translate this text to Spanish for me? I would be very grateful if you could help me with this. Thank you kindly!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+
+      <div class="example-prompt" onclick="copyToClipboard(this)">
+        <strong>Long Prompt (efficiency test)</strong>
+        <p>I would like to ask if you could please help me understand the complete history of artificial intelligence, including all the major developments, key figures, important papers, technological breakthroughs, and the evolution of different approaches from the 1950s to today. I would really appreciate it if you could be very thorough and detailed in your explanation. Please include examples and explain everything in simple terms. Thank you so much for your time and effort!</p>
+        <button class="copy-btn">Copy & Test</button>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>💡 What to Look For:</strong><br>
+      After pasting, the EcoPrompt Coach tooltip should appear showing:
+      <ul style="margin-left: 20px; margin-top: 10px;">
+        <li>Estimated token count</li>
+        <li>Detected task type (Image Generation, Summarization, etc.)</li>
+        <li>Polite words that can be removed</li>
+        <li>Task-specific optimization tips</li>
+        <li>Model recommendations</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    function copyToClipboard(element) {
+      const text = element.querySelector('p').textContent;
+
+      // Copy to clipboard
+      navigator.clipboard.writeText(text).then(() => {
+        // Paste into textarea
+        const textarea = document.getElementById('prompt-input');
+        textarea.value = text;
+        textarea.focus();
+
+        // Trigger paste event manually
+        const event = new Event('paste', { bubbles: true, cancelable: true });
+        textarea.dispatchEvent(event);
+
+        // Visual feedback
+        const btn = element.querySelector('.copy-btn');
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.style.background = '#2196f3';
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '#4caf50';
+        }, 2000);
+      });
+    }
+
+    // Also trigger analysis on direct paste
+    document.getElementById('prompt-input').addEventListener('paste', (e) => {
+      console.log('Paste detected in test page');
+    });
+  </script>
+</body>
+</html>
