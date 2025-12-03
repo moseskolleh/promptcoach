@@ -170,6 +170,15 @@ section {
   margin-right: 15px;
   min-width: 40px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.impact-card .icon-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .impact-card .details {
