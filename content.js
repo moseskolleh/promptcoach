@@ -164,12 +164,12 @@ function getOptimizationTips(text, taskType, politeWords, tokens) {
 
   // Tip 1: Remove polite words
   if (politeWords.totalTokensSaved > 0) {
-    const examples = politeWords.found.map(f => f.example).join('", "');
+    const examples = politeWords.found.slice(0, 2).map(f => f.example).join('", "');
     tips.push({
       type: 'polite_words',
       icon: 'Optimise Prompt.png',
       title: 'Remove Polite Phrases',
-      description: `Found polite phrases: "${examples}". AI doesn't need politeness!`,
+      description: `Found polite phrases like "${examples}". AI doesn't need politeness - removing them saves tokens!`,
       impact: `Save ~${politeWords.totalTokensSaved} tokens`,
       priority: 'high'
     });
@@ -180,19 +180,37 @@ function getOptimizationTips(text, taskType, politeWords, tokens) {
     tips.push({
       type: 'task_specific',
       icon: 'Optimise Prompt.png',
-      title: '⚠️ Image Generation Warning',
-      description: 'Image generation uses 3x more energy than text. Be specific to avoid regeneration.',
-      impact: 'Reduce energy waste',
+      title: '⚠️ High Energy Task Detected',
+      description: 'Image generation uses 3x more energy than text. Be specific with style, colors, and composition to avoid regeneration.',
+      impact: 'Reduce energy waste by 50-70%',
       priority: 'high'
     });
   } else if (taskType.type === 'AGENTIC_TASK') {
     tips.push({
       type: 'task_specific',
       icon: 'Optimise Prompt.png',
-      title: '⚠️ Agentic Task Warning',
-      description: 'Research/multi-step tasks use 2x more energy. Be clear to minimize iterations.',
-      impact: 'Reduce energy overhead',
+      title: '⚠️ Multi-Step Task Warning',
+      description: 'Research/multi-step tasks use 2x more energy due to multiple model calls. Be specific and clear to minimize iterations.',
+      impact: 'Reduce energy overhead by 40-50%',
       priority: 'high'
+    });
+  } else if (taskType.type === 'CODE_GENERATION') {
+    tips.push({
+      type: 'task_specific',
+      icon: 'Optimise Prompt.png',
+      title: 'Code Generation Tip',
+      description: 'Include language, libraries, and input/output examples for better results on first try.',
+      impact: 'Get working code faster',
+      priority: 'medium'
+    });
+  } else if (taskType.type === 'CREATIVE_WRITING') {
+    tips.push({
+      type: 'task_specific',
+      icon: 'Optimise Prompt.png',
+      title: 'Creative Writing Tip',
+      description: 'Creative tasks typically generate longer outputs (2x tokens). Consider if you need the full response.',
+      impact: 'Reduce output length',
+      priority: 'medium'
     });
   }
 
@@ -202,33 +220,44 @@ function getOptimizationTips(text, taskType, politeWords, tokens) {
       type: 'length',
       icon: 'Optimise Prompt.png',
       title: 'Consider Shorter Prompt',
-      description: 'Long prompts can be less effective. Focus on key requirements.',
+      description: 'Long prompts (>500 tokens) can be less effective and use more energy. Focus on key requirements only.',
       impact: `Target: ~${Math.floor(tokens * 0.7)} tokens`,
       priority: 'medium'
     });
   }
 
-  // Tip 4: Model alternatives
+  // Tip 4: Model alternatives (ALWAYS include this)
   tips.push({
     type: 'model',
     icon: 'Alternative Available.png',
-    title: 'Use Efficient Models',
+    title: '🔄 Use More Efficient Models',
     description: getModelRecommendation(taskType.type),
     impact: 'Save 50-70% energy',
-    priority: 'medium'
+    priority: 'high'
   });
 
-  return tips;
+  // Always return at least the model alternative tip
+  return tips.length > 0 ? tips : [{
+    type: 'general',
+    icon: 'Optimise Prompt.png',
+    title: 'Prompt Looks Good!',
+    description: 'Your prompt is well-optimized. Consider using efficient models to save energy.',
+    impact: 'Try GPT-4o mini or Gemini Flash',
+    priority: 'medium'
+  }];
 }
 
 function getModelRecommendation(taskType) {
   const recommendations = {
-    IMAGE_GENERATION: 'Use specialized image models (DALL-E, Stable Diffusion) instead of general LLMs',
-    TEXT_SUMMARIZATION: 'Try GPT-4o mini or Gemini Flash - they handle summaries efficiently',
-    CODE_GENERATION: 'Claude 3.7 Sonnet or GPT-4o work well, but LLaMA 3.3 70B is more efficient',
-    TRANSLATION: 'Use efficient models like GPT-4o mini - most models handle translation well',
-    AGENTIC_TASK: 'Avoid if possible - manual research is more energy-efficient',
-    GENERAL: 'Try smaller models first: GPT-4o mini, Gemini Flash, or LLaMA 3.2'
+    IMAGE_GENERATION: 'Alternative: Use DALL-E 3, Midjourney, or Stable Diffusion instead of general LLMs - they\'re optimized for images',
+    TEXT_SUMMARIZATION: 'Alternative: Try GPT-4o mini (70% less energy) or Gemini Flash - both handle summaries efficiently',
+    CODE_GENERATION: 'Alternative: Claude 3.7 Sonnet or GPT-4o work well, but LLaMA 3.3 70B uses 60% less energy',
+    TRANSLATION: 'Alternative: Use GPT-4o mini or Gemini Flash (70% savings) - most efficient models handle translation well',
+    AGENTIC_TASK: 'Alternative: Manual research is more energy-efficient. If automation needed, use GPT-4o mini for simple research tasks',
+    CREATIVE_WRITING: 'Alternative: For drafts, try GPT-4o mini first (70% savings), then refine with larger models only if needed',
+    DATA_ANALYSIS: 'Alternative: Use Claude 3.7 Sonnet or GPT-4o for complex analysis, LLaMA 3.3 for simpler tasks',
+    QUESTION_ANSWERING: 'Alternative: Try GPT-4o mini, Gemini Flash, or LLaMA 3.2 first (70% savings) - they handle most Q&A well',
+    GENERAL: 'Alternative: Start with smaller models: GPT-4o mini, Gemini Flash, or LLaMA 3.2 (70% less energy). Upgrade only if needed.'
   };
 
   return recommendations[taskType] || recommendations.GENERAL;
@@ -326,7 +355,7 @@ function showNotificationBanner(analysis) {
     right: 0;
     background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
     color: white;
-    padding: 12px 20px;
+    padding: 16px 20px;
     z-index: 1000000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -337,19 +366,25 @@ function showNotificationBanner(analysis) {
   `;
 
   const topTip = analysis.tips[0];
+  const tipsCount = analysis.tips.length;
+
   banner.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
       <span style="font-size: 24px;">🌱</span>
-      <div>
-        <div style="font-weight: 600; font-size: 14px;">${topTip.title}</div>
-        <div style="font-size: 12px; opacity: 0.95;">${topTip.description}</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${topTip.title}</div>
+        <div style="font-size: 13px; opacity: 0.95;">${topTip.description}</div>
+        <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">💚 ${topTip.impact}</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-      <button class="ecoprompt-banner-btn" style="background: white; color: #4caf50; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 13px;">
+      <div style="background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+        ${tipsCount} tip${tipsCount > 1 ? 's' : ''} available
+      </div>
+      <button class="ecoprompt-banner-btn" style="background: white; color: #4caf50; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
         View All Tips
       </button>
-      <button class="ecoprompt-banner-close" style="background: transparent; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">
+      <button class="ecoprompt-banner-close" style="background: transparent; border: none; color: white; font-size: 28px; cursor: pointer; padding: 0; width: 35px; height: 35px; line-height: 1;">
         ×
       </button>
     </div>
@@ -367,6 +402,10 @@ function showNotificationBanner(analysis) {
         transform: translateY(0);
         opacity: 1;
       }
+    }
+    .ecoprompt-banner-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
     }
   `;
   document.head.appendChild(style);
@@ -386,13 +425,7 @@ function showNotificationBanner(analysis) {
   document.body.appendChild(banner);
   bannerShown = true;
 
-  // Auto-hide after 10 seconds
-  setTimeout(() => {
-    if (banner.parentNode) {
-      banner.style.animation = 'slideDown 0.3s ease reverse';
-      setTimeout(() => banner.remove(), 300);
-    }
-  }, 10000);
+  // Don't auto-hide - let user close it manually
 }
 
 // Create tooltip HTML
@@ -457,28 +490,24 @@ function createTooltip(analysis, element) {
   // Tips
   const tipsContainer = document.createElement('div');
   tipsContainer.className = 'ecoprompt-tips';
-  tipsContainer.innerHTML = '<div class="ecoprompt-tips-title">💡 Optimization Tips</div>';
+  tipsContainer.innerHTML = '<div class="ecoprompt-tips-title">💡 Optimization Tips & Alternatives</div>';
 
-  if (analysis.tips.length > 0) {
-    analysis.tips.slice(0, 3).forEach(tip => {
-      const tipElement = document.createElement('div');
-      tipElement.className = `ecoprompt-tip priority-${tip.priority}`;
+  analysis.tips.slice(0, 4).forEach(tip => {
+    const tipElement = document.createElement('div');
+    tipElement.className = `ecoprompt-tip priority-${tip.priority}`;
 
-      const iconUrl = chrome.runtime.getURL(`assets/${tip.icon}`);
+    const iconUrl = chrome.runtime.getURL(`assets/${tip.icon}`);
 
-      tipElement.innerHTML = `
-        <img src="${iconUrl}" alt="${tip.title}" class="ecoprompt-tip-icon" onerror="this.style.display='none'" />
-        <div class="ecoprompt-tip-content">
-          <h4 class="ecoprompt-tip-title">${tip.title}</h4>
-          <p class="ecoprompt-tip-description">${tip.description}</p>
-          <p class="ecoprompt-tip-impact">💚 ${tip.impact}</p>
-        </div>
-      `;
-      tipsContainer.appendChild(tipElement);
-    });
-  } else {
-    tipsContainer.innerHTML += '<div class="ecoprompt-no-tips">Your prompt looks good! ✓</div>';
-  }
+    tipElement.innerHTML = `
+      <img src="${iconUrl}" alt="${tip.title}" class="ecoprompt-tip-icon" onerror="this.style.display='none'" />
+      <div class="ecoprompt-tip-content">
+        <h4 class="ecoprompt-tip-title">${tip.title}</h4>
+        <p class="ecoprompt-tip-description">${tip.description}</p>
+        <p class="ecoprompt-tip-impact">💚 ${tip.impact}</p>
+      </div>
+    `;
+    tipsContainer.appendChild(tipElement);
+  });
 
   tooltip.appendChild(tipsContainer);
 
@@ -547,12 +576,8 @@ function showTooltip(analysis, element) {
   currentTooltip = tooltip;
   lastAnalyzedElement = element;
 
-  // Auto-hide after 20 seconds
-  setTimeout(() => {
-    if (currentTooltip === tooltip) {
-      removeTooltip();
-    }
-  }, 20000);
+  // Don't auto-hide - let user close it manually
+  // User can close by clicking X or clicking outside
 }
 
 // Remove tooltip
@@ -585,8 +610,10 @@ function handlePaste(event) {
     }
 
     const analysis = analyzePrompt(text);
-    if (analysis && analysis.tips.length > 0) {
+    if (analysis) {
       currentAnalysis = analysis;
+
+      // Always show tips even if minimal
       showTooltip(analysis, element);
       createFloatingBadge();
 
@@ -608,8 +635,10 @@ function handleInput(event) {
     clearTimeout(element._ecopromptTimeout);
     element._ecopromptTimeout = setTimeout(() => {
       const analysis = analyzePrompt(text);
-      if (analysis && analysis.tips.length > 0) {
+      if (analysis) {
         currentAnalysis = analysis;
+
+        // Always show tips
         showTooltip(analysis, element);
         createFloatingBadge();
 
