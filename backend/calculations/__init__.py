@@ -210,7 +210,7 @@ class EcoImpactCalculator:
 
         # Suggestion 1: Model selection
         # Compare with more efficient models in same size class or smaller
-        all_models = ["gpt-4.1-nano", "llama-3.2-1b", "gpt-4o-mini", "gpt-4o", "claude-3.7-sonnet"]
+        all_models = ["gpt-4.1-nano", "llama-3.2-1b", "gemini-2.0-flash", "gemini-1.5-flash", "gpt-4o-mini", "gpt-4o", "gemini-1.5-pro", "claude-3.7-sonnet"]
         comparison = self.compare_models_complete(all_models, input_tokens, output_tokens)
 
         if comparison["recommendation"] != model_id:

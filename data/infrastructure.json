@@ -26,6 +26,15 @@
       "cif_kgco2e_per_kwh": 0.6,
       "notes": "Chinese data center averages",
       "source": "China Communications Enterprise Association, 2024"
+    },
+    "google_cloud": {
+      "name": "Google Cloud Platform",
+      "pue": 1.10,
+      "wue_onsite_l_per_kwh": 0.25,
+      "wue_offsite_l_per_kwh": 3.142,
+      "cif_kgco2e_per_kwh": 0.32,
+      "notes": "Used by Google Gemini models. Google has the lowest PUE in the industry.",
+      "source": "Google Environmental Report 2024"
     }
   },
   "hardware_specs": {
@@ -52,6 +61,14 @@
       "gpu_model": "H800",
       "gpu_power_w": 700,
       "notes": "Export-compliant version for China"
+    },
+    "google_tpu_v5": {
+      "name": "Google TPU v5",
+      "critical_power_kw": 8.50,
+      "tpu_count_per_pod": 8,
+      "tpu_model": "TPU v5",
+      "tpu_power_w": 450,
+      "notes": "Google's latest Tensor Processing Unit for Gemini models"
     }
   },
   "size_classes": {
