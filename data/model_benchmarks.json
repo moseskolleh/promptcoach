@@ -258,6 +258,117 @@
           "tps_p50": 200
         }
       }
+    },
+    {
+      "model_id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "hardware": "TPU v5",
+      "launch_date": "2024-12",
+      "size_class": "Small",
+      "gpu_count": 2,
+      "critical_power_kw": 8.50,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.095,
+          "energy_wh_std": 0.018,
+          "latency_p50": 0.12,
+          "tps_p50": 180
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.285,
+          "energy_wh_std": 0.048,
+          "latency_p50": 0.35,
+          "tps_p50": 160
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.520,
+          "energy_wh_std": 0.092,
+          "latency_p50": 0.65,
+          "tps_p50": 145
+        }
+      }
+    },
+    {
+      "model_id": "gemini-1.5-flash",
+      "name": "Gemini 1.5 Flash",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "hardware": "TPU v5",
+      "launch_date": "2024-05",
+      "size_class": "Small",
+      "gpu_count": 2,
+      "critical_power_kw": 8.50,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.115,
+          "energy_wh_std": 0.022,
+          "latency_p50": 0.16,
+          "tps_p50": 165
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.340,
+          "energy_wh_std": 0.058,
+          "latency_p50": 0.45,
+          "tps_p50": 145
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.625,
+          "energy_wh_std": 0.108,
+          "latency_p50": 0.80,
+          "tps_p50": 130
+        }
+      }
+    },
+    {
+      "model_id": "gemini-1.5-pro",
+      "name": "Gemini 1.5 Pro",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "hardware": "TPU v5",
+      "launch_date": "2024-02",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 8.50,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.580,
+          "energy_wh_std": 0.095,
+          "latency_p50": 0.48,
+          "tps_p50": 135
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 1.850,
+          "energy_wh_std": 0.285,
+          "latency_p50": 1.20,
+          "tps_p50": 115
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 3.420,
+          "energy_wh_std": 0.548,
+          "latency_p50": 2.10,
+          "tps_p50": 100
+        }
+      }
     }
   ]
 }

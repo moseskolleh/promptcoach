@@ -75,6 +75,14 @@ promptcoach/
 │   ├── infrastructure.json           # PUE, WUE, CIF multipliers
 │   └── conversion_factors.json       # Relatable conversion data
 ├── assets/                   # Icons, logos, branding
+│   ├── Energy Consumptions.png
+│   ├── Water Consumption.png
+│   ├── Carbon Emissions.png
+│   ├── Optimise Prompt.png
+│   ├── Alternative Available.png
+│   ├── Save to Library.png
+│   ├── Prompt Library.png
+│   └── ICON_MAPPING.md      # Icon usage documentation
 ├── docs/                     # Additional documentation
 └── Context/                  # Research papers and feedback
     ├── How Hungry is AI.pdf
@@ -122,6 +130,7 @@ Where:
 
 | Provider | PUE | WUE (on-site) | CIF |
 |----------|-----|---------------|-----|
+| **Google Cloud** (Gemini) | 1.10 | 0.25 L/kWh | 0.32 kgCO2e/kWh |
 | **Microsoft Azure** (OpenAI) | 1.12 | 0.30 L/kWh | 0.3528 kgCO2e/kWh |
 | **AWS** (Anthropic/Meta) | 1.14 | 0.18 L/kWh | 0.385 kgCO2e/kWh |
 | **DeepSeek** (China) | 1.27 | 1.20 L/kWh | 0.6 kgCO2e/kWh |
@@ -202,9 +211,10 @@ for suggestion in suggestions["suggestions"]:
 
 ## 📈 Supported Models
 
-Currently supports 7 models with benchmarks from the research paper:
+Currently supports 10 models with benchmarks:
 
 - **OpenAI**: GPT-4o, GPT-4o mini, GPT-4.1 nano
+- **Google**: Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro
 - **Anthropic**: Claude-3.7 Sonnet
 - **Meta**: LLaMA-3.3 70B, LLaMA-3.2 1B
 - **DeepSeek**: DeepSeek-R1
@@ -212,11 +222,14 @@ Currently supports 7 models with benchmarks from the research paper:
 ### Model Eco-Efficiency Ranking (Short Queries)
 
 1. 🥇 **LLaMA-3.2 1B** - 0.070 Wh
-2. 🥈 **GPT-4.1 nano** - 0.103 Wh
-3. 🥉 **LLaMA-3.3 70B** - 0.247 Wh
-4. **GPT-4o / GPT-4o mini** - 0.421 Wh
-5. **Claude-3.7 Sonnet** - 0.836 Wh
-6. **DeepSeek-R1** - 23.815 Wh (70x worse than best!)
+2. 🥈 **Gemini 2.0 Flash** - 0.095 Wh
+3. 🥉 **GPT-4.1 nano** - 0.103 Wh
+4. **Gemini 1.5 Flash** - 0.115 Wh
+5. **LLaMA-3.3 70B** - 0.247 Wh
+6. **GPT-4o / GPT-4o mini** - 0.421 Wh
+7. **Gemini 1.5 Pro** - 0.580 Wh
+8. **Claude-3.7 Sonnet** - 0.836 Wh
+9. **DeepSeek-R1** - 23.815 Wh (240x worse than best!)
 
 ---
 
