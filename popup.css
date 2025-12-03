@@ -87,34 +87,51 @@ section {
   margin-bottom: 20px;
 }
 
-/* Model Selection */
-.model-section label {
+/* Impact Prompt Section */
+.impact-prompt-section label {
   display: block;
   font-weight: 600;
   margin-bottom: 8px;
   color: #2e7d32;
 }
 
-#model-select {
+#impact-prompt-input {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 2px solid #a5d6a7;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
-  cursor: pointer;
+  font-family: inherit;
+  resize: vertical;
   transition: border-color 0.3s;
+  margin-bottom: 10px;
 }
 
-#model-select:focus {
+#impact-prompt-input:focus {
   outline: none;
   border-color: #4caf50;
 }
 
-/* Token Input */
-.token-section {
+.impact-info {
   display: flex;
-  gap: 15px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f1f8e9;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #2e7d32;
+  margin-bottom: 10px;
+}
+
+.impact-info span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.impact-info strong {
+  color: #1b5e20;
 }
 
 .input-group {

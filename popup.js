@@ -111,7 +111,7 @@ function interpolateEnergy(model, inputTokens, outputTokens) {
   return model[category].energy;
 }
 
-// Calculate environmental impact
+// Calculate environmental impact for a single model
 function calculateImpact(modelId, inputTokens, outputTokens) {
   const model = MODEL_DATA[modelId];
   if (!model) throw new Error('Model not found');
@@ -134,6 +134,52 @@ function calculateImpact(modelId, inputTokens, outputTokens) {
     carbon: carbonGco2e,
     model: model.name,
     provider: model.provider
+  };
+}
+
+// Calculate average impact across all models, weighted by task type
+function calculateAverageImpact(promptText) {
+  if (!promptText || promptText.trim().length === 0) {
+    return null;
+  }
+
+  // Estimate tokens and detect task type
+  const baseInputTokens = estimateTokens(promptText);
+  const taskType = detectTaskType(promptText);
+
+  // Apply task-specific multipliers
+  const inputTokens = Math.round(baseInputTokens * taskType.inputMultiplier);
+
+  // Estimate output tokens based on task type (using a baseline of 300 tokens)
+  const baseOutputTokens = 300;
+  const outputTokens = Math.round(baseOutputTokens * taskType.outputMultiplier);
+
+  // Calculate impact for all models
+  const impacts = [];
+  for (const modelId of Object.keys(MODEL_DATA)) {
+    const impact = calculateImpact(modelId, inputTokens, outputTokens);
+    impacts.push(impact);
+  }
+
+  // Calculate averages
+  const avgEnergy = impacts.reduce((sum, i) => sum + i.energy, 0) / impacts.length;
+  const avgWater = impacts.reduce((sum, i) => sum + i.water, 0) / impacts.length;
+  const avgCarbon = impacts.reduce((sum, i) => sum + i.carbon, 0) / impacts.length;
+
+  // Apply task-specific energy multiplier
+  const finalEnergy = avgEnergy * taskType.energyMultiplier;
+  const finalWater = avgWater * taskType.energyMultiplier;
+  const finalCarbon = avgCarbon * taskType.energyMultiplier;
+
+  return {
+    energy: finalEnergy,
+    water: finalWater,
+    carbon: finalCarbon,
+    inputTokens: inputTokens,
+    outputTokens: outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    taskType: taskType.displayName,
+    taskMultiplier: taskType.energyMultiplier
   };
 }
 
@@ -324,27 +370,70 @@ const POLITE_PHRASES = [
   { pattern: /\bsorry\b/gi, word: 'sorry', tokens: 1 },
 ];
 
-// Task type detection
+// Task type detection with token multipliers
 const TASK_TYPES = {
-  TEXT_SUMMARIZATION: {
-    keywords: ['summarize', 'summary', 'tldr', 'brief overview', 'key points'],
-    weight: 0.5
+  IMAGE_GENERATION: {
+    keywords: ['generate image', 'create image', 'draw', 'illustrate', 'picture of', 'photo of', 'dall-e', 'midjourney', 'stable diffusion'],
+    inputMultiplier: 1.2,   // Image prompts use more input tokens
+    outputMultiplier: 0.3,  // But produce minimal text output
+    energyMultiplier: 3.0,  // Image generation is much more energy intensive
+    displayName: 'Image Generation'
+  },
+  AGENTIC_TASK: {
+    keywords: ['research', 'analyze multiple', 'compare sources', 'investigate', 'browse', 'search for', 'find information', 'autonomous', 'agent'],
+    inputMultiplier: 1.5,   // Agentic tasks have complex prompts
+    outputMultiplier: 2.5,  // And generate extensive outputs
+    energyMultiplier: 2.0,  // Multiple model calls
+    displayName: 'Agentic/Research Task'
   },
   CODE_GENERATION: {
-    keywords: ['write code', 'create function', 'implement', 'debug'],
-    weight: 1.2
-  },
-  QUESTION_ANSWERING: {
-    keywords: ['what is', 'how to', 'why', 'explain', 'tell me about'],
-    weight: 0.7
+    keywords: ['write code', 'create function', 'implement', 'debug', 'program', 'script', 'algorithm'],
+    inputMultiplier: 1.0,
+    outputMultiplier: 1.5,  // Code outputs can be lengthy
+    energyMultiplier: 1.2,
+    displayName: 'Code Generation'
   },
   CREATIVE_WRITING: {
-    keywords: ['write story', 'poem', 'essay', 'article', 'creative'],
-    weight: 1.5
+    keywords: ['write story', 'poem', 'essay', 'article', 'creative', 'blog post', 'narrative'],
+    inputMultiplier: 1.0,
+    outputMultiplier: 2.0,  // Creative content is typically long
+    energyMultiplier: 1.3,
+    displayName: 'Creative Writing'
+  },
+  DATA_ANALYSIS: {
+    keywords: ['analyze data', 'analyze this', 'examine', 'interpret', 'statistics', 'trends', 'insights'],
+    inputMultiplier: 1.3,   // May include data in prompt
+    outputMultiplier: 1.5,
+    energyMultiplier: 1.4,
+    displayName: 'Data Analysis'
+  },
+  TEXT_SUMMARIZATION: {
+    keywords: ['summarize', 'summary', 'tldr', 'brief overview', 'key points', 'condense'],
+    inputMultiplier: 1.2,   // Often includes full text to summarize
+    outputMultiplier: 0.4,  // Output is short
+    energyMultiplier: 0.7,
+    displayName: 'Summarization'
   },
   TRANSLATION: {
-    keywords: ['translate', 'translation', 'in spanish', 'in french'],
-    weight: 0.6
+    keywords: ['translate', 'translation', 'in spanish', 'in french', 'in german', 'to english'],
+    inputMultiplier: 1.0,
+    outputMultiplier: 1.0,
+    energyMultiplier: 0.6,
+    displayName: 'Translation'
+  },
+  QUESTION_ANSWERING: {
+    keywords: ['what is', 'how to', 'why', 'when', 'where', 'who', 'explain', 'tell me about', 'describe'],
+    inputMultiplier: 0.8,
+    outputMultiplier: 1.0,
+    energyMultiplier: 0.8,
+    displayName: 'Q&A'
+  },
+  GENERAL: {
+    keywords: [],
+    inputMultiplier: 1.0,
+    outputMultiplier: 1.0,
+    energyMultiplier: 1.0,
+    displayName: 'General'
   }
 };
 
@@ -354,6 +443,8 @@ function detectTaskType(text) {
   let maxScore = 0;
 
   for (const [type, config] of Object.entries(TASK_TYPES)) {
+    if (config.keywords.length === 0) continue; // Skip GENERAL
+
     let score = 0;
     for (const keyword of config.keywords) {
       if (lowerText.includes(keyword)) {
@@ -366,10 +457,14 @@ function detectTaskType(text) {
     }
   }
 
+  const taskConfig = TASK_TYPES[detectedType];
   return {
     type: detectedType,
+    displayName: taskConfig.displayName,
     confidence: maxScore,
-    weight: TASK_TYPES[detectedType]?.weight || 1.0
+    inputMultiplier: taskConfig.inputMultiplier,
+    outputMultiplier: taskConfig.outputMultiplier,
+    energyMultiplier: taskConfig.energyMultiplier
   };
 }
 
@@ -407,6 +502,33 @@ function getOptimizationTips(politeWords, taskType, tokens) {
     });
   }
 
+  // Task-specific optimization tips
+  if (taskType.type === 'IMAGE_GENERATION') {
+    tips.push({
+      type: 'task_specific',
+      title: 'Image Generation Optimization',
+      description: 'Image generation uses 3x more energy. Be specific with style, colors, and composition to avoid regeneration.',
+      impact: 'Reduce energy usage significantly',
+      priority: 'high'
+    });
+  } else if (taskType.type === 'AGENTIC_TASK') {
+    tips.push({
+      type: 'task_specific',
+      title: 'Agentic Task Warning',
+      description: 'Research/agentic tasks use 2x more energy due to multiple model calls. Be specific to minimize iterations.',
+      impact: 'Reduce multi-call overhead',
+      priority: 'high'
+    });
+  } else if (taskType.type === 'QUESTION_ANSWERING' && tokens > 200) {
+    tips.push({
+      type: 'task_specific',
+      title: 'Simplify Question',
+      description: 'Simple questions work better when kept concise and direct.',
+      impact: 'Faster response',
+      priority: 'high'
+    });
+  }
+
   if (tokens > 500) {
     tips.push({
       type: 'length',
@@ -414,16 +536,6 @@ function getOptimizationTips(politeWords, taskType, tokens) {
       description: 'Long prompts can be less effective. Focus on key requirements.',
       impact: `Target: ~${Math.floor(tokens * 0.7)} tokens`,
       priority: 'medium'
-    });
-  }
-
-  if (taskType.type === 'QUESTION_ANSWERING' && tokens > 200) {
-    tips.push({
-      type: 'task_specific',
-      title: 'Simplify Question',
-      description: 'Simple questions work better when kept concise and direct.',
-      impact: 'Faster response',
-      priority: 'high'
     });
   }
 
@@ -441,7 +553,8 @@ function analyzePrompt(text) {
   return {
     originalText: text,
     tokens: tokens,
-    taskType: taskType.type,
+    taskType: taskType.displayName,
+    taskTypeRaw: taskType.type,
     politeWords: politeWords,
     tips: tips,
     optimizedTokenEstimate: tokens - politeWords.totalTokensSaved
@@ -632,27 +745,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Impact Calculator
   const calculateBtn = document.getElementById('calculate-btn');
-  const modelSelect = document.getElementById('model-select');
-  const inputTokens = document.getElementById('input-tokens');
-  const outputTokens = document.getElementById('output-tokens');
+  const impactPromptInput = document.getElementById('impact-prompt-input');
+  const impactTaskType = document.getElementById('impact-task-type');
+  const impactTokenCount = document.getElementById('impact-token-count');
+
+  // Real-time token counting and task detection for Impact tab
+  impactPromptInput.addEventListener('input', () => {
+    const text = impactPromptInput.value;
+    if (text.trim()) {
+      const tokens = estimateTokens(text);
+      const taskType = detectTaskType(text);
+      impactTokenCount.textContent = tokens;
+      impactTaskType.textContent = taskType.displayName;
+    } else {
+      impactTokenCount.textContent = '0';
+      impactTaskType.textContent = '-';
+    }
+  });
 
   calculateBtn.addEventListener('click', () => {
     try {
-      const modelId = modelSelect.value;
-      const input = parseInt(inputTokens.value);
-      const output = parseInt(outputTokens.value);
+      const promptText = impactPromptInput.value.trim();
 
-      if (input < 1 || output < 1) {
-        alert('Please enter valid token counts');
+      if (!promptText) {
+        alert('Please enter a prompt to analyze');
         return;
       }
 
-      const impact = calculateImpact(modelId, input, output);
-      const comparisons = getComparisons(impact);
-      const ecoScore = calculateEcoScore(modelId, input, output);
-      const suggestions = getOptimizationSuggestions(modelId, input, output);
+      const impact = calculateAverageImpact(promptText);
+      if (!impact) {
+        alert('Unable to calculate impact. Please enter a valid prompt.');
+        return;
+      }
 
-      displayResults(impact, comparisons, ecoScore, suggestions);
+      const comparisons = getComparisons(impact);
+
+      // Calculate eco score based on average (using a representative model)
+      const ecoScore = Math.round(100 - ((impact.energy - 0.070) / (33.634 - 0.070)) * 100);
+      const finalScore = Math.max(0, Math.min(100, ecoScore));
+
+      // Get suggestions (simplified without specific model)
+      const suggestions = [
+        {
+          title: 'Use Efficient Models',
+          description: 'Choose lightweight models like GPT-4o mini, Gemini Flash, or LLaMA for simple tasks',
+          savings: '70'
+        },
+        {
+          title: `Optimize for ${impact.taskType}`,
+          description: `This task type has a ${impact.taskMultiplier}x energy multiplier`,
+          savings: Math.round((1 - 1/impact.taskMultiplier) * 100)
+        },
+        {
+          title: 'Reduce Token Usage',
+          description: 'Remove unnecessary words and use concise prompts',
+          savings: '30'
+        }
+      ];
+
+      displayResults(impact, comparisons, finalScore, suggestions);
     } catch (error) {
       console.error('Calculation error:', error);
       alert('Error calculating impact. Please try again.');
@@ -734,6 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
       optimizedCard.dataset.optimizedPrompt = optimized;
       optimizedCard.dataset.tokens = analysis.optimizedTokenEstimate;
       optimizedCard.dataset.taskType = analysis.taskType;
+      optimizedCard.dataset.taskTypeRaw = analysis.taskTypeRaw;
     } else {
       optimizedCard.classList.add('hidden');
     }
@@ -764,8 +916,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = prompt('Enter prompt to save:');
     if (text && text.trim()) {
       const tokens = estimateTokens(text);
-      const taskType = detectTaskType(text).type;
-      promptLibrary.save({ text: text.trim(), tokens, taskType }).then(() => {
+      const taskTypeInfo = detectTaskType(text);
+      promptLibrary.save({ text: text.trim(), tokens, taskType: taskTypeInfo.displayName }).then(() => {
         renderLibrary();
         showNotification('Prompt added!');
       });
