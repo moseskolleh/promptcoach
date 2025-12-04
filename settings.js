@@ -8,10 +8,48 @@ const DEFAULT_SETTINGS = {
   showBanner: true,
   showConfidence: true,
   liveCalculation: true,
-  trackHistory: false
+  trackHistory: false,
+  userRegion: 'default',
+  taskMultipliers: {
+    IMAGE_GENERATION: 3.0,
+    AGENTIC_TASK: 2.0,
+    CODE_GENERATION: 1.2,
+    CREATIVE_WRITING: 1.3,
+    DATA_ANALYSIS: 1.4,
+    TEXT_SUMMARIZATION: 0.7,
+    TRANSLATION: 0.6,
+    QUESTION_ANSWERING: 0.8,
+    GENERAL: 1.0
+  }
 };
 
-// Storage key
+const TASK_TYPE_INFO = {
+  IMAGE_GENERATION: { name: 'Image Generation', desc: 'DALL-E, Midjourney, etc.', high: true },
+  AGENTIC_TASK: { name: 'Agentic/Research', desc: 'Multi-step tasks, browsing', high: true },
+  CODE_GENERATION: { name: 'Code Generation', desc: 'Writing and debugging code', high: false },
+  CREATIVE_WRITING: { name: 'Creative Writing', desc: 'Stories, poems, essays', high: false },
+  DATA_ANALYSIS: { name: 'Data Analysis', desc: 'Statistics, trends', high: false },
+  TEXT_SUMMARIZATION: { name: 'Summarization', desc: 'Key points extraction', high: false },
+  TRANSLATION: { name: 'Translation', desc: 'Language translation', high: false },
+  QUESTION_ANSWERING: { name: 'Q&A', desc: 'Simple questions', high: false },
+  GENERAL: { name: 'General', desc: 'Default multiplier', high: false }
+};
+
+const REGIONS = {
+  'default': { name: 'Global Average', cif: 0.45 },
+  'us-west': { name: 'US West (California)', cif: 0.25 },
+  'us-east': { name: 'US East (Virginia)', cif: 0.35 },
+  'us-central': { name: 'US Central (Texas)', cif: 0.40 },
+  'europe-west': { name: 'Europe West (Netherlands)', cif: 0.30 },
+  'europe-north': { name: 'Europe North (Sweden)', cif: 0.05 },
+  'asia-east': { name: 'Asia East (Japan)', cif: 0.45 },
+  'asia-south': { name: 'Asia South (India)', cif: 0.70 },
+  'china': { name: 'China', cif: 0.60 },
+  'australia': { name: 'Australia', cif: 0.65 },
+  'brazil': { name: 'Brazil', cif: 0.10 }
+};
+
+// Storage keys
 const SETTINGS_KEY = 'ecoprompt_settings';
 const HISTORY_KEY = 'ecoprompt_history';
 
@@ -28,6 +66,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Populate model dropdown
   populateModelDropdown();
+
+  // Render task multipliers
+  renderMultipliers();
 
   // Load saved settings
   await loadSettings();
@@ -51,7 +92,8 @@ async function loadModelData() {
         name: model.name,
         provider: model.provider,
         sizeClass: model.size_class,
-        shortEnergy: model.performance.short.energy_wh_mean
+        shortEnergy: model.performance.short.energy_wh_mean,
+        dataSource: model.data_source || 'measured'
       };
     });
   } catch (error) {
@@ -85,11 +127,36 @@ function populateModelDropdown() {
     models.forEach(model => {
       const option = document.createElement('option');
       option.value = model.id;
-      option.textContent = `${model.name} (${model.sizeClass})`;
+      const sourceIndicator = model.dataSource === 'extrapolated' ? ' *' : '';
+      option.textContent = `${model.name} (${model.sizeClass})${sourceIndicator}`;
       optgroup.appendChild(option);
     });
 
     select.appendChild(optgroup);
+  }
+}
+
+function renderMultipliers() {
+  const container = document.getElementById('multipliers-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  for (const [type, info] of Object.entries(TASK_TYPE_INFO)) {
+    const defaultValue = DEFAULT_SETTINGS.taskMultipliers[type];
+    const div = document.createElement('div');
+    div.className = `multiplier-item ${info.high ? 'multiplier-high' : ''}`;
+    div.innerHTML = `
+      <div class="multiplier-info">
+        <div class="multiplier-name">${info.name}</div>
+        <div class="multiplier-desc">${info.desc}</div>
+      </div>
+      <input type="number" class="multiplier-input"
+             id="multiplier-${type}"
+             value="${defaultValue}"
+             min="0.1" max="10" step="0.1">
+    `;
+    container.appendChild(div);
   }
 }
 
@@ -100,7 +167,7 @@ function populateModelDropdown() {
 async function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get([SETTINGS_KEY], (result) => {
-      const settings = result[SETTINGS_KEY] || DEFAULT_SETTINGS;
+      const settings = { ...DEFAULT_SETTINGS, ...result[SETTINGS_KEY] };
 
       // Apply settings to UI
       document.getElementById('auto-detect-toggle').checked = settings.autoDetect;
@@ -110,6 +177,15 @@ async function loadSettings() {
       document.getElementById('show-confidence').checked = settings.showConfidence;
       document.getElementById('live-calculation').checked = settings.liveCalculation;
       document.getElementById('track-history').checked = settings.trackHistory;
+      document.getElementById('user-region').value = settings.userRegion || 'default';
+
+      // Apply multipliers
+      if (settings.taskMultipliers) {
+        for (const [type, value] of Object.entries(settings.taskMultipliers)) {
+          const input = document.getElementById(`multiplier-${type}`);
+          if (input) input.value = value;
+        }
+      }
 
       // Update model info display
       updateModelInfo(settings.defaultModel);
@@ -123,6 +199,15 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  // Collect multipliers
+  const taskMultipliers = {};
+  for (const type of Object.keys(TASK_TYPE_INFO)) {
+    const input = document.getElementById(`multiplier-${type}`);
+    if (input) {
+      taskMultipliers[type] = parseFloat(input.value) || DEFAULT_SETTINGS.taskMultipliers[type];
+    }
+  }
+
   const settings = {
     autoDetect: document.getElementById('auto-detect-toggle').checked,
     defaultModel: document.getElementById('default-model').value,
@@ -130,7 +215,9 @@ async function saveSettings() {
     showBanner: document.getElementById('show-banner').checked,
     showConfidence: document.getElementById('show-confidence').checked,
     liveCalculation: document.getElementById('live-calculation').checked,
-    trackHistory: document.getElementById('track-history').checked
+    trackHistory: document.getElementById('track-history').checked,
+    userRegion: document.getElementById('user-region').value,
+    taskMultipliers: taskMultipliers
   };
 
   return new Promise((resolve) => {
@@ -150,9 +237,24 @@ function resetToDefaults() {
   document.getElementById('show-confidence').checked = DEFAULT_SETTINGS.showConfidence;
   document.getElementById('live-calculation').checked = DEFAULT_SETTINGS.liveCalculation;
   document.getElementById('track-history').checked = DEFAULT_SETTINGS.trackHistory;
+  document.getElementById('user-region').value = 'default';
+
+  // Reset multipliers
+  for (const [type, value] of Object.entries(DEFAULT_SETTINGS.taskMultipliers)) {
+    const input = document.getElementById(`multiplier-${type}`);
+    if (input) input.value = value;
+  }
 
   updateModelInfo(DEFAULT_SETTINGS.defaultModel);
   updateModelSelectVisibility(DEFAULT_SETTINGS.autoDetect);
+}
+
+function resetMultipliers() {
+  for (const [type, value] of Object.entries(DEFAULT_SETTINGS.taskMultipliers)) {
+    const input = document.getElementById(`multiplier-${type}`);
+    if (input) input.value = value;
+  }
+  showNotification('Multipliers reset to defaults');
 }
 
 // ========================================
@@ -190,7 +292,7 @@ function showNotification(message, type = 'success') {
 }
 
 // ========================================
-// HISTORY MANAGEMENT
+// HISTORY & EXPORT MANAGEMENT
 // ========================================
 
 async function clearHistory() {
@@ -209,7 +311,15 @@ async function exportData() {
     });
   });
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  // Add metadata
+  const exportData = {
+    exportDate: new Date().toISOString(),
+    version: '1.3.0',
+    ...data
+  };
+
+  // Create and download JSON
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -219,7 +329,47 @@ async function exportData() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showNotification('Data exported');
+  showNotification('Data exported as JSON');
+}
+
+async function exportAsCSV() {
+  const data = await new Promise((resolve) => {
+    chrome.storage.local.get([HISTORY_KEY], (result) => {
+      resolve(result[HISTORY_KEY] || []);
+    });
+  });
+
+  if (data.length === 0) {
+    showNotification('No history data to export', 'error');
+    return;
+  }
+
+  // Create CSV content
+  const headers = ['Date', 'Model', 'Tokens', 'Energy (Wh)', 'Water (mL)', 'Carbon (gCO2e)', 'Prompt Preview'];
+  const rows = data.map(entry => [
+    entry.date,
+    entry.model,
+    entry.tokens,
+    entry.energy?.toFixed(3) || '',
+    entry.water?.toFixed(2) || '',
+    entry.carbon?.toFixed(3) || '',
+    `"${(entry.promptPreview || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+  // Download CSV
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ecoprompt-history-${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showNotification('History exported as CSV');
 }
 
 // ========================================
@@ -250,6 +400,9 @@ function setupEventListeners() {
       showNotification('Settings reset to defaults');
     }
   });
+
+  // Reset multipliers button
+  document.getElementById('reset-multipliers')?.addEventListener('click', resetMultipliers);
 
   // Clear history button
   document.getElementById('clear-history').addEventListener('click', async () => {
