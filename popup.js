@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize tabs
   initLibraryTab();
-  initCompareTab();
+  initOptimizeTab();
   initStatsTab();
 });
 
@@ -211,7 +211,7 @@ function setupEventListeners() {
         renderLibrary();
       } else if (tabName === 'stats') {
         loadStats();
-      } else if (tabName === 'compare') {
+      } else if (tabName === 'optimize') {
         renderModelCheckboxes();
       }
     });
@@ -833,27 +833,133 @@ function showNotification(message) {
 }
 
 // ========================================
-// MODEL COMPARISON TAB
+// OPTIMIZE TAB (Tips + Compare Combined)
 // ========================================
 
 let selectedModelsForComparison = new Set();
+let currentOptimizeAnalysis = null;
 
-function initCompareTab() {
-  renderModelCheckboxes();
+function initOptimizeTab() {
+  // Token counter for optimize prompt
+  const optimizePrompt = document.getElementById('optimize-prompt-input');
+  const optimizeTokens = document.getElementById('optimize-token-count');
 
-  // Compare prompt input token counter
-  const comparePrompt = document.getElementById('compare-prompt');
-  const compareTokens = document.getElementById('compare-tokens');
-
-  comparePrompt?.addEventListener('input', () => {
+  optimizePrompt?.addEventListener('input', () => {
     if (typeof EcoPromptAnalyzer !== 'undefined') {
-      const tokens = EcoPromptAnalyzer.estimateTokens(comparePrompt.value);
-      compareTokens.textContent = tokens;
+      const tokens = EcoPromptAnalyzer.estimateTokens(optimizePrompt.value);
+      optimizeTokens.textContent = tokens;
     }
   });
 
-  // Compare button
-  document.getElementById('compare-btn')?.addEventListener('click', runModelComparison);
+  // Get Tips button
+  document.getElementById('get-tips-btn')?.addEventListener('click', getOptimizationTips);
+
+  // Compare Models button - shows comparison section
+  document.getElementById('compare-models-btn')?.addEventListener('click', () => {
+    const section = document.getElementById('model-comparison-section');
+    if (section.classList.contains('hidden')) {
+      section.classList.remove('hidden');
+      renderModelCheckboxes();
+    } else {
+      section.classList.add('hidden');
+    }
+  });
+
+  // Run Compare button
+  document.getElementById('run-compare-btn')?.addEventListener('click', runModelComparison);
+
+  // Copy optimized prompt
+  document.getElementById('copy-optimized-btn')?.addEventListener('click', () => {
+    const text = document.getElementById('optimized-prompt-text').textContent;
+    navigator.clipboard.writeText(text);
+    showNotification('Optimized prompt copied!');
+  });
+
+  // Save to library
+  document.getElementById('save-to-library-btn')?.addEventListener('click', async () => {
+    if (currentOptimizeAnalysis) {
+      const optimized = document.getElementById('optimized-prompt-text').textContent;
+      await promptLibrary.save({
+        text: optimized,
+        tokens: currentOptimizeAnalysis.optimizedTokenEstimate,
+        taskType: currentOptimizeAnalysis.taskType
+      });
+      showNotification('Saved to library!');
+    }
+  });
+}
+
+function getOptimizationTips() {
+  const promptText = document.getElementById('optimize-prompt-input')?.value?.trim();
+
+  if (!promptText) {
+    alert('Please enter a prompt to analyze');
+    return;
+  }
+
+  if (typeof EcoPromptAnalyzer === 'undefined') {
+    alert('Error: Analyzer not loaded');
+    return;
+  }
+
+  // Analyze prompt
+  const analysis = EcoPromptAnalyzer.analyzePrompt(promptText);
+  currentOptimizeAnalysis = analysis;
+
+  // Display results
+  const resultsSection = document.getElementById('tips-results');
+  const statsDiv = document.getElementById('optimize-analysis-stats');
+  const tipsDiv = document.getElementById('optimize-tips-list');
+  const optimizedCard = document.getElementById('optimized-card');
+  const optimizedText = document.getElementById('optimized-prompt-text');
+
+  resultsSection.classList.remove('hidden');
+
+  // Stats
+  statsDiv.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <div class="stat-item">
+        <div class="stat-label">Current Tokens</div>
+        <div class="stat-value">${analysis.tokens}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Optimized Tokens</div>
+        <div class="stat-value" style="color: #4caf50;">${analysis.optimizedTokenEstimate}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Task Type</div>
+        <div class="stat-value">${analysis.taskType}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Potential Savings</div>
+        <div class="stat-value" style="color: #4caf50;">${analysis.tokens - analysis.optimizedTokenEstimate} tokens</div>
+      </div>
+    </div>
+  `;
+
+  // Tips
+  if (analysis.tips.length > 0) {
+    tipsDiv.innerHTML = analysis.tips.map(tip => `
+      <div class="tip-item">
+        <div class="tip-title">${tip.title}</div>
+        <div class="tip-description">${tip.description}</div>
+        <div class="tip-impact">💡 ${tip.impact}</div>
+      </div>
+    `).join('');
+  } else {
+    tipsDiv.innerHTML = '<p style="color: #4caf50; text-align: center;">✅ Your prompt is already well-optimized!</p>';
+  }
+
+  // Optimized prompt
+  if (analysis.politeWords.totalTokensSaved > 0) {
+    const optimized = EcoPromptAnalyzer.generateOptimizedPrompt(promptText, analysis);
+    optimizedCard.classList.remove('hidden');
+    optimizedText.textContent = optimized;
+  } else {
+    optimizedCard.classList.add('hidden');
+  }
+
+  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderModelCheckboxes() {
@@ -901,10 +1007,10 @@ function renderModelCheckboxes() {
 }
 
 function runModelComparison() {
-  const promptText = document.getElementById('compare-prompt')?.value?.trim();
+  const promptText = document.getElementById('optimize-prompt-input')?.value?.trim();
 
   if (!promptText) {
-    alert('Please enter a prompt to compare');
+    alert('Please enter a prompt first');
     return;
   }
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EcoPrompt Coach</title>
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" href="assets/icon16.png">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
     <!-- Tab Navigation -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="impact">Impact</button>
-      <button class="tab-btn" data-tab="compare">Compare</button>
+      <button class="tab-btn" data-tab="optimize">Optimize</button>
       <button class="tab-btn" data-tab="library">Library</button>
       <button class="tab-btn" data-tab="stats">Stats</button>
     </nav>
@@ -105,74 +105,70 @@
       </section>
       </div>
 
-      <!-- Prompt Optimizer Tab -->
-      <div id="optimizer-tab" class="tab-content hidden">
-        <section class="optimizer-section">
-          <h2>✨ Prompt Optimizer</h2>
-          <p class="section-desc">Analyze and optimize your prompts for better efficiency</p>
+      <!-- Combined Optimize Tab (Tips + Compare) -->
+      <div id="optimize-tab" class="tab-content hidden">
+        <section class="optimize-section">
+          <h2>✨ Optimize & Compare</h2>
+          <p class="section-desc">Get tips, optimize your prompt, and compare models</p>
 
+          <!-- Prompt Input -->
           <div class="input-group">
-            <label for="prompt-input">Enter your prompt:</label>
-            <textarea id="prompt-input" placeholder="Type or paste your prompt here..." rows="6"></textarea>
+            <label for="optimize-prompt-input">Enter your prompt:</label>
+            <textarea id="optimize-prompt-input" placeholder="Type or paste your prompt here..." rows="4"></textarea>
             <div class="token-counter">
-              <span id="token-count">0</span> tokens
+              <span id="optimize-token-count">0</span> tokens
             </div>
           </div>
 
-          <button id="analyze-btn" class="primary-btn">Analyze Prompt</button>
+          <div class="optimize-actions">
+            <button id="get-tips-btn" class="primary-btn">Get Tips</button>
+            <button id="compare-models-btn" class="secondary-btn">Compare Models</button>
+          </div>
 
-          <!-- Analysis Results -->
-          <section id="analysis-results" class="analysis-results hidden">
+          <!-- Tips Results -->
+          <section id="tips-results" class="tips-results hidden">
             <div class="result-card">
               <h3>📊 Analysis</h3>
-              <div id="analysis-stats"></div>
+              <div id="optimize-analysis-stats"></div>
             </div>
 
             <div class="result-card">
               <h3>💡 Optimization Tips</h3>
-              <div id="optimization-tips"></div>
+              <div id="optimize-tips-list"></div>
             </div>
 
-            <div class="result-card optimized-prompt-card hidden">
+            <div class="result-card optimized-prompt-card hidden" id="optimized-card">
               <h3>✅ Optimized Prompt</h3>
               <div id="optimized-prompt-text"></div>
-              <button id="copy-optimized-btn" class="secondary-btn">Copy Optimized</button>
-              <button id="save-to-library-btn" class="secondary-btn">Save to Library</button>
+              <div class="card-actions">
+                <button id="copy-optimized-btn" class="secondary-btn">Copy</button>
+                <button id="save-to-library-btn" class="secondary-btn">Save to Library</button>
+              </div>
             </div>
           </section>
-        </section>
-      </div>
 
-      <!-- Model Comparison Tab -->
-      <div id="compare-tab" class="tab-content hidden">
-        <section class="compare-section">
-          <h2>📊 Model Comparison</h2>
-          <p class="section-desc">Compare energy usage across models for your prompt</p>
+          <!-- Model Comparison Results -->
+          <section id="model-comparison-section" class="model-comparison-section hidden">
+            <h3>📊 Model Comparison</h3>
+            <p class="section-hint">Select models to compare energy efficiency</p>
 
-          <div class="compare-input">
-            <textarea id="compare-prompt" placeholder="Enter your prompt to compare models..." rows="3"></textarea>
-            <div class="compare-info">
-              <span id="compare-tokens">0</span> tokens
-            </div>
-          </div>
-
-          <div class="model-select-group">
             <div class="model-checkbox-list" id="model-checkbox-list">
               <!-- Model checkboxes will be rendered here -->
             </div>
-            <button id="compare-btn" class="primary-btn">Compare Selected Models</button>
-          </div>
 
-          <div id="comparison-results" class="comparison-results hidden">
-            <div class="comparison-header">
-              <span>Model</span>
-              <span>Energy</span>
-              <span>Water</span>
-              <span>Carbon</span>
+            <button id="run-compare-btn" class="primary-btn">Compare Selected</button>
+
+            <div id="comparison-results" class="comparison-results hidden">
+              <div class="comparison-header">
+                <span>Model</span>
+                <span>Energy</span>
+                <span>Water</span>
+                <span>Carbon</span>
+              </div>
+              <div id="comparison-list"></div>
+              <div class="comparison-summary" id="comparison-summary"></div>
             </div>
-            <div id="comparison-list"></div>
-            <div class="comparison-summary" id="comparison-summary"></div>
-          </div>
+          </section>
         </section>
       </div>
 
