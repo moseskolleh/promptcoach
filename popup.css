@@ -20,20 +20,82 @@ body {
 header {
   background: linear-gradient(135deg, #4caf50 0%, #8bc34a 100%);
   color: white;
-  padding: 20px;
-  text-align: center;
+  padding: 15px 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-header h1 {
-  font-size: 24px;
-  font-weight: 700;
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 5px;
+}
+
+header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+#settings-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#settings-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .tagline {
   font-size: 12px;
   opacity: 0.9;
+  text-align: center;
+}
+
+/* Model Selection */
+.model-select-section {
+  margin-bottom: 15px;
+}
+
+.model-select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-select-row label {
+  font-weight: 600;
+  color: #2e7d32;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+#model-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid #a5d6a7;
+  border-radius: 8px;
+  font-size: 13px;
+  background: white;
+  cursor: pointer;
+}
+
+#model-select:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.model-status {
+  font-size: 11px;
+  color: #757575;
+  margin-top: 6px;
+  font-style: italic;
 }
 
 /* Tabs */
@@ -254,6 +316,13 @@ section {
   font-weight: 700;
   color: #2e7d32;
   margin-bottom: 3px;
+}
+
+.impact-card .confidence-interval {
+  font-size: 10px;
+  color: #999;
+  margin-bottom: 3px;
+  font-style: italic;
 }
 
 .impact-card .comparison {

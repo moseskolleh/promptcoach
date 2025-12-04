@@ -9,7 +9,10 @@
 <body>
   <div class="container">
     <header>
-      <h1>🌱 EcoPrompt Coach</h1>
+      <div class="header-row">
+        <h1>🌱 EcoPrompt Coach</h1>
+        <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+      </div>
       <p class="tagline">Making AI Sustainability Visible</p>
     </header>
 
@@ -23,13 +26,24 @@
     <main>
       <!-- Impact Calculator Tab -->
       <div id="impact-tab" class="tab-content active">
+      <!-- Model Selection -->
+      <section class="model-select-section">
+        <div class="model-select-row">
+          <label for="model-select">AI Model:</label>
+          <select id="model-select">
+            <option value="auto">Auto-detect</option>
+          </select>
+        </div>
+        <p class="model-status" id="model-status">Auto-detecting based on website</p>
+      </section>
+
       <!-- Prompt Input -->
       <section class="impact-prompt-section">
         <label for="impact-prompt-input">Enter your prompt:</label>
-        <textarea id="impact-prompt-input" placeholder="Type or paste your AI prompt here..." rows="5"></textarea>
+        <textarea id="impact-prompt-input" placeholder="Type or paste your AI prompt here..." rows="4"></textarea>
         <div class="impact-info">
           <span><strong>Task Type:</strong> <span id="impact-task-type">-</span></span>
-          <span><strong>Tokens:</strong> <span id="impact-token-count">0</span></span>
+          <span><strong>Tokens:</strong> <span id="impact-token-count">0</span> → <span id="impact-output-estimate">~300</span> out</span>
         </div>
       </section>
 
@@ -46,6 +60,7 @@
           <div class="details">
             <h3>Energy</h3>
             <p class="value" id="energy-value">-</p>
+            <p class="confidence-interval" id="energy-confidence">-</p>
             <p class="comparison" id="energy-comparison">-</p>
           </div>
         </div>
@@ -149,6 +164,8 @@
     </footer>
   </div>
 
+  <script src="shared/analyzer.js"></script>
+  <script src="shared/calculator.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
