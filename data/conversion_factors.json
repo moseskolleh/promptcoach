@@ -49,11 +49,11 @@
     "water_drops": {
       "name": "Water drops",
       "unit": "drops",
-      "factor": 1,
-      "ml_per_drop": 1,
-      "description": "Drops of water",
+      "factor": 20,
+      "ml_per_drop": 0.05,
+      "description": "Drops of water (standard dropper)",
       "icon": "💧",
-      "calculation": "ml / 1"
+      "calculation": "ml * 20"
     },
     "coffee_cups": {
       "name": "Coffee cups",

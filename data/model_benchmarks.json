@@ -44,33 +44,33 @@
       "host": "Microsoft Azure",
       "hardware": "DGX A100",
       "launch_date": "2024-07",
-      "size_class": "Medium",
-      "gpu_count": 4,
+      "size_class": "Small",
+      "gpu_count": 2,
       "critical_power_kw": 6.50,
       "performance": {
         "short": {
           "input_tokens": 100,
           "output_tokens": 300,
-          "energy_wh_mean": 0.421,
-          "energy_wh_std": 0.082,
-          "latency_p50": 0.40,
-          "tps_p50": 140
+          "energy_wh_mean": 0.185,
+          "energy_wh_std": 0.042,
+          "latency_p50": 0.25,
+          "tps_p50": 180
         },
         "medium": {
           "input_tokens": 1000,
           "output_tokens": 1000,
-          "energy_wh_mean": 1.418,
-          "energy_wh_std": 0.332,
-          "latency_p50": 0.90,
-          "tps_p50": 110
+          "energy_wh_mean": 0.520,
+          "energy_wh_std": 0.095,
+          "latency_p50": 0.55,
+          "tps_p50": 150
         },
         "long": {
           "input_tokens": 10000,
           "output_tokens": 1500,
-          "energy_wh_mean": 2.106,
-          "energy_wh_std": 0.477,
-          "latency_p50": 1.35,
-          "tps_p50": 90
+          "energy_wh_mean": 0.890,
+          "energy_wh_std": 0.165,
+          "latency_p50": 0.95,
+          "tps_p50": 130
         }
       }
     },
@@ -113,7 +113,7 @@
     },
     {
       "model_id": "claude-3.7-sonnet",
-      "name": "Claude-3.7 Sonnet",
+      "name": "Claude 3.7 Sonnet",
       "provider": "Anthropic",
       "host": "AWS",
       "hardware": "DGX H200/H100",
@@ -145,6 +145,154 @@
           "energy_wh_std": 0.751,
           "latency_p50": 2.80,
           "tps_p50": 95
+        }
+      }
+    },
+    {
+      "model_id": "claude-3.5-sonnet",
+      "name": "Claude 3.5 Sonnet",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-06",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.720,
+          "energy_wh_std": 0.095,
+          "latency_p50": 0.52,
+          "tps_p50": 140
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 2.350,
+          "energy_wh_std": 0.245,
+          "latency_p50": 1.30,
+          "tps_p50": 120
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 4.680,
+          "energy_wh_std": 0.625,
+          "latency_p50": 2.45,
+          "tps_p50": 105
+        }
+      }
+    },
+    {
+      "model_id": "claude-3.5-haiku",
+      "name": "Claude 3.5 Haiku",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-10",
+      "size_class": "Small",
+      "gpu_count": 2,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.125,
+          "energy_wh_std": 0.028,
+          "latency_p50": 0.15,
+          "tps_p50": 210
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.380,
+          "energy_wh_std": 0.065,
+          "latency_p50": 0.38,
+          "tps_p50": 185
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.685,
+          "energy_wh_std": 0.112,
+          "latency_p50": 0.68,
+          "tps_p50": 165
+        }
+      }
+    },
+    {
+      "model_id": "mistral-large",
+      "name": "Mistral Large 2",
+      "provider": "Mistral AI",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-07",
+      "size_class": "Large",
+      "gpu_count": 8,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.680,
+          "energy_wh_std": 0.088,
+          "latency_p50": 0.48,
+          "tps_p50": 145
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 2.150,
+          "energy_wh_std": 0.265,
+          "latency_p50": 1.25,
+          "tps_p50": 125
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 4.120,
+          "energy_wh_std": 0.545,
+          "latency_p50": 2.30,
+          "tps_p50": 110
+        }
+      }
+    },
+    {
+      "model_id": "mistral-small",
+      "name": "Mistral Small",
+      "provider": "Mistral AI",
+      "host": "AWS",
+      "hardware": "DGX H200/H100",
+      "launch_date": "2024-09",
+      "size_class": "Small",
+      "gpu_count": 2,
+      "critical_power_kw": 10.20,
+      "performance": {
+        "short": {
+          "input_tokens": 100,
+          "output_tokens": 300,
+          "energy_wh_mean": 0.145,
+          "energy_wh_std": 0.032,
+          "latency_p50": 0.18,
+          "tps_p50": 195
+        },
+        "medium": {
+          "input_tokens": 1000,
+          "output_tokens": 1000,
+          "energy_wh_mean": 0.425,
+          "energy_wh_std": 0.075,
+          "latency_p50": 0.45,
+          "tps_p50": 170
+        },
+        "long": {
+          "input_tokens": 10000,
+          "output_tokens": 1500,
+          "energy_wh_mean": 0.780,
+          "energy_wh_std": 0.125,
+          "latency_p50": 0.82,
+          "tps_p50": 150
         }
       }
     },

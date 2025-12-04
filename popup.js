@@ -2,474 +2,436 @@
 // Environmental impact calculator with research-based data
 
 // ========================================
-// DATA LOADING
+// SETTINGS & STATE
 // ========================================
 
-let MODEL_DATA = null;
-let INFRASTRUCTURE = null;
-let CONVERSIONS = null;
+const SETTINGS_KEY = 'ecoprompt_settings';
+const HISTORY_KEY = 'ecoprompt_history';
 
-// Load data from JSON files
-async function loadData() {
-  try {
-    const [modelsResponse, infraResponse, conversionsResponse] = await Promise.all([
-      fetch(chrome.runtime.getURL('data/model_benchmarks.json')),
-      fetch(chrome.runtime.getURL('data/infrastructure.json')),
-      fetch(chrome.runtime.getURL('data/conversion_factors.json'))
-    ]);
-
-    const modelsData = await modelsResponse.json();
-    const infraData = await infraResponse.json();
-    const conversionsData = await conversionsResponse.json();
-
-    // Transform model data for easier access
-    MODEL_DATA = {};
-    modelsData.models.forEach(model => {
-      MODEL_DATA[model.model_id] = {
-        name: model.name,
-        provider: model.provider,
-        host: model.host.toLowerCase().replace(' ', '_'),
-        short: {
-          energy: model.performance.short.energy_wh_mean,
-          latency: model.performance.short.latency_p50,
-          tps: model.performance.short.tps_p50
-        },
-        medium: {
-          energy: model.performance.medium.energy_wh_mean,
-          latency: model.performance.medium.latency_p50,
-          tps: model.performance.medium.tps_p50
-        },
-        long: {
-          energy: model.performance.long.energy_wh_mean,
-          latency: model.performance.long.latency_p50,
-          tps: model.performance.long.tps_p50
-        }
-      };
-    });
-
-    // Transform infrastructure data
-    INFRASTRUCTURE = {};
-    for (const [key, value] of Object.entries(infraData.providers)) {
-      INFRASTRUCTURE[key] = {
-        pue: value.pue,
-        wue_onsite: value.wue_onsite_l_per_kwh,
-        wue_offsite: value.wue_offsite_l_per_kwh,
-        cif: value.cif_kgco2e_per_kwh
-      };
-    }
-
-    CONVERSIONS = conversionsData;
-
-    return true;
-  } catch (error) {
-    console.error('Error loading data:', error);
-    return false;
-  }
-}
-
-// ========================================
-// TOKEN ESTIMATION
-// ========================================
-
-function estimateTokens(text) {
-  if (!text || text.trim().length === 0) return 0;
-  const words = text.trim().split(/\s+/).length;
-  const specialChars = (text.match(/[.,!?;:()[\]{}"'-]/g) || []).length;
-  return Math.ceil(words / 0.75 + specialChars * 0.5);
-}
-
-// ========================================
-// TASK TYPE DETECTION
-// ========================================
-
-const TASK_TYPES = {
-  IMAGE_GENERATION: {
-    keywords: ['generate image', 'create image', 'draw', 'illustrate', 'picture of', 'photo of', 'dall-e', 'midjourney', 'stable diffusion', 'image of'],
-    inputMultiplier: 1.2,
-    outputMultiplier: 0.3,
-    energyMultiplier: 3.0,
-    displayName: 'Image Generation'
-  },
-  AGENTIC_TASK: {
-    keywords: ['research', 'analyze multiple', 'compare sources', 'investigate', 'browse', 'search for', 'find information', 'autonomous', 'agent', 'multi-step'],
-    inputMultiplier: 1.5,
-    outputMultiplier: 2.5,
-    energyMultiplier: 2.0,
-    displayName: 'Agentic/Research Task'
-  },
-  CODE_GENERATION: {
-    keywords: ['write code', 'create function', 'implement', 'debug', 'program', 'script', 'algorithm', 'refactor', 'fix bug'],
-    inputMultiplier: 1.0,
-    outputMultiplier: 1.5,
-    energyMultiplier: 1.2,
-    displayName: 'Code Generation'
-  },
-  CREATIVE_WRITING: {
-    keywords: ['write story', 'poem', 'essay', 'article', 'creative', 'blog post', 'narrative', 'fiction', 'novel'],
-    inputMultiplier: 1.0,
-    outputMultiplier: 2.0,
-    energyMultiplier: 1.3,
-    displayName: 'Creative Writing'
-  },
-  DATA_ANALYSIS: {
-    keywords: ['analyze data', 'analyze this', 'examine', 'interpret', 'statistics', 'trends', 'insights', 'dashboard'],
-    inputMultiplier: 1.3,
-    outputMultiplier: 1.5,
-    energyMultiplier: 1.4,
-    displayName: 'Data Analysis'
-  },
-  TEXT_SUMMARIZATION: {
-    keywords: ['summarize', 'summary', 'tldr', 'brief overview', 'key points', 'condense', 'excerpt'],
-    inputMultiplier: 1.2,
-    outputMultiplier: 0.4,
-    energyMultiplier: 0.7,
-    displayName: 'Summarization'
-  },
-  TRANSLATION: {
-    keywords: ['translate', 'translation', 'in spanish', 'in french', 'in german', 'to english', 'language'],
-    inputMultiplier: 1.0,
-    outputMultiplier: 1.0,
-    energyMultiplier: 0.6,
-    displayName: 'Translation'
-  },
-  QUESTION_ANSWERING: {
-    keywords: ['what is', 'how to', 'why', 'when', 'where', 'who', 'explain', 'tell me about', 'describe', 'define'],
-    inputMultiplier: 0.8,
-    outputMultiplier: 1.0,
-    energyMultiplier: 0.8,
-    displayName: 'Q&A'
-  },
-  GENERAL: {
-    keywords: [],
-    inputMultiplier: 1.0,
-    outputMultiplier: 1.0,
-    energyMultiplier: 1.0,
-    displayName: 'General'
-  }
+let settings = {
+  autoDetect: true,
+  defaultModel: 'gpt-4o',
+  showBadge: true,
+  showBanner: true,
+  showConfidence: true,
+  liveCalculation: true,
+  trackHistory: false
 };
 
-function detectTaskType(text) {
-  const lowerText = text.toLowerCase();
-  let detectedType = 'GENERAL';
-  let maxScore = 0;
+let currentModel = null;
+let liveCalculationTimeout = null;
 
-  for (const [type, config] of Object.entries(TASK_TYPES)) {
-    if (config.keywords.length === 0) continue;
+// ========================================
+// INITIALIZATION
+// ========================================
 
-    let score = 0;
-    for (const keyword of config.keywords) {
-      if (lowerText.includes(keyword)) {
-        score += 2;
-      }
-    }
-    if (score > maxScore) {
-      maxScore = score;
-      detectedType = type;
-    }
+document.addEventListener('DOMContentLoaded', async () => {
+  // Load settings
+  await loadSettings();
+
+  // Load calculator data
+  if (typeof EcoPromptCalculator !== 'undefined') {
+    await EcoPromptCalculator.loadData();
+    populateModelDropdown();
   }
 
-  const taskConfig = TASK_TYPES[detectedType];
-  return {
-    type: detectedType,
-    displayName: taskConfig.displayName,
-    confidence: maxScore,
-    inputMultiplier: taskConfig.inputMultiplier,
-    outputMultiplier: taskConfig.outputMultiplier,
-    energyMultiplier: taskConfig.energyMultiplier
-  };
+  // Detect current website and set model
+  detectCurrentSite();
+
+  // Set up event listeners
+  setupEventListeners();
+
+  // Initialize library tab
+  renderLibrary();
+});
+
+// ========================================
+// SETTINGS
+// ========================================
+
+async function loadSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([SETTINGS_KEY], (result) => {
+      if (result[SETTINGS_KEY]) {
+        settings = { ...settings, ...result[SETTINGS_KEY] };
+      }
+      resolve(settings);
+    });
+  });
+}
+
+// ========================================
+// MODEL SELECTION
+// ========================================
+
+function populateModelDropdown() {
+  const select = document.getElementById('model-select');
+  if (!select || typeof EcoPromptCalculator === 'undefined') return;
+
+  // Keep auto-detect option
+  select.innerHTML = '<option value="auto">Auto-detect</option>';
+
+  const models = EcoPromptCalculator.getAvailableModels();
+  if (!models || models.length === 0) return;
+
+  // Group by provider
+  const providers = {};
+  models.forEach(model => {
+    if (!providers[model.provider]) {
+      providers[model.provider] = [];
+    }
+    providers[model.provider].push(model);
+  });
+
+  // Create optgroups
+  for (const [provider, providerModels] of Object.entries(providers)) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = provider;
+
+    providerModels.forEach(model => {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = `${model.name} (${model.sizeClass})`;
+      optgroup.appendChild(option);
+    });
+
+    select.appendChild(optgroup);
+  }
+
+  // Set saved default if not auto-detect
+  if (!settings.autoDetect && settings.defaultModel) {
+    select.value = settings.defaultModel;
+    currentModel = settings.defaultModel;
+    updateModelStatus(`Using: ${getModelName(settings.defaultModel)}`);
+  }
+}
+
+function getModelName(modelId) {
+  if (typeof EcoPromptCalculator === 'undefined') return modelId;
+  const models = EcoPromptCalculator.getAvailableModels();
+  const model = models.find(m => m.id === modelId);
+  return model ? model.name : modelId;
+}
+
+function detectCurrentSite() {
+  // Get current tab URL
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url) {
+      try {
+        const url = new URL(tabs[0].url);
+        const hostname = url.hostname;
+
+        if (settings.autoDetect && typeof EcoPromptCalculator !== 'undefined') {
+          const detectedModel = EcoPromptCalculator.autoDetectModel(hostname);
+          if (detectedModel) {
+            currentModel = detectedModel;
+            updateModelStatus(`Detected: ${getModelName(detectedModel)}`);
+            document.getElementById('model-select').value = 'auto';
+          } else {
+            currentModel = settings.defaultModel;
+            updateModelStatus(`Default: ${getModelName(settings.defaultModel)}`);
+          }
+        }
+      } catch (e) {
+        currentModel = settings.defaultModel;
+        updateModelStatus(`Default: ${getModelName(settings.defaultModel)}`);
+      }
+    }
+  });
+}
+
+function updateModelStatus(message) {
+  const statusEl = document.getElementById('model-status');
+  if (statusEl) {
+    statusEl.textContent = message;
+  }
+}
+
+// ========================================
+// EVENT LISTENERS
+// ========================================
+
+function setupEventListeners() {
+  // Settings button
+  document.getElementById('settings-btn')?.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+
+  // Model selection
+  document.getElementById('model-select')?.addEventListener('change', (e) => {
+    if (e.target.value === 'auto') {
+      detectCurrentSite();
+    } else {
+      currentModel = e.target.value;
+      updateModelStatus(`Using: ${getModelName(e.target.value)}`);
+    }
+  });
+
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabName = btn.dataset.tab;
+
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      tabContents.forEach(content => {
+        content.classList.remove('active');
+        if (content.id === `${tabName}-tab`) {
+          content.classList.add('active');
+        }
+      });
+
+      if (tabName === 'library') {
+        renderLibrary();
+      }
+    });
+  });
+
+  // Impact Calculator
+  const impactPromptInput = document.getElementById('impact-prompt-input');
+  const calculateBtn = document.getElementById('calculate-btn');
+
+  impactPromptInput?.addEventListener('input', () => {
+    updatePromptInfo();
+
+    // Live calculation if enabled
+    if (settings.liveCalculation) {
+      clearTimeout(liveCalculationTimeout);
+      liveCalculationTimeout = setTimeout(() => {
+        if (impactPromptInput.value.trim().length > 20) {
+          calculateImpact();
+        }
+      }, 800);
+    }
+  });
+
+  calculateBtn?.addEventListener('click', calculateImpact);
+
+  // Prompt Optimizer
+  const promptInput = document.getElementById('prompt-input');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const tokenCount = document.getElementById('token-count');
+
+  promptInput?.addEventListener('input', () => {
+    if (typeof EcoPromptAnalyzer !== 'undefined') {
+      const tokens = EcoPromptAnalyzer.estimateTokens(promptInput.value);
+      tokenCount.textContent = tokens;
+    }
+  });
+
+  analyzeBtn?.addEventListener('click', analyzePrompt);
+
+  // Optimizer buttons
+  document.getElementById('copy-optimized-btn')?.addEventListener('click', () => {
+    const text = document.getElementById('optimized-prompt-text').textContent;
+    navigator.clipboard.writeText(text);
+    showNotification('Optimized prompt copied!');
+  });
+
+  document.getElementById('save-to-library-btn')?.addEventListener('click', async () => {
+    const card = document.querySelector('.optimized-prompt-card');
+    const text = card.dataset.optimizedPrompt;
+    const tokens = parseInt(card.dataset.tokens);
+    const taskType = card.dataset.taskType;
+
+    await promptLibrary.save({ text, tokens, taskType });
+    showNotification('Saved to library!');
+  });
+
+  // Library buttons
+  document.getElementById('add-prompt-btn')?.addEventListener('click', () => {
+    const text = prompt('Enter prompt to save:');
+    if (text && text.trim()) {
+      const tokens = typeof EcoPromptAnalyzer !== 'undefined'
+        ? EcoPromptAnalyzer.estimateTokens(text)
+        : Math.ceil(text.split(/\s+/).length / 0.75);
+      const taskType = typeof EcoPromptAnalyzer !== 'undefined'
+        ? EcoPromptAnalyzer.detectTaskType(text).displayName
+        : 'General';
+      promptLibrary.save({ text: text.trim(), tokens, taskType }).then(() => {
+        renderLibrary();
+        showNotification('Prompt added!');
+      });
+    }
+  });
+
+  document.getElementById('clear-library-btn')?.addEventListener('click', () => {
+    if (confirm('Are you sure you want to delete all saved prompts?')) {
+      promptLibrary.clear().then(() => {
+        renderLibrary();
+        showNotification('Library cleared');
+      });
+    }
+  });
+}
+
+// ========================================
+// PROMPT INFO UPDATE
+// ========================================
+
+function updatePromptInfo() {
+  const text = document.getElementById('impact-prompt-input')?.value || '';
+
+  if (typeof EcoPromptAnalyzer !== 'undefined') {
+    const tokens = EcoPromptAnalyzer.estimateTokens(text);
+    const taskType = EcoPromptAnalyzer.detectTaskType(text);
+    const outputEstimate = EcoPromptAnalyzer.estimateOutputTokens(taskType.type, tokens);
+
+    document.getElementById('impact-token-count').textContent = tokens;
+    document.getElementById('impact-task-type').textContent = taskType.displayName;
+    document.getElementById('impact-output-estimate').textContent = `~${outputEstimate.estimated}`;
+  } else {
+    // Fallback
+    const words = text.trim().split(/\s+/).length;
+    const tokens = Math.ceil(words / 0.75);
+    document.getElementById('impact-token-count').textContent = tokens;
+    document.getElementById('impact-task-type').textContent = '-';
+    document.getElementById('impact-output-estimate').textContent = '~300';
+  }
 }
 
 // ========================================
 // IMPACT CALCULATION
 // ========================================
 
-function getQueryCategory(inputTokens, outputTokens) {
-  const totalTokens = inputTokens + outputTokens;
-  if (totalTokens <= 500) return 'short';
-  if (totalTokens <= 2500) return 'medium';
-  return 'long';
-}
+function calculateImpact() {
+  const promptText = document.getElementById('impact-prompt-input')?.value?.trim();
 
-function interpolateEnergy(model, inputTokens, outputTokens) {
-  const category = getQueryCategory(inputTokens, outputTokens);
-  return model[category].energy;
-}
-
-function calculateImpact(modelId, inputTokens, outputTokens) {
-  if (!MODEL_DATA || !INFRASTRUCTURE) return null;
-
-  const model = MODEL_DATA[modelId];
-  if (!model) return null;
-
-  const infrastructure = INFRASTRUCTURE[model.host];
-  if (!infrastructure) return null;
-
-  const energyWh = interpolateEnergy(model, inputTokens, outputTokens);
-
-  // Water (convert L/kWh to mL/Wh)
-  const energyKwh = energyWh / 1000;
-  const waterMl = (energyKwh / infrastructure.pue) * infrastructure.wue_onsite * 1000 +
-                   energyKwh * infrastructure.wue_offsite * 1000;
-
-  // Carbon (convert kgCO2e/kWh to gCO2e/Wh)
-  const carbonGco2e = energyKwh * infrastructure.cif * 1000;
-
-  return {
-    energy: energyWh,
-    water: waterMl,
-    carbon: carbonGco2e,
-    model: model.name,
-    provider: model.provider
-  };
-}
-
-function calculateAverageImpact(promptText) {
-  if (!promptText || promptText.trim().length === 0 || !MODEL_DATA) {
-    return null;
+  if (!promptText) {
+    return;
   }
 
-  const baseInputTokens = estimateTokens(promptText);
-  const taskType = detectTaskType(promptText);
-
-  const inputTokens = Math.round(baseInputTokens * taskType.inputMultiplier);
-  const baseOutputTokens = 300;
-  const outputTokens = Math.round(baseOutputTokens * taskType.outputMultiplier);
-
-  const impacts = [];
-  for (const modelId of Object.keys(MODEL_DATA)) {
-    const impact = calculateImpact(modelId, inputTokens, outputTokens);
-    if (impact) impacts.push(impact);
+  if (typeof EcoPromptCalculator === 'undefined' || typeof EcoPromptAnalyzer === 'undefined') {
+    alert('Error: Calculator not loaded. Please reload the extension.');
+    return;
   }
 
-  if (impacts.length === 0) return null;
+  // Analyze prompt
+  const tokens = EcoPromptAnalyzer.estimateTokens(promptText);
+  const taskType = EcoPromptAnalyzer.detectTaskType(promptText);
+  const outputEstimate = EcoPromptAnalyzer.estimateOutputTokens(taskType.type, tokens);
 
-  const avgEnergy = impacts.reduce((sum, i) => sum + i.energy, 0) / impacts.length;
-  const avgWater = impacts.reduce((sum, i) => sum + i.water, 0) / impacts.length;
-  const avgCarbon = impacts.reduce((sum, i) => sum + i.carbon, 0) / impacts.length;
+  let impact;
+  const modelId = currentModel || settings.defaultModel;
 
-  const finalEnergy = avgEnergy * taskType.energyMultiplier;
-  const finalWater = avgWater * taskType.energyMultiplier;
-  const finalCarbon = avgCarbon * taskType.energyMultiplier;
-
-  return {
-    energy: finalEnergy,
-    water: finalWater,
-    carbon: finalCarbon,
-    inputTokens: inputTokens,
-    outputTokens: outputTokens,
-    totalTokens: inputTokens + outputTokens,
-    taskType: taskType.displayName,
-    taskMultiplier: taskType.energyMultiplier
-  };
-}
-
-// ========================================
-// COMPARISONS
-// ========================================
-
-function formatEnergyComparison(wh) {
-  if (wh < 1) {
-    const minutes = Math.round(wh * 60);
-    return `${minutes} minutes of LED lightbulb`;
-  } else if (wh < 10) {
-    const percent = ((wh / 10) * 100).toFixed(1);
-    return `${percent}% of smartphone charge`;
+  if (modelId && modelId !== 'auto') {
+    // Calculate for specific model
+    impact = EcoPromptCalculator.calculateImpact(
+      modelId,
+      tokens,
+      outputEstimate.estimated,
+      taskType.energyMultiplier
+    );
   } else {
-    const minutes = Math.round((wh / 130) * 60);
-    return `${minutes} minutes of 65" TV`;
+    // Calculate average across all models
+    impact = EcoPromptCalculator.calculateAverageImpact(
+      tokens,
+      outputEstimate.estimated,
+      taskType.energyMultiplier
+    );
   }
-}
 
-function formatWaterComparison(ml) {
-  if (ml < 50) {
-    const drops = Math.round(ml);
-    return `~${drops} drops of water`;
-  } else if (ml < 250) {
-    const percent = ((ml / 250) * 100).toFixed(1);
-    return `${percent}% of a coffee cup`;
-  } else {
-    const cups = (ml / 250).toFixed(2);
-    return `${cups} coffee cups`;
+  if (!impact) {
+    alert('Error calculating impact. Please try again.');
+    return;
   }
-}
 
-function formatCarbonComparison(gco2e) {
-  if (gco2e < 1) {
-    const meters = ((gco2e / 200) * 1000).toFixed(1);
-    return `Driving ${meters} meters`;
-  } else if (gco2e < 100) {
-    const meters = Math.round((gco2e / 200) * 1000);
-    return `Driving ${meters} meters`;
-  } else {
-    const km = (gco2e / 200).toFixed(2);
-    return `Driving ${km} kilometers`;
-  }
-}
-
-function getComparisons(impact) {
-  return {
-    energy: formatEnergyComparison(impact.energy),
-    water: formatWaterComparison(impact.water),
-    carbon: formatCarbonComparison(impact.carbon)
+  // Get comparisons
+  const comparisons = {
+    energy: EcoPromptCalculator.formatEnergyComparison(impact.energy.wh),
+    water: EcoPromptCalculator.formatWaterComparison(impact.water.ml),
+    carbon: EcoPromptCalculator.formatCarbonComparison(impact.carbon.gCO2e)
   };
-}
 
-// ========================================
-// POLITE WORDS DETECTION
-// ========================================
+  // Calculate eco score
+  const ecoScore = EcoPromptCalculator.calculateEcoScore(impact.energy.wh);
+  const scoreLabel = EcoPromptCalculator.getScoreLabel(ecoScore);
 
-const POLITE_PHRASES = [
-  { pattern: /\bplease\b/gi, word: 'please', tokens: 1 },
-  { pattern: /\bthank you\b/gi, word: 'thank you', tokens: 2 },
-  { pattern: /\bthanks\b/gi, word: 'thanks', tokens: 1 },
-  { pattern: /\bkindly\b/gi, word: 'kindly', tokens: 1 },
-  { pattern: /\bcould you\b/gi, word: 'could you', tokens: 2 },
-  { pattern: /\bwould you\b/gi, word: 'would you', tokens: 2 },
-  { pattern: /\bcan you\b/gi, word: 'can you', tokens: 2 },
-  { pattern: /\bi would like\b/gi, word: 'I would like', tokens: 3 },
-  { pattern: /\bsorry\b/gi, word: 'sorry', tokens: 1 },
-];
+  // Generate suggestions
+  const suggestions = generateSuggestions(impact, taskType);
 
-function detectPoliteWords(text) {
-  const found = [];
-  let totalTokensSaved = 0;
+  // Display results
+  displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions);
 
-  for (const phrase of POLITE_PHRASES) {
-    const matches = text.match(phrase.pattern);
-    if (matches) {
-      const count = matches.length;
-      found.push({
-        phrase: phrase.word,
-        count: count,
-        tokensSaved: phrase.tokens * count,
-        example: matches[0]
-      });
-      totalTokensSaved += phrase.tokens * count;
-    }
+  // Track history if enabled
+  if (settings.trackHistory) {
+    trackQuery(impact, promptText);
   }
-
-  return { found, totalTokensSaved };
 }
 
-// ========================================
-// OPTIMIZATION TIPS
-// ========================================
+function generateSuggestions(impact, taskType) {
+  const suggestions = [];
 
-function getOptimizationTips(politeWords, taskType, tokens) {
-  const tips = [];
-
-  if (politeWords.totalTokensSaved > 0) {
-    tips.push({
-      type: 'polite_words',
-      title: 'Remove Polite Phrases',
-      description: `Found ${politeWords.found.length} polite phrase(s) that can be removed without affecting quality`,
-      impact: `Save ~${politeWords.totalTokensSaved} tokens`,
-      priority: 'high'
+  // Model efficiency suggestion
+  if (impact.energy.wh > 1) {
+    suggestions.push({
+      title: 'Use Efficient Models',
+      description: 'GPT-4o mini, Gemini Flash, or Claude 3.5 Haiku can handle most tasks with 70% less energy',
+      savings: '70'
     });
   }
 
-  if (taskType.type === 'IMAGE_GENERATION') {
-    tips.push({
-      type: 'task_specific',
-      title: 'Image Generation Optimization',
-      description: 'Image generation uses 3x more energy. Be specific with style, colors, and composition to avoid regeneration.',
-      impact: 'Reduce energy usage significantly',
-      priority: 'high'
-    });
-  } else if (taskType.type === 'AGENTIC_TASK') {
-    tips.push({
-      type: 'task_specific',
-      title: 'Agentic Task Warning',
-      description: 'Research/agentic tasks use 2x more energy due to multiple model calls. Be specific to minimize iterations.',
-      impact: 'Reduce multi-call overhead',
-      priority: 'high'
-    });
-  } else if (taskType.type === 'QUESTION_ANSWERING' && tokens > 200) {
-    tips.push({
-      type: 'task_specific',
-      title: 'Simplify Question',
-      description: 'Simple questions work better when kept concise and direct.',
-      impact: 'Faster response',
-      priority: 'high'
+  // Task-specific suggestion
+  if (taskType.energyMultiplier > 1) {
+    suggestions.push({
+      title: `Optimize for ${taskType.displayName}`,
+      description: `This task type uses ${taskType.energyMultiplier}x energy. Consider simplifying or breaking into smaller requests.`,
+      savings: Math.round((1 - 1/taskType.energyMultiplier) * 100).toString()
     });
   }
 
-  if (tokens > 500) {
-    tips.push({
-      type: 'length',
-      title: 'Consider Shorter Prompt',
-      description: 'Long prompts can be less effective. Focus on key requirements.',
-      impact: `Target: ~${Math.floor(tokens * 0.7)} tokens`,
-      priority: 'medium'
+  // Token reduction suggestion
+  if (impact.tokens && impact.tokens.input > 200) {
+    suggestions.push({
+      title: 'Reduce Token Usage',
+      description: 'Remove unnecessary context and polite phrases to save energy',
+      savings: '30'
     });
   }
 
-  return tips;
-}
-
-function analyzePrompt(text) {
-  if (!text || text.trim().length === 0) return null;
-
-  const tokens = estimateTokens(text);
-  const taskType = detectTaskType(text);
-  const politeWords = detectPoliteWords(text);
-  const tips = getOptimizationTips(politeWords, taskType, tokens);
-
-  return {
-    originalText: text,
-    tokens: tokens,
-    taskType: taskType.displayName,
-    taskTypeRaw: taskType.type,
-    politeWords: politeWords,
-    tips: tips,
-    optimizedTokenEstimate: tokens - politeWords.totalTokensSaved
-  };
-}
-
-function generateOptimizedPrompt(originalText, analysis) {
-  let optimized = originalText;
-
-  if (analysis.politeWords.found.length > 0) {
-    for (const polite of analysis.politeWords.found) {
-      const pattern = POLITE_PHRASES.find(p => p.word === polite.phrase)?.pattern;
-      if (pattern) {
-        optimized = optimized.replace(pattern, '').trim();
-        optimized = optimized.replace(/\s+/g, ' ');
-      }
-    }
-  }
-
-  return optimized;
+  return suggestions;
 }
 
 // ========================================
-// DISPLAY FUNCTIONS
+// DISPLAY RESULTS
 // ========================================
 
-function displayResults(impact, comparisons, ecoScore, suggestions) {
+function displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions) {
   const resultsSection = document.getElementById('results');
   resultsSection.classList.remove('hidden');
 
-  document.getElementById('energy-value').textContent = `${impact.energy.toFixed(3)} Wh`;
+  // Energy
+  document.getElementById('energy-value').textContent = `${impact.energy.wh.toFixed(3)} Wh`;
   document.getElementById('energy-comparison').textContent = comparisons.energy;
 
-  document.getElementById('water-value').textContent = `${impact.water.toFixed(2)} mL`;
+  // Confidence interval
+  const confidenceEl = document.getElementById('energy-confidence');
+  if (confidenceEl && settings.showConfidence && impact.energy.confidenceInterval) {
+    confidenceEl.textContent = `Range: ${impact.energy.confidenceInterval.minWh.toFixed(3)} - ${impact.energy.confidenceInterval.maxWh.toFixed(3)} Wh`;
+    confidenceEl.style.display = 'block';
+  } else if (confidenceEl) {
+    confidenceEl.style.display = 'none';
+  }
+
+  // Water
+  document.getElementById('water-value').textContent = `${impact.water.ml.toFixed(2)} mL`;
   document.getElementById('water-comparison').textContent = comparisons.water;
 
-  document.getElementById('carbon-value').textContent = `${impact.carbon.toFixed(3)} gCO2e`;
+  // Carbon
+  document.getElementById('carbon-value').textContent = `${impact.carbon.gCO2e.toFixed(3)} gCO2e`;
   document.getElementById('carbon-comparison').textContent = comparisons.carbon;
 
+  // Eco Score
   const scoreFill = document.getElementById('score-fill');
   const scoreText = document.getElementById('score-text');
   scoreFill.style.width = `${ecoScore}%`;
-
-  let scoreLabel = 'Poor';
-  if (ecoScore >= 80) scoreLabel = 'Excellent';
-  else if (ecoScore >= 60) scoreLabel = 'Good';
-  else if (ecoScore >= 40) scoreLabel = 'Fair';
-
   scoreText.textContent = `${ecoScore}/100 - ${scoreLabel}`;
 
+  // Suggestions
   const suggestionsSection = document.getElementById('suggestions');
   const suggestionsList = document.getElementById('suggestions-list');
 
@@ -487,9 +449,122 @@ function displayResults(impact, comparisons, ecoScore, suggestions) {
       `;
       suggestionsList.appendChild(item);
     });
+  } else {
+    suggestionsSection.classList.add('hidden');
   }
 
   resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ========================================
+// PROMPT ANALYSIS
+// ========================================
+
+function analyzePrompt() {
+  const text = document.getElementById('prompt-input')?.value?.trim();
+  if (!text) {
+    alert('Please enter a prompt to analyze');
+    return;
+  }
+
+  if (typeof EcoPromptAnalyzer === 'undefined') {
+    alert('Error: Analyzer not loaded. Please reload the extension.');
+    return;
+  }
+
+  const analysis = EcoPromptAnalyzer.analyzePrompt(text);
+  displayAnalysis(analysis);
+}
+
+function displayAnalysis(analysis) {
+  const resultsSection = document.getElementById('analysis-results');
+  const statsDiv = document.getElementById('analysis-stats');
+  const tipsDiv = document.getElementById('optimization-tips');
+  const optimizedCard = document.querySelector('.optimized-prompt-card');
+  const optimizedText = document.getElementById('optimized-prompt-text');
+
+  resultsSection.classList.remove('hidden');
+
+  statsDiv.innerHTML = `
+    <div class="stat-item">
+      <div class="stat-label">Tokens</div>
+      <div class="stat-value">${analysis.tokens}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Task Type</div>
+      <div class="stat-value">${analysis.taskType}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Optimized</div>
+      <div class="stat-value">${analysis.optimizedTokenEstimate}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Savings</div>
+      <div class="stat-value">${analysis.tokens - analysis.optimizedTokenEstimate}</div>
+    </div>
+  `;
+
+  if (analysis.tips.length > 0) {
+    tipsDiv.innerHTML = analysis.tips.map(tip => `
+      <div class="tip-item">
+        <div class="tip-title">${tip.title}</div>
+        <div class="tip-description">${tip.description}</div>
+        <div class="tip-impact">💡 ${tip.impact}</div>
+      </div>
+    `).join('');
+  } else {
+    tipsDiv.innerHTML = '<p style="color: #4caf50;">✅ Your prompt is already well-optimized!</p>';
+  }
+
+  if (analysis.politeWords.totalTokensSaved > 0) {
+    const optimized = EcoPromptAnalyzer.generateOptimizedPrompt(analysis.originalText, analysis);
+    optimizedCard.classList.remove('hidden');
+    optimizedText.textContent = optimized;
+
+    optimizedCard.dataset.optimizedPrompt = optimized;
+    optimizedCard.dataset.tokens = analysis.optimizedTokenEstimate;
+    optimizedCard.dataset.taskType = analysis.taskType;
+    optimizedCard.dataset.taskTypeRaw = analysis.taskTypeRaw;
+  } else {
+    optimizedCard.classList.add('hidden');
+  }
+
+  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ========================================
+// HISTORY TRACKING
+// ========================================
+
+async function trackQuery(impact, promptText) {
+  const history = await getHistory();
+  const entry = {
+    timestamp: Date.now(),
+    date: new Date().toISOString(),
+    model: currentModel || 'average',
+    tokens: impact.tokens?.total || 0,
+    energy: impact.energy.wh,
+    water: impact.water.ml,
+    carbon: impact.carbon.gCO2e,
+    promptPreview: promptText.substring(0, 50)
+  };
+
+  history.push(entry);
+
+  // Keep last 1000 entries
+  if (history.length > 1000) {
+    history.shift();
+  }
+
+  chrome.storage.local.set({ [HISTORY_KEY]: history });
+}
+
+async function getHistory() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([HISTORY_KEY], (result) => {
+      resolve(result[HISTORY_KEY] || []);
+    });
+  });
 }
 
 // ========================================
@@ -556,6 +631,8 @@ async function renderLibrary() {
   const prompts = await promptLibrary.getAll();
   const listElement = document.getElementById('library-list');
 
+  if (!listElement) return;
+
   if (prompts.length === 0) {
     listElement.innerHTML = '<p class="empty-state">No saved prompts yet. Start by analyzing a prompt and saving it!</p>';
     return;
@@ -602,6 +679,10 @@ async function renderLibrary() {
   });
 }
 
+// ========================================
+// NOTIFICATIONS
+// ========================================
+
 function showNotification(message) {
   const notification = document.createElement('div');
   notification.textContent = message;
@@ -621,218 +702,3 @@ function showNotification(message) {
   document.body.appendChild(notification);
   setTimeout(() => notification.remove(), 2000);
 }
-
-// ========================================
-// INITIALIZATION
-// ========================================
-
-document.addEventListener('DOMContentLoaded', async () => {
-  // Load data first
-  const dataLoaded = await loadData();
-
-  if (!dataLoaded) {
-    alert('Error loading environmental data. Please reload the extension.');
-    return;
-  }
-
-  // Tab switching
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
-
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
-
-      tabButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      tabContents.forEach(content => {
-        content.classList.remove('active');
-        if (content.id === `${tabName}-tab`) {
-          content.classList.add('active');
-        }
-      });
-
-      if (tabName === 'library') {
-        renderLibrary();
-      }
-    });
-  });
-
-  // Impact Calculator
-  const calculateBtn = document.getElementById('calculate-btn');
-  const impactPromptInput = document.getElementById('impact-prompt-input');
-  const impactTaskType = document.getElementById('impact-task-type');
-  const impactTokenCount = document.getElementById('impact-token-count');
-
-  impactPromptInput.addEventListener('input', () => {
-    const text = impactPromptInput.value;
-    if (text.trim()) {
-      const tokens = estimateTokens(text);
-      const taskType = detectTaskType(text);
-      impactTokenCount.textContent = tokens;
-      impactTaskType.textContent = taskType.displayName;
-    } else {
-      impactTokenCount.textContent = '0';
-      impactTaskType.textContent = '-';
-    }
-  });
-
-  calculateBtn.addEventListener('click', () => {
-    try {
-      const promptText = impactPromptInput.value.trim();
-
-      if (!promptText) {
-        alert('Please enter a prompt to analyze');
-        return;
-      }
-
-      const impact = calculateAverageImpact(promptText);
-      if (!impact) {
-        alert('Unable to calculate impact. Please try again.');
-        return;
-      }
-
-      const comparisons = getComparisons(impact);
-      const ecoScore = Math.round(100 - ((impact.energy - 0.070) / (33.634 - 0.070)) * 100);
-      const finalScore = Math.max(0, Math.min(100, ecoScore));
-
-      const suggestions = [
-        {
-          title: 'Use Efficient Models',
-          description: 'Choose lightweight models like GPT-4o mini, Gemini Flash, or LLaMA 3.2 for simple tasks',
-          savings: '70'
-        },
-        {
-          title: `Optimize for ${impact.taskType}`,
-          description: `This task type has a ${impact.taskMultiplier}x energy multiplier. Consider if a simpler approach would work.`,
-          savings: Math.max(0, Math.round((1 - 1/impact.taskMultiplier) * 100))
-        },
-        {
-          title: 'Reduce Token Usage',
-          description: 'Remove unnecessary words and use concise prompts to save energy',
-          savings: '30'
-        }
-      ];
-
-      displayResults(impact, comparisons, finalScore, suggestions);
-    } catch (error) {
-      console.error('Calculation error:', error);
-      alert('Error calculating impact. Please try again.');
-    }
-  });
-
-  // Prompt Optimizer
-  const promptInput = document.getElementById('prompt-input');
-  const tokenCount = document.getElementById('token-count');
-  const analyzeBtn = document.getElementById('analyze-btn');
-
-  promptInput.addEventListener('input', () => {
-    const tokens = estimateTokens(promptInput.value);
-    tokenCount.textContent = tokens;
-  });
-
-  analyzeBtn.addEventListener('click', () => {
-    const text = promptInput.value.trim();
-    if (!text) {
-      alert('Please enter a prompt to analyze');
-      return;
-    }
-
-    const analysis = analyzePrompt(text);
-    displayAnalysis(analysis);
-  });
-
-  function displayAnalysis(analysis) {
-    const resultsSection = document.getElementById('analysis-results');
-    const statsDiv = document.getElementById('analysis-stats');
-    const tipsDiv = document.getElementById('optimization-tips');
-    const optimizedCard = document.querySelector('.optimized-prompt-card');
-    const optimizedText = document.getElementById('optimized-prompt-text');
-
-    resultsSection.classList.remove('hidden');
-
-    statsDiv.innerHTML = `
-      <div class="stat-item">
-        <div class="stat-label">Tokens</div>
-        <div class="stat-value">${analysis.tokens}</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Task Type</div>
-        <div class="stat-value">${analysis.taskType}</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Optimized</div>
-        <div class="stat-value">${analysis.optimizedTokenEstimate}</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Savings</div>
-        <div class="stat-value">${analysis.tokens - analysis.optimizedTokenEstimate}</div>
-      </div>
-    `;
-
-    if (analysis.tips.length > 0) {
-      tipsDiv.innerHTML = analysis.tips.map(tip => `
-        <div class="tip-item">
-          <div class="tip-title">${tip.title}</div>
-          <div class="tip-description">${tip.description}</div>
-          <div class="tip-impact">💡 ${tip.impact}</div>
-        </div>
-      `).join('');
-    } else {
-      tipsDiv.innerHTML = '<p style="color: #4caf50;">✅ Your prompt is already well-optimized!</p>';
-    }
-
-    if (analysis.politeWords.totalTokensSaved > 0) {
-      const optimized = generateOptimizedPrompt(analysis.originalText, analysis);
-      optimizedCard.classList.remove('hidden');
-      optimizedText.textContent = optimized;
-
-      optimizedCard.dataset.optimizedPrompt = optimized;
-      optimizedCard.dataset.tokens = analysis.optimizedTokenEstimate;
-      optimizedCard.dataset.taskType = analysis.taskType;
-      optimizedCard.dataset.taskTypeRaw = analysis.taskTypeRaw;
-    } else {
-      optimizedCard.classList.add('hidden');
-    }
-
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  document.getElementById('copy-optimized-btn').addEventListener('click', () => {
-    const text = document.getElementById('optimized-prompt-text').textContent;
-    navigator.clipboard.writeText(text);
-    showNotification('Optimized prompt copied!');
-  });
-
-  document.getElementById('save-to-library-btn').addEventListener('click', async () => {
-    const card = document.querySelector('.optimized-prompt-card');
-    const text = card.dataset.optimizedPrompt;
-    const tokens = parseInt(card.dataset.tokens);
-    const taskType = card.dataset.taskType;
-
-    await promptLibrary.save({ text, tokens, taskType });
-    showNotification('Saved to library!');
-  });
-
-  document.getElementById('add-prompt-btn').addEventListener('click', () => {
-    const text = prompt('Enter prompt to save:');
-    if (text && text.trim()) {
-      const tokens = estimateTokens(text);
-      const taskTypeInfo = detectTaskType(text);
-      promptLibrary.save({ text: text.trim(), tokens, taskType: taskTypeInfo.displayName }).then(() => {
-        renderLibrary();
-        showNotification('Prompt added!');
-      });
-    }
-  });
-
-  document.getElementById('clear-library-btn').addEventListener('click', () => {
-    if (confirm('Are you sure you want to delete all saved prompts?')) {
-      promptLibrary.clear().then(() => {
-        renderLibrary();
-        showNotification('Library cleared');
-      });
-    }
-  });
-});

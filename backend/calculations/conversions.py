@@ -107,12 +107,12 @@ class ConversionCalculator:
         """
         conversions = {}
 
-        # Water drops
-        drops = water_ml / 1  # 1mL ≈ 1 drop (approximation)
+        # Water drops (approximately 20 drops per mL)
+        drops = water_ml * 20  # 1mL ≈ 20 drops (medical/standard dropper)
         conversions["water_drops"] = {
             "value": drops,
             "unit": "drops",
-            "description": f"{drops:.1f} drops of water",
+            "description": f"{drops:.0f} drops of water",
             "icon": "💧"
         }
 

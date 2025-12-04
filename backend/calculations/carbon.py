@@ -32,7 +32,8 @@ class CarbonCalculator:
         provider_map = {
             "Microsoft Azure": "microsoft_azure",
             "AWS": "aws",
-            "DeepSeek": "deepseek"
+            "DeepSeek": "deepseek",
+            "Google Cloud": "google_cloud"
         }
 
         provider_key = provider_map.get(model["host"])

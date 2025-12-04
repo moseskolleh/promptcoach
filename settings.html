@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoPrompt Coach Settings</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f0 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      color: #2e7d32;
+      font-size: 28px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .tagline {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .settings-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .settings-card h2 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e8f5e9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .setting-item {
+      margin-bottom: 24px;
+    }
+
+    .setting-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .setting-label {
+      display: block;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    .setting-description {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: #4caf50;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+    }
+
+    .toggle-label {
+      flex: 1;
+    }
+
+    .toggle-label .setting-label {
+      margin-bottom: 4px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: #4caf50;
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    .model-info {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .model-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .model-info-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .model-info-label {
+      color: #666;
+    }
+
+    .model-info-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4caf50;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      display: none;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .version-info {
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Settings</h1>
+      <p class="tagline">Configure EcoPrompt Coach preferences</p>
+    </header>
+
+    <!-- Model Settings -->
+    <div class="settings-card">
+      <h2>Model Selection</h2>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Auto-detect model</label>
+            <p class="setting-description">Automatically detect which AI model you're using based on the website</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="auto-detect-toggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-item" id="model-select-container">
+        <label class="setting-label" for="default-model">Default Model</label>
+        <p class="setting-description">Used when auto-detect is off or website not recognized</p>
+        <select id="default-model">
+          <option value="">Loading models...</option>
+        </select>
+        <div class="model-info" id="model-info" style="display: none;">
+          <div class="model-info-row">
+            <span class="model-info-label">Provider</span>
+            <span class="model-info-value" id="model-provider">-</span>
+          </div>
+          <div class="model-info-row">
+            <span class="model-info-label">Size Class</span>
+            <span class="model-info-value" id="model-size">-</span>
+          </div>
+          <div class="model-info-row">
+            <span class="model-info-label">Energy (short query)</span>
+            <span class="model-info-value" id="model-energy">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Display Settings -->
+    <div class="settings-card">
+      <h2>Display Settings</h2>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Show floating badge</label>
+            <p class="setting-description">Display eco tips badge on AI websites</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-badge" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Show notification banners</label>
+            <p class="setting-description">Display optimization tips at the top of AI websites</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-banner" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Show confidence intervals</label>
+            <p class="setting-description">Display energy uncertainty ranges in calculations</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-confidence" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Live calculation</label>
+            <p class="setting-description">Calculate impact as you type (may use more resources)</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="live-calculation" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Privacy Settings -->
+    <div class="settings-card">
+      <h2>Privacy</h2>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <div class="toggle-label">
+            <label class="setting-label">Track session history</label>
+            <p class="setting-description">Store query history locally to show daily/weekly impact summaries</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="track-history">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn btn-secondary" id="clear-history">Clear History</button>
+        <button class="btn btn-secondary" id="export-data">Export Data</button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="button-row">
+      <button class="btn btn-primary" id="save-settings">Save Settings</button>
+      <button class="btn btn-secondary" id="reset-defaults">Reset to Defaults</button>
+    </div>
+
+    <p class="version-info">EcoPrompt Coach v1.3.0</p>
+  </div>
+
+  <div class="notification" id="notification"></div>
+
+  <script src="shared/analyzer.js"></script>
+  <script src="shared/calculator.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
