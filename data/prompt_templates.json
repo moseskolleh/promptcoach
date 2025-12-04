@@ -1,0 +1,191 @@
+{
+  "_metadata": {
+    "version": "1.0.0",
+    "description": "Pre-built efficient prompt templates for common AI tasks",
+    "lastUpdated": "2024-12-04"
+  },
+  "categories": [
+    {
+      "id": "summarization",
+      "name": "Summarization",
+      "icon": "📝",
+      "description": "Efficient prompts for summarizing content"
+    },
+    {
+      "id": "coding",
+      "name": "Coding",
+      "icon": "💻",
+      "description": "Efficient prompts for programming tasks"
+    },
+    {
+      "id": "writing",
+      "name": "Writing",
+      "icon": "✍️",
+      "description": "Efficient prompts for content creation"
+    },
+    {
+      "id": "analysis",
+      "name": "Analysis",
+      "icon": "🔍",
+      "description": "Efficient prompts for data and text analysis"
+    },
+    {
+      "id": "translation",
+      "name": "Translation",
+      "icon": "🌐",
+      "description": "Efficient prompts for language translation"
+    }
+  ],
+  "templates": [
+    {
+      "id": "summary-brief",
+      "category": "summarization",
+      "title": "Brief Summary",
+      "description": "Get a concise summary in 2-3 sentences",
+      "prompt": "Summarize in 2-3 sentences: [YOUR TEXT]",
+      "tokens": 12,
+      "efficiency": "high",
+      "tip": "Specifying length reduces unnecessary output"
+    },
+    {
+      "id": "summary-bullets",
+      "category": "summarization",
+      "title": "Bullet Point Summary",
+      "description": "Extract key points as a bullet list",
+      "prompt": "List 5 key points from: [YOUR TEXT]",
+      "tokens": 10,
+      "efficiency": "high",
+      "tip": "Numbered limits prevent verbose responses"
+    },
+    {
+      "id": "summary-tldr",
+      "category": "summarization",
+      "title": "TL;DR",
+      "description": "One-line summary for quick overview",
+      "prompt": "TL;DR (one line): [YOUR TEXT]",
+      "tokens": 9,
+      "efficiency": "very-high",
+      "tip": "Shortest summary format available"
+    },
+    {
+      "id": "code-fix",
+      "category": "coding",
+      "title": "Fix Bug",
+      "description": "Get a targeted bug fix",
+      "prompt": "Fix this bug. Return only the corrected code:\n[YOUR CODE]",
+      "tokens": 14,
+      "efficiency": "high",
+      "tip": "'Return only code' prevents lengthy explanations"
+    },
+    {
+      "id": "code-explain",
+      "category": "coding",
+      "title": "Explain Code",
+      "description": "Brief explanation of code functionality",
+      "prompt": "Explain briefly what this does:\n[YOUR CODE]",
+      "tokens": 9,
+      "efficiency": "high",
+      "tip": "'Briefly' limits verbose explanations"
+    },
+    {
+      "id": "code-refactor",
+      "category": "coding",
+      "title": "Refactor Code",
+      "description": "Improve code quality",
+      "prompt": "Refactor for readability. Code only:\n[YOUR CODE]",
+      "tokens": 10,
+      "efficiency": "high",
+      "tip": "Single focus prevents scope creep"
+    },
+    {
+      "id": "code-convert",
+      "category": "coding",
+      "title": "Convert Language",
+      "description": "Convert code between languages",
+      "prompt": "Convert to [LANGUAGE]. Code only:\n[YOUR CODE]",
+      "tokens": 9,
+      "efficiency": "high",
+      "tip": "Specify target language clearly"
+    },
+    {
+      "id": "write-email",
+      "category": "writing",
+      "title": "Draft Email",
+      "description": "Professional email draft",
+      "prompt": "Draft a brief professional email about: [TOPIC]",
+      "tokens": 10,
+      "efficiency": "medium",
+      "tip": "'Brief' prevents overly long drafts"
+    },
+    {
+      "id": "write-rewrite",
+      "category": "writing",
+      "title": "Rewrite Text",
+      "description": "Improve clarity and tone",
+      "prompt": "Rewrite more clearly: [YOUR TEXT]",
+      "tokens": 6,
+      "efficiency": "very-high",
+      "tip": "Simple instruction, focused output"
+    },
+    {
+      "id": "write-headline",
+      "category": "writing",
+      "title": "Generate Headlines",
+      "description": "Create compelling headlines",
+      "prompt": "Write 3 headlines for: [TOPIC]",
+      "tokens": 7,
+      "efficiency": "very-high",
+      "tip": "Specific count limits generation"
+    },
+    {
+      "id": "analyze-sentiment",
+      "category": "analysis",
+      "title": "Sentiment Analysis",
+      "description": "Determine positive/negative sentiment",
+      "prompt": "Sentiment (positive/negative/neutral): [YOUR TEXT]",
+      "tokens": 8,
+      "efficiency": "very-high",
+      "tip": "Constrained output format is very efficient"
+    },
+    {
+      "id": "analyze-extract",
+      "category": "analysis",
+      "title": "Extract Information",
+      "description": "Pull specific data from text",
+      "prompt": "Extract [WHAT] from: [YOUR TEXT]",
+      "tokens": 7,
+      "efficiency": "very-high",
+      "tip": "Targeted extraction is most efficient"
+    },
+    {
+      "id": "analyze-compare",
+      "category": "analysis",
+      "title": "Compare Items",
+      "description": "Quick comparison table",
+      "prompt": "Compare in a table (3 rows max): [ITEM A] vs [ITEM B]",
+      "tokens": 14,
+      "efficiency": "high",
+      "tip": "Row limit prevents excessive output"
+    },
+    {
+      "id": "translate-simple",
+      "category": "translation",
+      "title": "Quick Translate",
+      "description": "Direct translation",
+      "prompt": "Translate to [LANGUAGE]: [YOUR TEXT]",
+      "tokens": 6,
+      "efficiency": "very-high",
+      "tip": "Minimal prompt for translation tasks"
+    },
+    {
+      "id": "translate-formal",
+      "category": "translation",
+      "title": "Formal Translation",
+      "description": "Professional/formal tone translation",
+      "prompt": "Translate formally to [LANGUAGE]: [YOUR TEXT]",
+      "tokens": 7,
+      "efficiency": "very-high",
+      "tip": "Single modifier keeps it efficient"
+    }
+  ]
+}

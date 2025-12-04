@@ -994,3 +994,248 @@ textarea:focus {
 .stats-actions .secondary-btn {
   flex: 1;
 }
+
+/* ========================================
+   LIBRARY TAB
+   ======================================== */
+
+.library-section h2 {
+  font-size: 20px;
+  color: #2e7d32;
+  margin-bottom: 5px;
+}
+
+.library-subsection {
+  margin-bottom: 20px;
+}
+
+.subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.subsection-header h3 {
+  font-size: 14px;
+  color: #333;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.category-select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+}
+
+.category-select:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+/* Templates List */
+.templates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.template-item {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.template-item:hover {
+  border-color: #4caf50;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.15);
+}
+
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.template-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.template-category {
+  font-size: 16px;
+}
+
+.template-description {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.template-prompt {
+  background: #f5f5f5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  color: #333;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.template-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.template-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: #757575;
+}
+
+.template-efficiency {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.template-efficiency.very-high {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+
+.template-efficiency.high {
+  background: #dcedc8;
+  color: #558b2f;
+}
+
+.template-efficiency.medium {
+  background: #fff9c4;
+  color: #f9a825;
+}
+
+.template-tip {
+  font-size: 10px;
+  color: #4caf50;
+  font-style: italic;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+.template-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.template-actions .small-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.template-actions .copy-btn {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.template-actions .copy-btn:hover {
+  background: #c8e6c9;
+}
+
+.template-actions .use-btn {
+  background: #4caf50;
+  color: white;
+}
+
+.template-actions .use-btn:hover {
+  background: #388e3c;
+}
+
+/* Library List (Saved Prompts) */
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.library-item {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.library-item:hover {
+  border-color: #81c784;
+}
+
+.library-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.library-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+}
+
+.library-item-meta {
+  font-size: 10px;
+  color: #999;
+}
+
+.library-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.library-item-prompt {
+  font-size: 12px;
+  color: #666;
+  background: #f9f9f9;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-item-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 11px;
+  color: #757575;
+}

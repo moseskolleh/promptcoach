@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50"/>
+      <stop offset="100%" style="stop-color:#2E7D32"/>
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#81C784"/>
+      <stop offset="50%" style="stop-color:#4CAF50"/>
+      <stop offset="100%" style="stop-color:#81C784"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Leaf shape - stylized eco symbol -->
+  <path d="M16 2 C8 2 3 10 3 18 C3 22 5 25 8 27 C10 28 13 28 16 26 C19 28 22 28 24 27 C27 25 29 22 29 18 C29 10 24 2 16 2 Z"
+        fill="url(#leafGrad)"
+        stroke="#1B5E20"
+        stroke-width="0.5"/>
+
+  <!-- Center vein - looks like a text cursor/prompt -->
+  <path d="M16 6 L16 22"
+        stroke="#E8F5E9"
+        stroke-width="2"
+        stroke-linecap="round"/>
+
+  <!-- Side veins - circuit/neural pattern -->
+  <path d="M16 10 L10 14 M16 14 L22 18 M16 18 L11 21"
+        stroke="#E8F5E9"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        opacity="0.9"/>
+
+  <!-- Pulse/signal dots - representing AI activity -->
+  <circle cx="10" cy="14" r="1.5" fill="#E8F5E9"/>
+  <circle cx="22" cy="18" r="1.5" fill="#E8F5E9"/>
+  <circle cx="11" cy="21" r="1.5" fill="#E8F5E9"/>
+
+  <!-- Small eco badge -->
+  <circle cx="25" cy="7" r="4" fill="#81C784" stroke="#2E7D32" stroke-width="0.5"/>
+  <text x="25" y="9" font-size="5" fill="#1B5E20" text-anchor="middle" font-weight="bold">E</text>
+</svg>

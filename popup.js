@@ -7,6 +7,7 @@
 
 const SETTINGS_KEY = 'ecoprompt_settings';
 const HISTORY_KEY = 'ecoprompt_history';
+const TEMPLATES_URL = 'data/prompt_templates.json';
 
 let settings = {
   autoDetect: true,
@@ -20,6 +21,8 @@ let settings = {
 
 let currentModel = null;
 let liveCalculationTimeout = null;
+let promptTemplates = { categories: [], templates: [] };
+let selectedTemplateCategory = 'all';
 
 // ========================================
 // INITIALIZATION
@@ -35,6 +38,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateModelDropdown();
   }
 
+  // Load templates
+  await loadTemplates();
+
   // Detect current website and set model
   detectCurrentSite();
 
@@ -42,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 
   // Initialize tabs
-  renderLibrary();
+  initLibraryTab();
   initCompareTab();
   initStatsTab();
 });
@@ -60,6 +66,18 @@ async function loadSettings() {
       resolve(settings);
     });
   });
+}
+
+async function loadTemplates() {
+  try {
+    const response = await fetch(chrome.runtime.getURL(TEMPLATES_URL));
+    if (response.ok) {
+      const data = await response.json();
+      promptTemplates = data;
+    }
+  } catch (e) {
+    console.warn('Failed to load templates:', e);
+  }
 }
 
 // ========================================
@@ -189,6 +207,7 @@ function setupEventListeners() {
 
       // Refresh tab-specific content
       if (tabName === 'library') {
+        renderTemplates();
         renderLibrary();
       } else if (tabName === 'stats') {
         loadStats();
@@ -633,6 +652,109 @@ class PromptLibrary {
 }
 
 const promptLibrary = new PromptLibrary();
+
+// ========================================
+// LIBRARY TAB WITH TEMPLATES
+// ========================================
+
+function initLibraryTab() {
+  // Category filter
+  const categorySelect = document.getElementById('template-category');
+  if (categorySelect && promptTemplates.categories) {
+    // Populate categories
+    promptTemplates.categories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat.id;
+      option.textContent = `${cat.icon} ${cat.name}`;
+      categorySelect.appendChild(option);
+    });
+
+    categorySelect.addEventListener('change', (e) => {
+      selectedTemplateCategory = e.target.value;
+      renderTemplates();
+    });
+  }
+
+  // Render templates and saved prompts
+  renderTemplates();
+  renderLibrary();
+}
+
+function renderTemplates() {
+  const container = document.getElementById('templates-list');
+  if (!container) return;
+
+  let templates = promptTemplates.templates || [];
+
+  // Filter by category
+  if (selectedTemplateCategory !== 'all') {
+    templates = templates.filter(t => t.category === selectedTemplateCategory);
+  }
+
+  if (templates.length === 0) {
+    container.innerHTML = '<p class="empty-state">No templates in this category</p>';
+    return;
+  }
+
+  // Get category info
+  const getCategoryIcon = (categoryId) => {
+    const cat = promptTemplates.categories?.find(c => c.id === categoryId);
+    return cat ? cat.icon : '📝';
+  };
+
+  container.innerHTML = templates.map(template => `
+    <div class="template-item" data-id="${template.id}">
+      <div class="template-header">
+        <span class="template-title">${template.title}</span>
+        <span class="template-category">${getCategoryIcon(template.category)}</span>
+      </div>
+      <div class="template-description">${template.description}</div>
+      <div class="template-prompt">${escapeHtml(template.prompt)}</div>
+      <div class="template-footer">
+        <div class="template-stats">
+          <span>🔤 ${template.tokens} tokens</span>
+        </div>
+        <span class="template-efficiency ${template.efficiency}">${template.efficiency.replace('-', ' ')}</span>
+      </div>
+      <div class="template-tip">💡 ${template.tip}</div>
+      <div class="template-actions">
+        <button class="small-btn copy-btn" data-prompt="${escapeHtml(template.prompt)}">Copy</button>
+        <button class="small-btn use-btn" data-prompt="${escapeHtml(template.prompt)}">Use in Calculator</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Add event listeners
+  container.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prompt = e.target.dataset.prompt;
+      navigator.clipboard.writeText(prompt);
+      showNotification('Template copied!');
+    });
+  });
+
+  container.querySelectorAll('.use-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prompt = e.target.dataset.prompt;
+      // Switch to Impact tab and fill prompt
+      document.querySelector('[data-tab="impact"]').click();
+      const input = document.getElementById('impact-prompt-input');
+      if (input) {
+        input.value = prompt;
+        input.dispatchEvent(new Event('input'));
+      }
+      showNotification('Template loaded!');
+    });
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 async function renderLibrary() {
   const prompts = await promptLibrary.getAll();
