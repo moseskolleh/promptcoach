@@ -19,8 +19,9 @@
     <!-- Tab Navigation -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="impact">Impact</button>
-      <button class="tab-btn" data-tab="optimizer">Optimizer</button>
-      <button class="tab-btn" data-tab="library">Library</button>
+      <button class="tab-btn" data-tab="compare">Compare</button>
+      <button class="tab-btn" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="optimizer">Tips</button>
     </nav>
 
     <main>
@@ -141,19 +142,90 @@
         </section>
       </div>
 
-      <!-- Prompt Library Tab -->
-      <div id="library-tab" class="tab-content hidden">
-        <section class="library-section">
-          <h2>📚 Prompt Library</h2>
-          <p class="section-desc">Save and reuse your best prompts</p>
+      <!-- Model Comparison Tab -->
+      <div id="compare-tab" class="tab-content hidden">
+        <section class="compare-section">
+          <h2>📊 Model Comparison</h2>
+          <p class="section-desc">Compare energy usage across models for your prompt</p>
 
-          <div class="library-actions">
-            <button id="add-prompt-btn" class="secondary-btn">+ Add New Prompt</button>
-            <button id="clear-library-btn" class="secondary-btn danger">Clear All</button>
+          <div class="compare-input">
+            <textarea id="compare-prompt" placeholder="Enter your prompt to compare models..." rows="3"></textarea>
+            <div class="compare-info">
+              <span id="compare-tokens">0</span> tokens
+            </div>
           </div>
 
-          <div id="library-list" class="library-list">
-            <p class="empty-state">No saved prompts yet. Start by analyzing a prompt and saving it!</p>
+          <div class="model-select-group">
+            <div class="model-checkbox-list" id="model-checkbox-list">
+              <!-- Model checkboxes will be rendered here -->
+            </div>
+            <button id="compare-btn" class="primary-btn">Compare Selected Models</button>
+          </div>
+
+          <div id="comparison-results" class="comparison-results hidden">
+            <div class="comparison-header">
+              <span>Model</span>
+              <span>Energy</span>
+              <span>Water</span>
+              <span>Carbon</span>
+            </div>
+            <div id="comparison-list"></div>
+            <div class="comparison-summary" id="comparison-summary"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Stats/Dashboard Tab -->
+      <div id="stats-tab" class="tab-content hidden">
+        <section class="stats-section">
+          <h2>📈 Impact Dashboard</h2>
+          <p class="section-desc">Track your environmental impact over time</p>
+
+          <div class="stats-period">
+            <button class="period-btn active" data-period="today">Today</button>
+            <button class="period-btn" data-period="week">Week</button>
+            <button class="period-btn" data-period="month">Month</button>
+            <button class="period-btn" data-period="all">All Time</button>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">⚡</div>
+              <div class="stat-value" id="total-energy">-</div>
+              <div class="stat-label">Total Energy (Wh)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💧</div>
+              <div class="stat-value" id="total-water">-</div>
+              <div class="stat-label">Total Water (mL)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🌿</div>
+              <div class="stat-value" id="total-carbon">-</div>
+              <div class="stat-label">Total Carbon (gCO2e)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📝</div>
+              <div class="stat-value" id="total-queries">-</div>
+              <div class="stat-label">Total Queries</div>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <h3>Daily Usage</h3>
+            <div id="usage-chart" class="usage-chart">
+              <!-- Simple bar chart will be rendered here -->
+            </div>
+          </div>
+
+          <div class="stats-actions">
+            <button id="export-csv-btn" class="secondary-btn">Export CSV</button>
+            <button id="export-json-btn" class="secondary-btn">Export JSON</button>
+          </div>
+
+          <div id="no-history-msg" class="empty-state hidden">
+            <p>No history data yet. Enable "Track session history" in Settings to start tracking.</p>
+            <button id="enable-tracking-btn" class="secondary-btn">Open Settings</button>
           </div>
         </section>
       </div>

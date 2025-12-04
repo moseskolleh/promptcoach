@@ -41,8 +41,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set up event listeners
   setupEventListeners();
 
-  // Initialize library tab
+  // Initialize tabs
   renderLibrary();
+  initCompareTab();
+  initStatsTab();
 });
 
 // ========================================
@@ -185,8 +187,13 @@ function setupEventListeners() {
         }
       });
 
+      // Refresh tab-specific content
       if (tabName === 'library') {
         renderLibrary();
+      } else if (tabName === 'stats') {
+        loadStats();
+      } else if (tabName === 'compare') {
+        renderModelCheckboxes();
       }
     });
   });
@@ -701,4 +708,359 @@ function showNotification(message) {
   `;
   document.body.appendChild(notification);
   setTimeout(() => notification.remove(), 2000);
+}
+
+// ========================================
+// MODEL COMPARISON TAB
+// ========================================
+
+let selectedModelsForComparison = new Set();
+
+function initCompareTab() {
+  renderModelCheckboxes();
+
+  // Compare prompt input token counter
+  const comparePrompt = document.getElementById('compare-prompt');
+  const compareTokens = document.getElementById('compare-tokens');
+
+  comparePrompt?.addEventListener('input', () => {
+    if (typeof EcoPromptAnalyzer !== 'undefined') {
+      const tokens = EcoPromptAnalyzer.estimateTokens(comparePrompt.value);
+      compareTokens.textContent = tokens;
+    }
+  });
+
+  // Compare button
+  document.getElementById('compare-btn')?.addEventListener('click', runModelComparison);
+}
+
+function renderModelCheckboxes() {
+  const container = document.getElementById('model-checkbox-list');
+  if (!container || typeof EcoPromptCalculator === 'undefined') return;
+
+  const models = EcoPromptCalculator.getAvailableModels();
+  if (!models || models.length === 0) return;
+
+  // Pre-select some efficient models
+  const defaultSelected = ['gpt-4o-mini', 'gemini-2.0-flash', 'claude-3.5-haiku'];
+
+  container.innerHTML = models.map(model => {
+    const isSelected = defaultSelected.includes(model.id);
+    if (isSelected) selectedModelsForComparison.add(model.id);
+
+    return `
+      <label class="model-checkbox-item ${isSelected ? 'selected' : ''}" data-model-id="${model.id}">
+        <input type="checkbox" ${isSelected ? 'checked' : ''}>
+        <span class="model-checkbox-label">${model.name}</span>
+        <span class="model-checkbox-size">${model.sizeClass}</span>
+      </label>
+    `;
+  }).join('');
+
+  // Add event listeners
+  container.querySelectorAll('.model-checkbox-item').forEach(item => {
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    const modelId = item.dataset.modelId;
+
+    item.addEventListener('click', (e) => {
+      if (e.target !== checkbox) {
+        checkbox.checked = !checkbox.checked;
+      }
+
+      if (checkbox.checked) {
+        selectedModelsForComparison.add(modelId);
+        item.classList.add('selected');
+      } else {
+        selectedModelsForComparison.delete(modelId);
+        item.classList.remove('selected');
+      }
+    });
+  });
+}
+
+function runModelComparison() {
+  const promptText = document.getElementById('compare-prompt')?.value?.trim();
+
+  if (!promptText) {
+    alert('Please enter a prompt to compare');
+    return;
+  }
+
+  if (selectedModelsForComparison.size < 2) {
+    alert('Please select at least 2 models to compare');
+    return;
+  }
+
+  if (typeof EcoPromptCalculator === 'undefined' || typeof EcoPromptAnalyzer === 'undefined') {
+    alert('Error: Calculator not loaded');
+    return;
+  }
+
+  // Analyze prompt
+  const tokens = EcoPromptAnalyzer.estimateTokens(promptText);
+  const taskType = EcoPromptAnalyzer.detectTaskType(promptText);
+  const outputEstimate = EcoPromptAnalyzer.estimateOutputTokens(taskType.type, tokens);
+
+  // Calculate impact for each selected model
+  const results = [];
+  const models = EcoPromptCalculator.getAvailableModels();
+
+  selectedModelsForComparison.forEach(modelId => {
+    const model = models.find(m => m.id === modelId);
+    if (!model) return;
+
+    const impact = EcoPromptCalculator.calculateImpact(
+      modelId,
+      tokens,
+      outputEstimate.estimated,
+      taskType.energyMultiplier
+    );
+
+    if (impact) {
+      results.push({
+        modelId,
+        modelName: model.name,
+        provider: model.provider,
+        energy: impact.energy.wh,
+        water: impact.water.ml,
+        carbon: impact.carbon.gCO2e
+      });
+    }
+  });
+
+  // Sort by energy (lowest first)
+  results.sort((a, b) => a.energy - b.energy);
+
+  // Find best and worst
+  const bestEnergy = Math.min(...results.map(r => r.energy));
+  const worstEnergy = Math.max(...results.map(r => r.energy));
+
+  // Display results
+  displayComparisonResults(results, bestEnergy, worstEnergy);
+}
+
+function displayComparisonResults(results, bestEnergy, worstEnergy) {
+  const resultsContainer = document.getElementById('comparison-results');
+  const listContainer = document.getElementById('comparison-list');
+  const summaryContainer = document.getElementById('comparison-summary');
+
+  resultsContainer.classList.remove('hidden');
+
+  listContainer.innerHTML = results.map(result => {
+    const energyClass = result.energy === bestEnergy ? 'best' : (result.energy === worstEnergy ? 'worst' : '');
+
+    return `
+      <div class="comparison-row">
+        <div>
+          <span class="comparison-model-name">${result.modelName}</span>
+          <span class="comparison-model-provider">${result.provider}</span>
+        </div>
+        <span class="comparison-value ${energyClass}">${result.energy.toFixed(3)} Wh</span>
+        <span class="comparison-value">${result.water.toFixed(2)} mL</span>
+        <span class="comparison-value">${result.carbon.toFixed(3)} g</span>
+      </div>
+    `;
+  }).join('');
+
+  // Summary
+  const bestModel = results[0];
+  const worstModel = results[results.length - 1];
+  const savingsPercent = ((worstEnergy - bestEnergy) / worstEnergy * 100).toFixed(0);
+
+  summaryContainer.innerHTML = `
+    <strong>${bestModel.modelName}</strong> is the most efficient choice, using
+    <strong>${savingsPercent}% less energy</strong> than ${worstModel.modelName}.
+    <br><br>
+    * Best value for each metric
+  `;
+
+  resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ========================================
+// STATS/DASHBOARD TAB
+// ========================================
+
+let currentStatsPeriod = 'today';
+
+function initStatsTab() {
+  // Period buttons
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentStatsPeriod = btn.dataset.period;
+      loadStats();
+    });
+  });
+
+  // Export buttons
+  document.getElementById('export-csv-btn')?.addEventListener('click', exportStatsCSV);
+  document.getElementById('export-json-btn')?.addEventListener('click', exportStatsJSON);
+  document.getElementById('enable-tracking-btn')?.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+
+  // Initial load
+  loadStats();
+}
+
+async function loadStats() {
+  const history = await getHistory();
+
+  // Check if tracking is enabled
+  if (!settings.trackHistory) {
+    document.getElementById('no-history-msg')?.classList.remove('hidden');
+    document.querySelector('.stats-grid')?.classList.add('hidden');
+    document.querySelector('.chart-container')?.classList.add('hidden');
+    document.querySelector('.stats-actions')?.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('no-history-msg')?.classList.add('hidden');
+  document.querySelector('.stats-grid')?.classList.remove('hidden');
+  document.querySelector('.chart-container')?.classList.remove('hidden');
+  document.querySelector('.stats-actions')?.classList.remove('hidden');
+
+  // Filter by period
+  const now = new Date();
+  const filteredHistory = history.filter(entry => {
+    const entryDate = new Date(entry.timestamp);
+
+    switch (currentStatsPeriod) {
+      case 'today':
+        return entryDate.toDateString() === now.toDateString();
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return entryDate >= weekAgo;
+      case 'month':
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return entryDate >= monthAgo;
+      case 'all':
+      default:
+        return true;
+    }
+  });
+
+  // Calculate totals
+  const totals = filteredHistory.reduce((acc, entry) => {
+    acc.energy += entry.energy || 0;
+    acc.water += entry.water || 0;
+    acc.carbon += entry.carbon || 0;
+    acc.queries += 1;
+    return acc;
+  }, { energy: 0, water: 0, carbon: 0, queries: 0 });
+
+  // Update display
+  document.getElementById('total-energy').textContent = totals.energy.toFixed(2);
+  document.getElementById('total-water').textContent = totals.water.toFixed(1);
+  document.getElementById('total-carbon').textContent = totals.carbon.toFixed(2);
+  document.getElementById('total-queries').textContent = totals.queries;
+
+  // Render chart
+  renderUsageChart(filteredHistory);
+}
+
+function renderUsageChart(history) {
+  const chartContainer = document.getElementById('usage-chart');
+  if (!chartContainer) return;
+
+  // Group by day
+  const dailyData = {};
+  history.forEach(entry => {
+    const date = new Date(entry.timestamp).toLocaleDateString();
+    if (!dailyData[date]) {
+      dailyData[date] = { energy: 0, queries: 0 };
+    }
+    dailyData[date].energy += entry.energy || 0;
+    dailyData[date].queries += 1;
+  });
+
+  const days = Object.keys(dailyData).slice(-7); // Last 7 days
+  const maxEnergy = Math.max(...days.map(d => dailyData[d].energy), 0.1);
+
+  if (days.length === 0) {
+    chartContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">No data for this period</p>';
+    return;
+  }
+
+  const barsHTML = days.map(day => {
+    const data = dailyData[day];
+    const heightPercent = (data.energy / maxEnergy) * 100;
+    const shortDate = new Date(day).toLocaleDateString('en-US', { weekday: 'short' });
+
+    return `
+      <div class="chart-bar" style="height: ${Math.max(heightPercent, 5)}%">
+        <div class="chart-bar-tooltip">
+          ${shortDate}: ${data.energy.toFixed(2)} Wh (${data.queries} queries)
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const labelsHTML = days.map(day => {
+    const shortDate = new Date(day).toLocaleDateString('en-US', { weekday: 'short' });
+    return `<span class="chart-label">${shortDate}</span>`;
+  }).join('');
+
+  chartContainer.innerHTML = `
+    <div class="usage-chart" style="display: flex; align-items: flex-end; gap: 4px; height: 120px;">
+      ${barsHTML}
+    </div>
+    <div class="chart-labels">${labelsHTML}</div>
+  `;
+}
+
+async function exportStatsCSV() {
+  const history = await getHistory();
+
+  if (history.length === 0) {
+    alert('No history data to export');
+    return;
+  }
+
+  const headers = ['Date', 'Model', 'Tokens', 'Energy (Wh)', 'Water (mL)', 'Carbon (gCO2e)', 'Prompt Preview'];
+  const rows = history.map(entry => [
+    entry.date,
+    entry.model,
+    entry.tokens,
+    entry.energy?.toFixed(4),
+    entry.water?.toFixed(4),
+    entry.carbon?.toFixed(4),
+    `"${(entry.promptPreview || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  downloadFile(csvContent, 'ecoprompt-history.csv', 'text/csv');
+  showNotification('CSV exported!');
+}
+
+async function exportStatsJSON() {
+  const history = await getHistory();
+
+  if (history.length === 0) {
+    alert('No history data to export');
+    return;
+  }
+
+  const jsonContent = JSON.stringify({
+    exportDate: new Date().toISOString(),
+    totalEntries: history.length,
+    history: history
+  }, null, 2);
+
+  downloadFile(jsonContent, 'ecoprompt-history.json', 'application/json');
+  showNotification('JSON exported!');
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

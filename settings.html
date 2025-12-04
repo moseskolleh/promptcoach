@@ -248,6 +248,76 @@
       font-size: 12px;
       margin-top: 20px;
     }
+
+    .multiplier-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .multiplier-info {
+      flex: 1;
+    }
+
+    .multiplier-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .multiplier-desc {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .multiplier-input {
+      width: 80px;
+      padding: 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .multiplier-input:focus {
+      outline: none;
+      border-color: #4caf50;
+    }
+
+    .multiplier-high {
+      border-left: 3px solid #ff9800;
+    }
+
+    .tabs-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-link {
+      padding: 10px 20px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .tab-link:hover {
+      background: #e0e0e0;
+    }
+
+    .tab-link.active {
+      background: #4caf50;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -374,6 +444,41 @@
       <div class="button-row">
         <button class="btn btn-secondary" id="clear-history">Clear History</button>
         <button class="btn btn-secondary" id="export-data">Export Data</button>
+      </div>
+    </div>
+
+    <!-- Regional Settings -->
+    <div class="settings-card">
+      <h2>Location & Carbon</h2>
+
+      <div class="setting-item">
+        <label class="setting-label" for="user-region">Your Region</label>
+        <p class="setting-description">Select your region for accurate carbon intensity calculations</p>
+        <select id="user-region">
+          <option value="default">Global Average (0.45 kgCO2e/kWh)</option>
+          <option value="us-west">US West - California (0.25 kgCO2e/kWh)</option>
+          <option value="us-east">US East - Virginia (0.35 kgCO2e/kWh)</option>
+          <option value="us-central">US Central - Texas (0.40 kgCO2e/kWh)</option>
+          <option value="europe-west">Europe West - Netherlands (0.30 kgCO2e/kWh)</option>
+          <option value="europe-north">Europe North - Sweden (0.05 kgCO2e/kWh)</option>
+          <option value="asia-east">Asia East - Japan (0.45 kgCO2e/kWh)</option>
+          <option value="asia-south">Asia South - India (0.70 kgCO2e/kWh)</option>
+          <option value="china">China (0.60 kgCO2e/kWh)</option>
+          <option value="australia">Australia (0.65 kgCO2e/kWh)</option>
+          <option value="brazil">Brazil (0.10 kgCO2e/kWh)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Task Multipliers -->
+    <div class="settings-card">
+      <h2>Task Energy Multipliers</h2>
+      <p class="setting-description" style="margin-bottom: 16px;">Customize energy multipliers for different task types. These affect impact calculations.</p>
+
+      <div id="multipliers-list"></div>
+
+      <div class="button-row">
+        <button class="btn btn-secondary" id="reset-multipliers">Reset to Defaults</button>
       </div>
     </div>
 

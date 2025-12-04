@@ -1,4 +1,15 @@
 {
+  "_metadata": {
+    "version": "1.3.0",
+    "last_updated": "2024-12-04",
+    "source": "How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference (Jegham et al., 2025)",
+    "paper_arxiv": "arXiv:2505.09598v4",
+    "notes": {
+      "measured_models": ["gpt-4o", "gpt-4.1-nano", "claude-3.7-sonnet", "deepseek-r1", "llama-3.3-70b", "llama-3.2-1b", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+      "extrapolated_models": ["gpt-4o-mini", "claude-3.5-sonnet", "claude-3.5-haiku", "mistral-large", "mistral-small"],
+      "extrapolation_method": "Estimates based on model size class, GPU count, and similar model performance patterns from measured data"
+    }
+  },
   "models": [
     {
       "model_id": "gpt-4o",
@@ -10,6 +21,7 @@
       "size_class": "Large",
       "gpu_count": 8,
       "critical_power_kw": 10.20,
+      "data_source": "measured",
       "performance": {
         "short": {
           "input_tokens": 100,

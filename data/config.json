@@ -1,0 +1,147 @@
+{
+  "_metadata": {
+    "version": "1.0.0",
+    "description": "Configurable task type energy multipliers for EcoPrompt Coach",
+    "notes": "These multipliers are estimates based on typical resource usage patterns. They can be customized by users."
+  },
+  "task_multipliers": {
+    "IMAGE_GENERATION": {
+      "displayName": "Image Generation",
+      "description": "DALL-E, Midjourney, Stable Diffusion tasks",
+      "energyMultiplier": 3.0,
+      "inputMultiplier": 1.2,
+      "outputMultiplier": 0.3,
+      "defaultOutput": 50,
+      "isHighEnergy": true
+    },
+    "AGENTIC_TASK": {
+      "displayName": "Agentic/Research Task",
+      "description": "Multi-step tasks, browsing, research",
+      "energyMultiplier": 2.0,
+      "inputMultiplier": 1.5,
+      "outputMultiplier": 2.5,
+      "defaultOutput": 800,
+      "isHighEnergy": true
+    },
+    "CODE_GENERATION": {
+      "displayName": "Code Generation",
+      "description": "Writing, debugging, refactoring code",
+      "energyMultiplier": 1.2,
+      "inputMultiplier": 1.0,
+      "outputMultiplier": 1.5,
+      "defaultOutput": 400,
+      "isHighEnergy": false
+    },
+    "CREATIVE_WRITING": {
+      "displayName": "Creative Writing",
+      "description": "Stories, poems, essays, articles",
+      "energyMultiplier": 1.3,
+      "inputMultiplier": 1.0,
+      "outputMultiplier": 2.0,
+      "defaultOutput": 600,
+      "isHighEnergy": false
+    },
+    "DATA_ANALYSIS": {
+      "displayName": "Data Analysis",
+      "description": "Analyzing data, statistics, trends",
+      "energyMultiplier": 1.4,
+      "inputMultiplier": 1.3,
+      "outputMultiplier": 1.5,
+      "defaultOutput": 500,
+      "isHighEnergy": false
+    },
+    "TEXT_SUMMARIZATION": {
+      "displayName": "Summarization",
+      "description": "Summarizing text, key points extraction",
+      "energyMultiplier": 0.7,
+      "inputMultiplier": 1.2,
+      "outputMultiplier": 0.4,
+      "defaultOutput": 150,
+      "isHighEnergy": false
+    },
+    "TRANSLATION": {
+      "displayName": "Translation",
+      "description": "Language translation tasks",
+      "energyMultiplier": 0.6,
+      "inputMultiplier": 1.0,
+      "outputMultiplier": 1.0,
+      "defaultOutput": 0,
+      "isHighEnergy": false
+    },
+    "QUESTION_ANSWERING": {
+      "displayName": "Q&A",
+      "description": "Simple questions and explanations",
+      "energyMultiplier": 0.8,
+      "inputMultiplier": 0.8,
+      "outputMultiplier": 1.0,
+      "defaultOutput": 200,
+      "isHighEnergy": false
+    },
+    "GENERAL": {
+      "displayName": "General",
+      "description": "General purpose tasks",
+      "energyMultiplier": 1.0,
+      "inputMultiplier": 1.0,
+      "outputMultiplier": 1.0,
+      "defaultOutput": 300,
+      "isHighEnergy": false
+    }
+  },
+  "regions": {
+    "us-west": {
+      "name": "US West (California)",
+      "carbonIntensity": 0.25,
+      "unit": "kgCO2e/kWh"
+    },
+    "us-east": {
+      "name": "US East (Virginia)",
+      "carbonIntensity": 0.35,
+      "unit": "kgCO2e/kWh"
+    },
+    "us-central": {
+      "name": "US Central (Texas)",
+      "carbonIntensity": 0.40,
+      "unit": "kgCO2e/kWh"
+    },
+    "europe-west": {
+      "name": "Europe West (Netherlands)",
+      "carbonIntensity": 0.30,
+      "unit": "kgCO2e/kWh"
+    },
+    "europe-north": {
+      "name": "Europe North (Sweden)",
+      "carbonIntensity": 0.05,
+      "unit": "kgCO2e/kWh"
+    },
+    "asia-east": {
+      "name": "Asia East (Japan)",
+      "carbonIntensity": 0.45,
+      "unit": "kgCO2e/kWh"
+    },
+    "asia-south": {
+      "name": "Asia South (India)",
+      "carbonIntensity": 0.70,
+      "unit": "kgCO2e/kWh"
+    },
+    "china": {
+      "name": "China",
+      "carbonIntensity": 0.60,
+      "unit": "kgCO2e/kWh"
+    },
+    "australia": {
+      "name": "Australia",
+      "carbonIntensity": 0.65,
+      "unit": "kgCO2e/kWh"
+    },
+    "brazil": {
+      "name": "Brazil",
+      "carbonIntensity": 0.10,
+      "unit": "kgCO2e/kWh"
+    },
+    "default": {
+      "name": "Global Average",
+      "carbonIntensity": 0.45,
+      "unit": "kgCO2e/kWh"
+    }
+  }
+}

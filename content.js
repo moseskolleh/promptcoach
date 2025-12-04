@@ -1,7 +1,35 @@
 // EcoPrompt Coach - Content Script
 // Detects prompt input and provides real-time optimization tips
+// Uses shared modules: EcoPromptAnalyzer and EcoPromptCalculator
 
 console.log('EcoPrompt Coach content script loaded');
+
+// ========================================
+// SETTINGS & STATE
+// ========================================
+
+const SETTINGS_KEY = 'ecoprompt_settings';
+
+let settings = {
+  autoDetect: true,
+  defaultModel: 'gpt-4o',
+  showBadge: true,
+  showBanner: true,
+  showConfidence: true,
+  liveCalculation: true,
+  trackHistory: false
+};
+
+let currentTooltip = null;
+let lastAnalyzedElement = null;
+let floatingBadge = null;
+let currentAnalysis = null;
+let bannerShown = false;
+let calculatorLoaded = false;
+
+// ========================================
+// INITIALIZATION
+// ========================================
 
 // Inject tooltip CSS
 const cssLink = document.createElement('link');
@@ -9,281 +37,138 @@ cssLink.rel = 'stylesheet';
 cssLink.href = chrome.runtime.getURL('tooltip.css');
 document.head.appendChild(cssLink);
 
-// Current tooltip instance
-let currentTooltip = null;
-let lastAnalyzedElement = null;
-let floatingBadge = null;
-let currentAnalysis = null;
-let bannerShown = false;
+// Load settings
+chrome.storage.local.get([SETTINGS_KEY], (result) => {
+  if (result[SETTINGS_KEY]) {
+    settings = { ...settings, ...result[SETTINGS_KEY] };
+  }
+});
 
-// Detect if we're on an AI platform
+// Load calculator data
+async function initCalculator() {
+  if (typeof EcoPromptCalculator !== 'undefined' && !calculatorLoaded) {
+    try {
+      await EcoPromptCalculator.loadData();
+      calculatorLoaded = true;
+      console.log('EcoPrompt Calculator data loaded');
+    } catch (e) {
+      console.error('Failed to load calculator data:', e);
+    }
+  }
+}
+
+initCalculator();
+
+// ========================================
+// PLATFORM DETECTION
+// ========================================
+
 function detectAIPlatform() {
   const hostname = window.location.hostname;
 
-  if (hostname.includes('chatgpt.com') || hostname.includes('openai.com')) {
-    return 'ChatGPT';
-  } else if (hostname.includes('claude.ai') || hostname.includes('anthropic.com')) {
-    return 'Claude';
-  } else if (hostname.includes('gemini.google.com') || hostname.includes('bard.google.com')) {
-    return 'Gemini';
-  } else if (hostname.includes('copilot.microsoft.com') || hostname.includes('bing.com/chat')) {
-    return 'Copilot';
-  } else if (hostname.includes('poe.com')) {
-    return 'Poe';
-  } else if (hostname.includes('perplexity.ai')) {
-    return 'Perplexity';
-  } else if (hostname.includes('you.com')) {
-    return 'You.com';
+  const platforms = {
+    'chatgpt.com': 'ChatGPT',
+    'chat.openai.com': 'ChatGPT',
+    'openai.com': 'ChatGPT',
+    'claude.ai': 'Claude',
+    'anthropic.com': 'Claude',
+    'gemini.google.com': 'Gemini',
+    'bard.google.com': 'Gemini',
+    'copilot.microsoft.com': 'Copilot',
+    'bing.com/chat': 'Copilot',
+    'poe.com': 'Poe',
+    'perplexity.ai': 'Perplexity',
+    'you.com': 'You.com',
+    'mistral.ai': 'Mistral'
+  };
+
+  for (const [domain, platform] of Object.entries(platforms)) {
+    if (hostname.includes(domain)) {
+      return platform;
+    }
   }
 
   return null;
 }
 
-// Token estimation (same as in promptAnalyzer.js)
-function estimateTokens(text) {
-  if (!text || text.trim().length === 0) return 0;
-  const words = text.trim().split(/\s+/).length;
-  const specialChars = (text.match(/[.,!?;:()[\]{}"'-]/g) || []).length;
-  return Math.ceil(words / 0.75 + specialChars * 0.5);
-}
+// ========================================
+// ANALYSIS FUNCTIONS (Using Shared Modules)
+// ========================================
 
-// Detect task type
-const TASK_TYPES = {
-  IMAGE_GENERATION: {
-    keywords: ['generate image', 'create image', 'draw', 'illustrate', 'picture of', 'photo of', 'dall-e', 'midjourney', 'stable diffusion', 'image of'],
-    energyMultiplier: 3.0,
-    displayName: 'Image Generation'
-  },
-  AGENTIC_TASK: {
-    keywords: ['research', 'analyze multiple', 'compare sources', 'investigate', 'browse', 'search for', 'find information', 'autonomous', 'agent', 'multi-step'],
-    energyMultiplier: 2.0,
-    displayName: 'Agentic/Research Task'
-  },
-  CODE_GENERATION: {
-    keywords: ['write code', 'create function', 'implement', 'debug', 'program', 'script', 'algorithm', 'refactor', 'fix bug'],
-    energyMultiplier: 1.2,
-    displayName: 'Code Generation'
-  },
-  CREATIVE_WRITING: {
-    keywords: ['write story', 'poem', 'essay', 'article', 'creative', 'blog post', 'narrative', 'fiction', 'novel'],
-    energyMultiplier: 1.3,
-    displayName: 'Creative Writing'
-  },
-  DATA_ANALYSIS: {
-    keywords: ['analyze data', 'analyze this', 'examine', 'interpret', 'statistics', 'trends', 'insights', 'dashboard'],
-    energyMultiplier: 1.4,
-    displayName: 'Data Analysis'
-  },
-  TEXT_SUMMARIZATION: {
-    keywords: ['summarize', 'summary', 'tldr', 'brief overview', 'key points', 'condense', 'excerpt'],
-    energyMultiplier: 0.7,
-    displayName: 'Summarization'
-  },
-  TRANSLATION: {
-    keywords: ['translate', 'translation', 'in spanish', 'in french', 'in german', 'to english', 'language'],
-    energyMultiplier: 0.6,
-    displayName: 'Translation'
-  },
-  QUESTION_ANSWERING: {
-    keywords: ['what is', 'how to', 'why', 'when', 'where', 'who', 'explain', 'tell me about', 'describe', 'define'],
-    energyMultiplier: 0.8,
-    displayName: 'Q&A'
-  },
-  GENERAL: {
-    keywords: [],
-    energyMultiplier: 1.0,
-    displayName: 'General'
-  }
-};
-
-function detectTaskType(text) {
-  const lowerText = text.toLowerCase();
-  let detectedType = 'GENERAL';
-  let maxScore = 0;
-
-  for (const [type, config] of Object.entries(TASK_TYPES)) {
-    if (config.keywords.length === 0) continue;
-
-    let score = 0;
-    for (const keyword of config.keywords) {
-      if (lowerText.includes(keyword)) {
-        score += 2;
-      }
-    }
-    if (score > maxScore) {
-      maxScore = score;
-      detectedType = type;
-    }
-  }
-
-  const taskConfig = TASK_TYPES[detectedType];
-  return {
-    type: detectedType,
-    displayName: taskConfig.displayName,
-    energyMultiplier: taskConfig.energyMultiplier
-  };
-}
-
-// Detect polite words
-function detectPoliteWords(text) {
-  const politePatterns = [
-    { pattern: /\bplease\b/gi, word: 'please', tokens: 1 },
-    { pattern: /\bthank you\b/gi, word: 'thank you', tokens: 2 },
-    { pattern: /\bthanks\b/gi, word: 'thanks', tokens: 1 },
-    { pattern: /\bi beg\b/gi, word: 'I beg', tokens: 2 },
-    { pattern: /\bkindly\b/gi, word: 'kindly', tokens: 1 },
-    { pattern: /\bcould you\b/gi, word: 'could you', tokens: 2 },
-    { pattern: /\bwould you\b/gi, word: 'would you', tokens: 2 },
-    { pattern: /\bcan you\b/gi, word: 'can you', tokens: 2 },
-    { pattern: /\bi appreciate\b/gi, word: 'I appreciate', tokens: 2 },
-    { pattern: /\bsorry\b/gi, word: 'sorry', tokens: 1 }
-  ];
-
-  const found = [];
-  let totalTokensSaved = 0;
-
-  for (const phrase of politePatterns) {
-    const matches = text.match(phrase.pattern);
-    if (matches) {
-      found.push({
-        phrase: phrase.word,
-        count: matches.length,
-        tokensSaved: phrase.tokens * matches.length,
-        example: matches[0]
-      });
-      totalTokensSaved += phrase.tokens * matches.length;
-    }
-  }
-
-  return { found, totalTokensSaved };
-}
-
-// Get optimization tips
-function getOptimizationTips(text, taskType, politeWords, tokens) {
-  const tips = [];
-
-  // Tip 1: Remove polite words
-  if (politeWords.totalTokensSaved > 0) {
-    const examples = politeWords.found.slice(0, 2).map(f => f.example).join('", "');
-    tips.push({
-      type: 'polite_words',
-      icon: 'Optimise Prompt.png',
-      title: 'Remove Polite Phrases',
-      description: `Found polite phrases like "${examples}". AI doesn't need politeness - removing them saves tokens!`,
-      impact: `Save ~${politeWords.totalTokensSaved} tokens`,
-      priority: 'high'
-    });
-  }
-
-  // Tip 2: Task-specific warnings
-  if (taskType.type === 'IMAGE_GENERATION') {
-    tips.push({
-      type: 'task_specific',
-      icon: 'Optimise Prompt.png',
-      title: '⚠️ High Energy Task Detected',
-      description: 'Image generation uses 3x more energy than text. Be specific with style, colors, and composition to avoid regeneration.',
-      impact: 'Reduce energy waste by 50-70%',
-      priority: 'high'
-    });
-  } else if (taskType.type === 'AGENTIC_TASK') {
-    tips.push({
-      type: 'task_specific',
-      icon: 'Optimise Prompt.png',
-      title: '⚠️ Multi-Step Task Warning',
-      description: 'Research/multi-step tasks use 2x more energy due to multiple model calls. Be specific and clear to minimize iterations.',
-      impact: 'Reduce energy overhead by 40-50%',
-      priority: 'high'
-    });
-  } else if (taskType.type === 'CODE_GENERATION') {
-    tips.push({
-      type: 'task_specific',
-      icon: 'Optimise Prompt.png',
-      title: 'Code Generation Tip',
-      description: 'Include language, libraries, and input/output examples for better results on first try.',
-      impact: 'Get working code faster',
-      priority: 'medium'
-    });
-  } else if (taskType.type === 'CREATIVE_WRITING') {
-    tips.push({
-      type: 'task_specific',
-      icon: 'Optimise Prompt.png',
-      title: 'Creative Writing Tip',
-      description: 'Creative tasks typically generate longer outputs (2x tokens). Consider if you need the full response.',
-      impact: 'Reduce output length',
-      priority: 'medium'
-    });
-  }
-
-  // Tip 3: Length optimization
-  if (tokens > 500) {
-    tips.push({
-      type: 'length',
-      icon: 'Optimise Prompt.png',
-      title: 'Consider Shorter Prompt',
-      description: 'Long prompts (>500 tokens) can be less effective and use more energy. Focus on key requirements only.',
-      impact: `Target: ~${Math.floor(tokens * 0.7)} tokens`,
-      priority: 'medium'
-    });
-  }
-
-  // Tip 4: Model alternatives (ALWAYS include this)
-  tips.push({
-    type: 'model',
-    icon: 'Alternative Available.png',
-    title: '🔄 Use More Efficient Models',
-    description: getModelRecommendation(taskType.type),
-    impact: 'Save 50-70% energy',
-    priority: 'high'
-  });
-
-  // Always return at least the model alternative tip
-  return tips.length > 0 ? tips : [{
-    type: 'general',
-    icon: 'Optimise Prompt.png',
-    title: 'Prompt Looks Good!',
-    description: 'Your prompt is well-optimized. Consider using efficient models to save energy.',
-    impact: 'Try GPT-4o mini or Gemini Flash',
-    priority: 'medium'
-  }];
-}
-
-function getModelRecommendation(taskType) {
-  const recommendations = {
-    IMAGE_GENERATION: 'Alternative: Use DALL-E 3, Midjourney, or Stable Diffusion instead of general LLMs - they\'re optimized for images',
-    TEXT_SUMMARIZATION: 'Alternative: Try GPT-4o mini (70% less energy) or Gemini Flash - both handle summaries efficiently',
-    CODE_GENERATION: 'Alternative: Claude 3.7 Sonnet or GPT-4o work well, but LLaMA 3.3 70B uses 60% less energy',
-    TRANSLATION: 'Alternative: Use GPT-4o mini or Gemini Flash (70% savings) - most efficient models handle translation well',
-    AGENTIC_TASK: 'Alternative: Manual research is more energy-efficient. If automation needed, use GPT-4o mini for simple research tasks',
-    CREATIVE_WRITING: 'Alternative: For drafts, try GPT-4o mini first (70% savings), then refine with larger models only if needed',
-    DATA_ANALYSIS: 'Alternative: Use Claude 3.7 Sonnet or GPT-4o for complex analysis, LLaMA 3.3 for simpler tasks',
-    QUESTION_ANSWERING: 'Alternative: Try GPT-4o mini, Gemini Flash, or LLaMA 3.2 first (70% savings) - they handle most Q&A well',
-    GENERAL: 'Alternative: Start with smaller models: GPT-4o mini, Gemini Flash, or LLaMA 3.2 (70% less energy). Upgrade only if needed.'
-  };
-
-  return recommendations[taskType] || recommendations.GENERAL;
-}
-
-// Analyze prompt
 function analyzePrompt(text) {
   if (!text || text.trim().length === 0) return null;
 
-  const tokens = estimateTokens(text);
-  const taskType = detectTaskType(text);
-  const politeWords = detectPoliteWords(text);
-  const tips = getOptimizationTips(text, taskType, politeWords, tokens);
+  // Use shared analyzer if available
+  if (typeof EcoPromptAnalyzer !== 'undefined') {
+    return EcoPromptAnalyzer.analyzePrompt(text);
+  }
+
+  // Fallback to basic analysis
+  const words = text.trim().split(/\s+/).length;
+  const tokens = Math.ceil(words / 0.75);
 
   return {
     tokens,
-    taskType,
-    politeWords,
-    tips,
-    optimizedTokens: tokens - politeWords.totalTokensSaved
+    taskType: { type: 'GENERAL', displayName: 'General', energyMultiplier: 1.0 },
+    politeWords: { found: [], totalTokensSaved: 0 },
+    tips: [{
+      type: 'general',
+      icon: 'Optimise Prompt.png',
+      title: 'Analyzer Loading...',
+      description: 'Please wait while the analyzer loads.',
+      impact: 'Full analysis coming soon',
+      priority: 'medium'
+    }],
+    optimizedTokens: tokens
   };
 }
 
-// Create floating badge
+function getModelRecommendation(taskType) {
+  if (typeof EcoPromptAnalyzer !== 'undefined') {
+    return EcoPromptAnalyzer.getModelRecommendation(taskType);
+  }
+
+  return 'Start with smaller models: GPT-4o mini, Gemini Flash, or Claude 3.5 Haiku (70% less energy).';
+}
+
+// ========================================
+// IMPACT CALCULATION (Using Shared Calculator)
+// ========================================
+
+async function calculateQuickImpact(tokens, taskType) {
+  if (!calculatorLoaded || typeof EcoPromptCalculator === 'undefined') {
+    return null;
+  }
+
+  const platform = detectAIPlatform();
+  let modelId = settings.defaultModel;
+
+  // Auto-detect model based on platform
+  if (settings.autoDetect && platform) {
+    const detected = EcoPromptCalculator.autoDetectModel(window.location.hostname);
+    if (detected) modelId = detected;
+  }
+
+  const outputEstimate = typeof EcoPromptAnalyzer !== 'undefined'
+    ? EcoPromptAnalyzer.estimateOutputTokens(taskType.type || taskType, tokens)
+    : { estimated: 300 };
+
+  const impact = EcoPromptCalculator.calculateImpact(
+    modelId,
+    tokens,
+    outputEstimate.estimated,
+    taskType.energyMultiplier || 1.0
+  );
+
+  return impact;
+}
+
+// ========================================
+// UI COMPONENTS
+// ========================================
+
 function createFloatingBadge() {
-  if (floatingBadge) return; // Already exists
+  if (floatingBadge || !settings.showBadge) return;
 
   const badge = document.createElement('div');
   badge.className = 'ecoprompt-floating-badge';
@@ -302,7 +187,6 @@ function createFloatingBadge() {
   document.body.appendChild(badge);
   floatingBadge = badge;
 
-  // Add styles inline to ensure visibility
   badge.style.cssText = `
     position: fixed;
     bottom: 20px;
@@ -324,7 +208,6 @@ function createFloatingBadge() {
     animation: ecoprompt-badge-bounce 2s infinite;
   `;
 
-  // Add animation
   const style = document.createElement('style');
   style.textContent = `
     @keyframes ecoprompt-badge-bounce {
@@ -342,9 +225,8 @@ function createFloatingBadge() {
   document.head.appendChild(style);
 }
 
-// Show notification banner at top
 function showNotificationBanner(analysis) {
-  if (bannerShown) return;
+  if (bannerShown || !settings.showBanner) return;
 
   const banner = document.createElement('div');
   banner.className = 'ecoprompt-notification-banner';
@@ -368,11 +250,17 @@ function showNotificationBanner(analysis) {
   const topTip = analysis.tips[0];
   const tipsCount = analysis.tips.length;
 
+  // Add energy estimate if available
+  let energyInfo = '';
+  if (analysis.energyEstimate) {
+    energyInfo = `<span style="margin-left: 10px; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 10px; font-size: 11px;">⚡ ~${analysis.energyEstimate.toFixed(3)} Wh</span>`;
+  }
+
   banner.innerHTML = `
     <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
       <span style="font-size: 24px;">🌱</span>
       <div style="flex: 1;">
-        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${topTip.title}</div>
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${topTip.title}${energyInfo}</div>
         <div style="font-size: 13px; opacity: 0.95;">${topTip.description}</div>
         <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">💚 ${topTip.impact}</div>
       </div>
@@ -390,18 +278,11 @@ function showNotificationBanner(analysis) {
     </div>
   `;
 
-  // Add animation
   const style = document.createElement('style');
   style.textContent = `
     @keyframes slideDown {
-      from {
-        transform: translateY(-100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
+      from { transform: translateY(-100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
     .ecoprompt-banner-btn:hover {
       transform: scale(1.05);
@@ -424,11 +305,8 @@ function showNotificationBanner(analysis) {
 
   document.body.appendChild(banner);
   bannerShown = true;
-
-  // Don't auto-hide - let user close it manually
 }
 
-// Create tooltip HTML
 function createTooltip(analysis, element) {
   const tooltip = document.createElement('div');
   tooltip.className = 'ecoprompt-tooltip';
@@ -445,20 +323,44 @@ function createTooltip(analysis, element) {
   `;
   tooltip.appendChild(header);
 
-  // Token info
+  // Token info with task type
+  const taskTypeDisplay = analysis.taskType?.displayName || analysis.taskType || 'General';
+  const energyMultiplier = analysis.taskType?.energyMultiplier || analysis.energyMultiplier || 1.0;
+
   const tokenInfo = document.createElement('div');
   tokenInfo.className = 'ecoprompt-token-info';
   tokenInfo.innerHTML = `
     <div class="ecoprompt-token-count">
       <strong>${analysis.tokens}</strong>
-      <span>Estimated Tokens</span>
+      <span>Tokens</span>
     </div>
-    <div class="ecoprompt-task-type">${analysis.taskType.displayName}</div>
+    <div class="ecoprompt-task-type">${taskTypeDisplay}</div>
   `;
   tooltip.appendChild(tokenInfo);
 
-  // Energy warning
-  if (analysis.taskType.energyMultiplier > 1.5) {
+  // Energy estimate if available
+  if (analysis.energyEstimate) {
+    const energyDiv = document.createElement('div');
+    energyDiv.style.cssText = `
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px 0;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
+    energyDiv.innerHTML = `
+      <span>⚡ Energy: <strong>${analysis.energyEstimate.toFixed(3)} Wh</strong></span>
+      <span>💧 Water: <strong>${analysis.waterEstimate?.toFixed(2) || '?'} mL</strong></span>
+    `;
+    tooltip.appendChild(energyDiv);
+  }
+
+  // Energy warning for high-energy tasks
+  if (energyMultiplier > 1.5) {
     const warning = document.createElement('div');
     warning.className = 'ecoprompt-warning';
     warning.style.cssText = `
@@ -471,12 +373,12 @@ function createTooltip(analysis, element) {
       font-weight: 600;
       border-left: 3px solid #ffc107;
     `;
-    warning.textContent = `⚠️ High-energy task (${analysis.taskType.energyMultiplier}x multiplier)`;
+    warning.textContent = `⚠️ High-energy task (${energyMultiplier}x multiplier)`;
     tooltip.appendChild(warning);
   }
 
   // Savings indicator
-  if (analysis.politeWords.totalTokensSaved > 0) {
+  if (analysis.politeWords?.totalTokensSaved > 0) {
     const savings = document.createElement('div');
     savings.className = 'ecoprompt-savings';
     savings.innerHTML = `
@@ -490,9 +392,9 @@ function createTooltip(analysis, element) {
   // Tips
   const tipsContainer = document.createElement('div');
   tipsContainer.className = 'ecoprompt-tips';
-  tipsContainer.innerHTML = '<div class="ecoprompt-tips-title">💡 Optimization Tips & Alternatives</div>';
+  tipsContainer.innerHTML = '<div class="ecoprompt-tips-title">💡 Optimization Tips</div>';
 
-  analysis.tips.slice(0, 4).forEach(tip => {
+  (analysis.tips || []).slice(0, 4).forEach(tip => {
     const tipElement = document.createElement('div');
     tipElement.className = `ecoprompt-tip priority-${tip.priority}`;
 
@@ -513,7 +415,7 @@ function createTooltip(analysis, element) {
 
   // View more button
   const viewMoreBtn = document.createElement('button');
-  viewMoreBtn.textContent = 'View Full Analysis & Alternatives';
+  viewMoreBtn.textContent = 'View Full Analysis';
   viewMoreBtn.style.cssText = `
     width: 100%;
     padding: 10px;
@@ -536,24 +438,19 @@ function createTooltip(analysis, element) {
 
   // Close button handler
   const closeBtn = header.querySelector('.ecoprompt-tooltip-close');
-  closeBtn.addEventListener('click', () => {
-    removeTooltip();
-  });
+  closeBtn.addEventListener('click', () => removeTooltip());
 
   return tooltip;
 }
 
-// Position tooltip near element
 function positionTooltip(tooltip, element) {
   const rect = element.getBoundingClientRect();
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
   const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
 
-  // Position below the element
   tooltip.style.top = `${rect.bottom + scrollTop + 10}px`;
   tooltip.style.left = `${rect.left + scrollLeft}px`;
 
-  // Adjust if tooltip goes off screen
   setTimeout(() => {
     const tooltipRect = tooltip.getBoundingClientRect();
     if (tooltipRect.right > window.innerWidth) {
@@ -565,7 +462,6 @@ function positionTooltip(tooltip, element) {
   }, 10);
 }
 
-// Show tooltip
 function showTooltip(analysis, element) {
   removeTooltip();
 
@@ -575,12 +471,8 @@ function showTooltip(analysis, element) {
 
   currentTooltip = tooltip;
   lastAnalyzedElement = element;
-
-  // Don't auto-hide - let user close it manually
-  // User can close by clicking X or clicking outside
 }
 
-// Remove tooltip
 function removeTooltip() {
   if (currentTooltip) {
     currentTooltip.remove();
@@ -588,11 +480,13 @@ function removeTooltip() {
   }
 }
 
-// Handle paste event
-function handlePaste(event) {
+// ========================================
+// EVENT HANDLERS
+// ========================================
+
+async function handlePaste(event) {
   const element = event.target;
 
-  // Only handle textareas and contenteditable elements
   if (
     element.tagName !== 'TEXTAREA' &&
     !element.isContentEditable &&
@@ -601,23 +495,26 @@ function handlePaste(event) {
     return;
   }
 
-  // Wait for paste to complete
-  setTimeout(() => {
+  setTimeout(async () => {
     const text = element.value || element.textContent || element.innerText;
 
-    if (!text || text.trim().length < 10) {
-      return; // Skip very short text
-    }
+    if (!text || text.trim().length < 10) return;
 
     const analysis = analyzePrompt(text);
     if (analysis) {
+      // Calculate energy estimate
+      const impact = await calculateQuickImpact(analysis.tokens, analysis.taskType || analysis.taskTypeRaw);
+      if (impact) {
+        analysis.energyEstimate = impact.energy.wh;
+        analysis.waterEstimate = impact.water.ml;
+        analysis.carbonEstimate = impact.carbon.gCO2e;
+      }
+
       currentAnalysis = analysis;
 
-      // Always show tips even if minimal
       showTooltip(analysis, element);
       createFloatingBadge();
 
-      // Show banner for first significant prompt
       if (!bannerShown && text.trim().length > 50) {
         showNotificationBanner(analysis);
       }
@@ -625,39 +522,48 @@ function handlePaste(event) {
   }, 100);
 }
 
-// Handle input event (for manual typing)
 function handleInput(event) {
   const element = event.target;
   const text = element.value || element.textContent || element.innerText;
 
-  // Only analyze if text is substantial and user paused typing
   if (text && text.trim().length > 50) {
     clearTimeout(element._ecopromptTimeout);
-    element._ecopromptTimeout = setTimeout(() => {
+    element._ecopromptTimeout = setTimeout(async () => {
       const analysis = analyzePrompt(text);
       if (analysis) {
+        // Calculate energy estimate
+        const impact = await calculateQuickImpact(analysis.tokens, analysis.taskType || analysis.taskTypeRaw);
+        if (impact) {
+          analysis.energyEstimate = impact.energy.wh;
+          analysis.waterEstimate = impact.water.ml;
+          analysis.carbonEstimate = impact.carbon.gCO2e;
+        }
+
         currentAnalysis = analysis;
 
-        // Always show tips
         showTooltip(analysis, element);
         createFloatingBadge();
 
-        // Show banner for first significant prompt
         if (!bannerShown) {
           showNotificationBanner(analysis);
         }
       }
-    }, 2000); // Wait 2 seconds after typing stops
+    }, 2000);
   }
 }
 
-// Check if we're on an AI platform and show welcome message
+// ========================================
+// PLATFORM-SPECIFIC SETUP
+// ========================================
+
 const platform = detectAIPlatform();
 if (platform) {
   console.log(`EcoPrompt Coach: Detected ${platform}. Ready to provide tips!`);
 
-  // Show initial badge after a delay
+  // Show welcome badge
   setTimeout(() => {
+    if (!settings.showBadge) return;
+
     const badge = document.createElement('div');
     badge.style.cssText = `
       position: fixed;
@@ -675,12 +581,27 @@ if (platform) {
       cursor: pointer;
       animation: fadeIn 0.5s ease;
     `;
+
+    // Get detected model
+    let modelInfo = '';
+    if (calculatorLoaded && typeof EcoPromptCalculator !== 'undefined') {
+      const detectedModel = EcoPromptCalculator.autoDetectModel(window.location.hostname);
+      if (detectedModel) {
+        const models = EcoPromptCalculator.getAvailableModels();
+        const model = models.find(m => m.id === detectedModel);
+        if (model) {
+          modelInfo = `<div style="font-size: 10px; opacity: 0.8; margin-top: 2px;">Model: ${model.name}</div>`;
+        }
+      }
+    }
+
     badge.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 20px;">🌱</span>
         <div>
           <div>EcoPrompt Coach Active</div>
           <div style="font-size: 11px; opacity: 0.9;">Start typing to get optimization tips</div>
+          ${modelInfo}
         </div>
       </div>
     `;
@@ -691,13 +612,11 @@ if (platform) {
 
     document.body.appendChild(badge);
 
-    // Auto-hide after 5 seconds
     setTimeout(() => {
       badge.style.animation = 'fadeOut 0.5s ease';
       setTimeout(() => badge.remove(), 500);
     }, 5000);
 
-    // Add animations
     const style = document.createElement('style');
     style.textContent = `
       @keyframes fadeIn {
@@ -713,11 +632,13 @@ if (platform) {
   }, 2000);
 }
 
-// Listen for paste events on all textareas and inputs
+// ========================================
+// EVENT LISTENERS
+// ========================================
+
 document.addEventListener('paste', handlePaste, true);
 document.addEventListener('input', handleInput, true);
 
-// Close tooltip when clicking outside
 document.addEventListener('click', (event) => {
   if (currentTooltip && !currentTooltip.contains(event.target)) {
     if (lastAnalyzedElement && !lastAnalyzedElement.contains(event.target)) {
@@ -726,12 +647,23 @@ document.addEventListener('click', (event) => {
   }
 });
 
-// Listen for messages from the popup or background script
+// ========================================
+// MESSAGE HANDLING
+// ========================================
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'detectPlatform') {
-    const platform = detectAIPlatform();
-    sendResponse({ platform });
+    sendResponse({ platform: detectAIPlatform() });
   } else if (request.action === 'getCurrentAnalysis') {
     sendResponse({ analysis: currentAnalysis });
+  } else if (request.action === 'settingsUpdated') {
+    settings = { ...settings, ...request.settings };
+  }
+});
+
+// Listen for settings changes
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes[SETTINGS_KEY]) {
+    settings = { ...settings, ...changes[SETTINGS_KEY].newValue };
   }
 });
