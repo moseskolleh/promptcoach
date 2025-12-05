@@ -852,7 +852,7 @@ function initOptimizeTab() {
   });
 
   // Get Tips button
-  document.getElementById('get-tips-btn')?.addEventListener('click', getOptimizationTips);
+  document.getElementById('get-tips-btn')?.addEventListener('click', handleGetTips);
 
   // Compare Models button - shows comparison section
   document.getElementById('compare-models-btn')?.addEventListener('click', () => {
@@ -889,7 +889,7 @@ function initOptimizeTab() {
   });
 }
 
-function getOptimizationTips() {
+function handleGetTips() {
   const promptText = document.getElementById('optimize-prompt-input')?.value?.trim();
 
   if (!promptText) {
