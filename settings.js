@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS = {
   showBanner: true,
   showConfidence: true,
   liveCalculation: true,
+  showModelComparison: false,
   trackHistory: false,
   userRegion: 'default',
   taskMultipliers: {
@@ -176,6 +177,7 @@ async function loadSettings() {
       document.getElementById('show-banner').checked = settings.showBanner;
       document.getElementById('show-confidence').checked = settings.showConfidence;
       document.getElementById('live-calculation').checked = settings.liveCalculation;
+      document.getElementById('show-model-comparison').checked = settings.showModelComparison;
       document.getElementById('track-history').checked = settings.trackHistory;
       document.getElementById('user-region').value = settings.userRegion || 'default';
 
@@ -215,6 +217,7 @@ async function saveSettings() {
     showBanner: document.getElementById('show-banner').checked,
     showConfidence: document.getElementById('show-confidence').checked,
     liveCalculation: document.getElementById('live-calculation').checked,
+    showModelComparison: document.getElementById('show-model-comparison').checked,
     trackHistory: document.getElementById('track-history').checked,
     userRegion: document.getElementById('user-region').value,
     taskMultipliers: taskMultipliers
@@ -236,6 +239,7 @@ function resetToDefaults() {
   document.getElementById('show-banner').checked = DEFAULT_SETTINGS.showBanner;
   document.getElementById('show-confidence').checked = DEFAULT_SETTINGS.showConfidence;
   document.getElementById('live-calculation').checked = DEFAULT_SETTINGS.liveCalculation;
+  document.getElementById('show-model-comparison').checked = DEFAULT_SETTINGS.showModelComparison;
   document.getElementById('track-history').checked = DEFAULT_SETTINGS.trackHistory;
   document.getElementById('user-region').value = 'default';
 

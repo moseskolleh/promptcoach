@@ -1,8 +1,8 @@
 {
   "_metadata": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Pre-built efficient prompt templates for common AI tasks",
-    "lastUpdated": "2024-12-04"
+    "lastUpdated": "2024-12-15"
   },
   "categories": [
     {
@@ -34,6 +34,12 @@
       "name": "Translation",
       "icon": "🌐",
       "description": "Efficient prompts for language translation"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "⚡",
+      "description": "Efficient prompts for everyday tasks"
     }
   ],
   "templates": [
@@ -186,6 +192,66 @@
       "tokens": 7,
       "efficiency": "very-high",
       "tip": "Single modifier keeps it efficient"
+    },
+    {
+      "id": "prod-list",
+      "category": "productivity",
+      "title": "Quick Task List",
+      "description": "Generate action items from notes",
+      "prompt": "List action items from: [YOUR NOTES]",
+      "tokens": 7,
+      "efficiency": "very-high",
+      "tip": "Direct instruction for focused output"
+    },
+    {
+      "id": "prod-meeting",
+      "category": "productivity",
+      "title": "Meeting Notes",
+      "description": "Structure meeting notes quickly",
+      "prompt": "Format as meeting notes (decisions, actions): [YOUR TEXT]",
+      "tokens": 10,
+      "efficiency": "high",
+      "tip": "Structured format guides output"
+    },
+    {
+      "id": "prod-reply",
+      "category": "productivity",
+      "title": "Quick Reply",
+      "description": "Generate a brief response",
+      "prompt": "Draft a 2-sentence reply to: [MESSAGE]",
+      "tokens": 9,
+      "efficiency": "very-high",
+      "tip": "Sentence limit keeps it concise"
+    },
+    {
+      "id": "prod-proofread",
+      "category": "productivity",
+      "title": "Proofread",
+      "description": "Check for errors only",
+      "prompt": "List only errors (if any) in: [YOUR TEXT]",
+      "tokens": 9,
+      "efficiency": "very-high",
+      "tip": "Only errors - no rewrites needed"
+    },
+    {
+      "id": "code-debug",
+      "category": "coding",
+      "title": "Debug Error",
+      "description": "Fix specific error message",
+      "prompt": "Fix this error: [ERROR]\nCode: [YOUR CODE]",
+      "tokens": 8,
+      "efficiency": "high",
+      "tip": "Error context helps targeted fix"
+    },
+    {
+      "id": "analyze-pros-cons",
+      "category": "analysis",
+      "title": "Pros and Cons",
+      "description": "Quick decision analysis",
+      "prompt": "3 pros and 3 cons of: [TOPIC]",
+      "tokens": 9,
+      "efficiency": "high",
+      "tip": "Number limits keep output focused"
     }
   ]
 }

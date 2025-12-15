@@ -324,44 +324,78 @@ function calculateAverageImpact(inputTokens, outputTokens, energyMultiplier = 1.
 // ========================================
 
 /**
- * Format energy into relatable comparison
+ * Format energy into relatable comparison using lightbulb hours
+ * A standard LED lightbulb uses about 10W (0.01 kW)
  * @param {number} wh - Energy in watt-hours
  * @returns {string} Human-readable comparison
  */
 function formatEnergyComparison(wh) {
-  if (wh < 0.5) {
-    const minutes = Math.round(wh * 60);
-    return `${minutes} minute${minutes !== 1 ? 's' : ''} of LED lightbulb`;
-  } else if (wh < 10) {
-    const percent = ((wh / 10) * 100).toFixed(1);
-    return `${percent}% of smartphone charge`;
-  } else if (wh < 50) {
-    const minutes = Math.round((wh / 50) * 60);
-    return `${minutes} minute${minutes !== 1 ? 's' : ''} of laptop usage`;
+  // LED lightbulb: 10W = 10Wh per hour
+  const lightbulbWatts = 10;
+  const hours = wh / lightbulbWatts;
+
+  if (hours < 1/60) {
+    // Less than 1 minute - show seconds
+    const seconds = Math.round(hours * 3600);
+    return `${seconds} second${seconds !== 1 ? 's' : ''} of lightbulb use`;
+  } else if (hours < 1) {
+    // Less than 1 hour - show minutes
+    const minutes = Math.round(hours * 60);
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} of lightbulb use`;
+  } else if (hours < 24) {
+    // Less than a day - show hours
+    const roundedHours = hours.toFixed(1);
+    return `${roundedHours} hour${parseFloat(roundedHours) !== 1 ? 's' : ''} of lightbulb use`;
   } else {
-    const minutes = Math.round((wh / 130) * 60);
-    return `${minutes} minute${minutes !== 1 ? 's' : ''} of 65" TV`;
+    // More than a day - show days
+    const days = (hours / 24).toFixed(1);
+    return `${days} day${parseFloat(days) !== 1 ? 's' : ''} of lightbulb use`;
   }
 }
 
 /**
- * Format water into relatable comparison
+ * Format water into relatable accumulated comparison
+ * Uses meaningful visualizations for emotional impact
  * @param {number} ml - Water in milliliters
  * @returns {string} Human-readable comparison
  */
 function formatWaterComparison(ml) {
-  if (ml < 5) {
-    const drops = Math.round(ml * 20); // 20 drops per mL
-    return `~${drops} drop${drops !== 1 ? 's' : ''} of water`;
-  } else if (ml < 100) {
-    const percent = ((ml / 250) * 100).toFixed(1);
-    return `${percent}% of a coffee cup`;
-  } else if (ml < 500) {
-    const cups = (ml / 250).toFixed(2);
-    return `${cups} coffee cups`;
+  // Convert to liters for easier calculations
+  const liters = ml / 1000;
+
+  if (liters < 0.01) {
+    // Less than 10ml - use teaspoons (5ml each)
+    const teaspoons = Math.round(ml / 5);
+    return `~${teaspoons} teaspoon${teaspoons !== 1 ? 's' : ''} of water`;
+  } else if (liters < 0.25) {
+    // Less than a cup - show as portion of a cup
+    const percent = ((ml / 250) * 100).toFixed(0);
+    return `${percent}% of a drinking glass`;
+  } else if (liters < 1) {
+    // Less than 1 liter - show as glasses
+    const glasses = (ml / 250).toFixed(1);
+    return `${glasses} drinking glass${parseFloat(glasses) !== 1 ? 'es' : ''}`;
+  } else if (liters < 10) {
+    // 1-10 liters - show as water bottles
+    const bottles = liters.toFixed(1);
+    return `${bottles} liter${parseFloat(bottles) !== 1 ? 's' : ''} (bottles)`;
+  } else if (liters < 100) {
+    // 10-100 liters - show as buckets (~10L each)
+    const buckets = (liters / 10).toFixed(1);
+    return `${buckets} bucket${parseFloat(buckets) !== 1 ? 's' : ''} of water`;
+  } else if (liters < 1000) {
+    // 100-1000 liters - show as bathtubs (~150L each)
+    const bathtubs = (liters / 150).toFixed(1);
+    return `${bathtubs} bathtub${parseFloat(bathtubs) !== 1 ? 's' : ''} of water`;
+  } else if (liters < 100000) {
+    // 1000-100000 liters - show as small pools
+    const pools = (liters / 20000).toFixed(2);
+    return `${pools} small swimming pool${parseFloat(pools) !== 1 ? 's' : ''}`;
   } else {
-    const bottles = (ml / 500).toFixed(2);
-    return `${bottles} water bottles (500mL)`;
+    // Very large amounts - show as small lake portions
+    // Average small lake: ~10 million liters
+    const lakePercent = ((liters / 10000000) * 100).toFixed(4);
+    return `${lakePercent}% of a small lake`;
   }
 }
 

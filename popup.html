@@ -19,15 +19,15 @@
 
     <!-- Tab Navigation -->
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="impact">Impact</button>
-      <button class="tab-btn" data-tab="optimize">Optimize</button>
+      <button class="tab-btn active" data-tab="optimize">Optimizer</button>
       <button class="tab-btn" data-tab="library">Library</button>
       <button class="tab-btn" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="impact">Impacts</button>
     </nav>
 
     <main>
       <!-- Impact Calculator Tab -->
-      <div id="impact-tab" class="tab-content active">
+      <div id="impact-tab" class="tab-content hidden">
       <!-- Model Selection -->
       <section class="model-select-section">
         <div class="model-select-row">
@@ -89,12 +89,16 @@
           </div>
         </div>
 
-        <div class="eco-score">
-          <h3>Eco-Efficiency Score</h3>
+        <div class="eco-score prominent">
+          <div class="eco-score-header">
+            <h3>⚡ Energy Efficiency Score</h3>
+            <span class="eco-badge" id="eco-badge">-</span>
+          </div>
           <div class="score-bar">
             <div id="score-fill" class="score-fill"></div>
           </div>
           <p id="score-text">-</p>
+          <p class="eco-hint">Higher is better • Based on energy consumption per query</p>
         </div>
       </section>
 
@@ -103,13 +107,36 @@
         <h2>💡 Optimization Tips</h2>
         <div id="suggestions-list"></div>
       </section>
+
+      <!-- Model Comparison Section (Hidden by default, toggled in settings) -->
+      <section id="model-comparison-section" class="model-comparison-section hidden">
+        <h3>📊 AI Model Comparison</h3>
+        <p class="section-hint">Select models to compare energy efficiency</p>
+
+        <div class="model-checkbox-list" id="model-checkbox-list">
+          <!-- Model checkboxes will be rendered here -->
+        </div>
+
+        <button id="run-compare-btn" class="primary-btn">Compare Selected</button>
+
+        <div id="comparison-results" class="comparison-results hidden">
+          <div class="comparison-header">
+            <span>Model</span>
+            <span>Energy</span>
+            <span>Water</span>
+            <span>Carbon</span>
+          </div>
+          <div id="comparison-list"></div>
+          <div class="comparison-summary" id="comparison-summary"></div>
+        </div>
+      </section>
       </div>
 
-      <!-- Combined Optimize Tab (Tips + Compare) -->
-      <div id="optimize-tab" class="tab-content hidden">
+      <!-- Optimizer Tab (Priority view) -->
+      <div id="optimize-tab" class="tab-content active">
         <section class="optimize-section">
-          <h2>✨ Optimize & Compare</h2>
-          <p class="section-desc">Get tips, optimize your prompt, and compare models</p>
+          <h2>✨ Optimizer</h2>
+          <p class="section-desc">Get optimization tips for your prompts</p>
 
           <!-- Prompt Input -->
           <div class="input-group">
@@ -121,8 +148,7 @@
           </div>
 
           <div class="optimize-actions">
-            <button id="get-tips-btn" class="primary-btn">Get Tips</button>
-            <button id="compare-models-btn" class="secondary-btn">Compare Models</button>
+            <button id="get-tips-btn" class="primary-btn">Get Optimization Tips</button>
           </div>
 
           <!-- Tips Results -->
@@ -147,28 +173,6 @@
             </div>
           </section>
 
-          <!-- Model Comparison Results -->
-          <section id="model-comparison-section" class="model-comparison-section hidden">
-            <h3>📊 Model Comparison</h3>
-            <p class="section-hint">Select models to compare energy efficiency</p>
-
-            <div class="model-checkbox-list" id="model-checkbox-list">
-              <!-- Model checkboxes will be rendered here -->
-            </div>
-
-            <button id="run-compare-btn" class="primary-btn">Compare Selected</button>
-
-            <div id="comparison-results" class="comparison-results hidden">
-              <div class="comparison-header">
-                <span>Model</span>
-                <span>Energy</span>
-                <span>Water</span>
-                <span>Carbon</span>
-              </div>
-              <div id="comparison-list"></div>
-              <div class="comparison-summary" id="comparison-summary"></div>
-            </div>
-          </section>
         </section>
       </div>
 
@@ -177,6 +181,7 @@
         <section class="library-section">
           <h2>📚 Prompt Library</h2>
           <p class="section-desc">Efficient templates and saved prompts</p>
+          <p class="storage-note">💾 Saved prompts are stored locally on your device</p>
 
           <!-- Templates Section -->
           <div class="library-subsection">
