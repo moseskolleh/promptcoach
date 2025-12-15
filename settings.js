@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = {
   autoDetect: true,
   defaultModel: 'gpt-4o',
   showBadge: true,
-  showBanner: true,
+  showBanner: false,  // Disabled by default - simplified for testing
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,

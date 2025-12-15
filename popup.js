@@ -13,7 +13,7 @@ let settings = {
   autoDetect: true,
   defaultModel: 'gpt-4o',
   showBadge: true,
-  showBanner: true,
+  showBanner: false,  // Disabled by default
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,
@@ -64,10 +64,33 @@ async function loadSettings() {
       if (result[SETTINGS_KEY]) {
         settings = { ...settings, ...result[SETTINGS_KEY] };
       }
+      // Apply settings to UI
+      applySettings();
       resolve(settings);
     });
   });
 }
+
+function applySettings() {
+  // Apply model comparison visibility
+  const comparisonSection = document.getElementById('model-comparison-section');
+  if (comparisonSection) {
+    if (settings.showModelComparison) {
+      comparisonSection.classList.remove('hidden');
+      renderModelCheckboxes();
+    } else {
+      comparisonSection.classList.add('hidden');
+    }
+  }
+}
+
+// Listen for settings changes from settings page
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes[SETTINGS_KEY]) {
+    settings = { ...settings, ...changes[SETTINGS_KEY].newValue };
+    applySettings();
+  }
+});
 
 async function loadTemplates() {
   try {
