@@ -265,6 +265,74 @@ function estimateOutputTokens(taskType, inputTokens) {
 // ========================================
 
 /**
+ * Get eco-friendly alternative suggestion based on task type
+ * @param {string} taskType - The task type
+ * @returns {Object|null} Alternative suggestion or null
+ */
+function getEcoAlternative(taskType) {
+  const alternatives = {
+    TRANSLATION: {
+      title: '🌍 Use Offline Translation',
+      description: 'For common languages, try offline apps like Google Translate (offline mode), DeepL desktop, or Apple Translate. They work without internet and use zero cloud energy.',
+      impact: 'Zero cloud energy usage',
+      priority: 'high',
+      savingsPercent: 100
+    },
+    QUESTION_ANSWERING: {
+      title: '🔍 Try a Search Engine First',
+      description: 'For factual questions, a quick web search (Google, DuckDuckGo) uses ~0.0003 Wh vs ~0.3 Wh for AI. Reserve AI for complex reasoning.',
+      impact: 'Use 1000x less energy',
+      priority: 'high',
+      savingsPercent: 99
+    },
+    TEXT_SUMMARIZATION: {
+      title: '📖 Skim or Use Browser Tools',
+      description: 'For short texts, skimming takes seconds. Browser extensions like "TLDR This" or "Pocket" offer lightweight summaries.',
+      impact: 'Significant energy savings',
+      priority: 'medium',
+      savingsPercent: 80
+    },
+    CODE_GENERATION: {
+      title: '📚 Check Documentation First',
+      description: 'Official docs, Stack Overflow, or GitHub examples often have ready solutions. AI is best for custom logic, not common patterns.',
+      impact: 'Often faster than AI',
+      priority: 'medium',
+      savingsPercent: 70
+    },
+    CREATIVE_WRITING: {
+      title: '✍️ Start with Your Own Draft',
+      description: 'Writing your first draft and asking AI to improve it uses fewer tokens than generating from scratch.',
+      impact: 'Save 40-60% tokens',
+      priority: 'medium',
+      savingsPercent: 50
+    },
+    DATA_ANALYSIS: {
+      title: '📊 Use Spreadsheet Functions',
+      description: 'Excel, Google Sheets, or Python pandas can handle most data analysis locally. Reserve AI for interpretation.',
+      impact: 'Process data locally',
+      priority: 'medium',
+      savingsPercent: 70
+    },
+    IMAGE_GENERATION: {
+      title: '🖼️ Use Stock Images or Templates',
+      description: 'Unsplash, Pexels, or Canva templates may have what you need. AI image generation uses 3x more energy.',
+      impact: 'Significant energy savings',
+      priority: 'high',
+      savingsPercent: 90
+    },
+    AGENTIC_TASK: {
+      title: '🔎 Manual Research is Greener',
+      description: 'For research tasks, targeted searches and reading sources directly gives better results than AI browsing.',
+      impact: 'Better accuracy, less energy',
+      priority: 'high',
+      savingsPercent: 75
+    }
+  };
+
+  return alternatives[taskType] || null;
+}
+
+/**
  * Generate optimization tips based on analysis
  * @param {Object} politeWords - Detected polite words
  * @param {Object} taskType - Detected task type
@@ -274,7 +342,17 @@ function estimateOutputTokens(taskType, inputTokens) {
 function getOptimizationTips(politeWords, taskType, tokens) {
   const tips = [];
 
-  // Tip 1: Remove polite phrases
+  // Tip 1: Eco-friendly alternative (if available) - prioritize this
+  const ecoAlternative = getEcoAlternative(taskType.type);
+  if (ecoAlternative) {
+    tips.push({
+      type: 'eco_alternative',
+      icon: 'Alternative Available.png',
+      ...ecoAlternative
+    });
+  }
+
+  // Tip 2: Remove polite phrases
   if (politeWords.totalTokensSaved > 0) {
     const examples = politeWords.found.slice(0, 2).map(f => f.example).join('", "');
     tips.push({
@@ -288,7 +366,7 @@ function getOptimizationTips(politeWords, taskType, tokens) {
     });
   }
 
-  // Tip 2: Task-specific warnings
+  // Tip 3: Task-specific warnings
   if (taskType.type === 'IMAGE_GENERATION') {
     tips.push({
       type: 'task_specific',
@@ -331,7 +409,7 @@ function getOptimizationTips(politeWords, taskType, tokens) {
     });
   }
 
-  // Tip 3: Length optimization
+  // Tip 4: Length optimization
   if (tokens > 500) {
     tips.push({
       type: 'length',
@@ -344,7 +422,7 @@ function getOptimizationTips(politeWords, taskType, tokens) {
     });
   }
 
-  // Tip 4: Model alternatives (always include)
+  // Tip 5: Model alternatives (always include)
   tips.push({
     type: 'model',
     icon: 'Alternative Available.png',
@@ -459,6 +537,7 @@ if (typeof window !== 'undefined') {
     detectPoliteWords,
     estimateOutputTokens,
     getOptimizationTips,
+    getEcoAlternative,
     getModelRecommendation,
     generateOptimizedPrompt,
     analyzePrompt,
@@ -475,6 +554,7 @@ if (typeof module !== 'undefined' && module.exports) {
     detectPoliteWords,
     estimateOutputTokens,
     getOptimizationTips,
+    getEcoAlternative,
     getModelRecommendation,
     generateOptimizedPrompt,
     analyzePrompt,

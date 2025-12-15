@@ -14,9 +14,10 @@ let settings = {
   autoDetect: true,
   defaultModel: 'gpt-4o',
   showBadge: true,
-  showBanner: true,
+  showBanner: false,  // Disabled by default - only show bottom right badge
   showConfidence: true,
   liveCalculation: true,
+  showModelComparison: false,
   trackHistory: false
 };
 
@@ -180,6 +181,7 @@ function createFloatingBadge() {
   badge.addEventListener('click', () => {
     chrome.runtime.sendMessage({
       action: 'openPopup',
+      tab: 'optimize',  // Open on Optimizer tab
       analysis: currentAnalysis
     });
   });
@@ -559,77 +561,7 @@ function handleInput(event) {
 const platform = detectAIPlatform();
 if (platform) {
   console.log(`EcoPrompt Coach: Detected ${platform}. Ready to provide tips!`);
-
-  // Show welcome badge
-  setTimeout(() => {
-    if (!settings.showBadge) return;
-
-    const badge = document.createElement('div');
-    badge.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-      z-index: 999999;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      animation: fadeIn 0.5s ease;
-    `;
-
-    // Get detected model
-    let modelInfo = '';
-    if (calculatorLoaded && typeof EcoPromptCalculator !== 'undefined') {
-      const detectedModel = EcoPromptCalculator.autoDetectModel(window.location.hostname);
-      if (detectedModel) {
-        const models = EcoPromptCalculator.getAvailableModels();
-        const model = models.find(m => m.id === detectedModel);
-        if (model) {
-          modelInfo = `<div style="font-size: 10px; opacity: 0.8; margin-top: 2px;">Model: ${model.name}</div>`;
-        }
-      }
-    }
-
-    badge.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 20px;">🌱</span>
-        <div>
-          <div>EcoPrompt Coach Active</div>
-          <div style="font-size: 11px; opacity: 0.9;">Start typing to get optimization tips</div>
-          ${modelInfo}
-        </div>
-      </div>
-    `;
-
-    badge.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'openPopup' });
-    });
-
-    document.body.appendChild(badge);
-
-    setTimeout(() => {
-      badge.style.animation = 'fadeOut 0.5s ease';
-      setTimeout(() => badge.remove(), 500);
-    }, 5000);
-
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes fadeOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-20px); }
-      }
-    `;
-    document.head.appendChild(style);
-  }, 2000);
+  // Welcome badge disabled - only floating badge at bottom-right is shown
 }
 
 // ========================================
