@@ -16,6 +16,7 @@ let settings = {
   showBanner: true,
   showConfidence: true,
   liveCalculation: true,
+  showModelComparison: false,
   trackHistory: false
 };
 
@@ -212,7 +213,18 @@ function setupEventListeners() {
       } else if (tabName === 'stats') {
         loadStats();
       } else if (tabName === 'optimize') {
-        renderModelCheckboxes();
+        // Initialize optimizer tab
+      } else if (tabName === 'impact') {
+        // Show/hide model comparison based on settings
+        const comparisonSection = document.getElementById('model-comparison-section');
+        if (comparisonSection) {
+          if (settings.showModelComparison) {
+            comparisonSection.classList.remove('hidden');
+            renderModelCheckboxes();
+          } else {
+            comparisonSection.classList.add('hidden');
+          }
+        }
       }
     });
   });
@@ -454,8 +466,25 @@ function displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions) 
   // Eco Score
   const scoreFill = document.getElementById('score-fill');
   const scoreText = document.getElementById('score-text');
+  const ecoBadge = document.getElementById('eco-badge');
+
   scoreFill.style.width = `${ecoScore}%`;
   scoreText.textContent = `${ecoScore}/100 - ${scoreLabel}`;
+
+  // Update eco badge with score and appropriate class
+  if (ecoBadge) {
+    ecoBadge.textContent = ecoScore;
+    ecoBadge.className = 'eco-badge';
+    if (ecoScore >= 80) {
+      ecoBadge.classList.add('excellent');
+    } else if (ecoScore >= 60) {
+      ecoBadge.classList.add('good');
+    } else if (ecoScore >= 40) {
+      ecoBadge.classList.add('fair');
+    } else {
+      ecoBadge.classList.add('poor');
+    }
+  }
 
   // Suggestions
   const suggestionsSection = document.getElementById('suggestions');
@@ -467,11 +496,22 @@ function displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions) 
 
     suggestions.forEach(suggestion => {
       const item = document.createElement('div');
-      item.className = 'suggestion-item';
+      // Determine impact level based on savings percentage
+      const savingsNum = parseInt(suggestion.savings) || 0;
+      let impactClass = 'low-impact';
+      let savingsEmoji = '💚';
+      if (savingsNum >= 50) {
+        impactClass = 'high-impact';
+        savingsEmoji = '🔴';
+      } else if (savingsNum >= 30) {
+        impactClass = 'medium-impact';
+        savingsEmoji = '🟠';
+      }
+      item.className = `suggestion-item ${impactClass}`;
       item.innerHTML = `
         <h4>${suggestion.title}</h4>
         <p>${suggestion.description}</p>
-        <p class="savings">💚 Save up to ${suggestion.savings}% energy</p>
+        <p class="savings">${savingsEmoji} Save up to ${suggestion.savings}% energy</p>
       `;
       suggestionsList.appendChild(item);
     });
@@ -854,18 +894,7 @@ function initOptimizeTab() {
   // Get Tips button
   document.getElementById('get-tips-btn')?.addEventListener('click', handleGetTips);
 
-  // Compare Models button - shows comparison section
-  document.getElementById('compare-models-btn')?.addEventListener('click', () => {
-    const section = document.getElementById('model-comparison-section');
-    if (section.classList.contains('hidden')) {
-      section.classList.remove('hidden');
-      renderModelCheckboxes();
-    } else {
-      section.classList.add('hidden');
-    }
-  });
-
-  // Run Compare button
+  // Run Compare button (in Impacts tab)
   document.getElementById('run-compare-btn')?.addEventListener('click', runModelComparison);
 
   // Copy optimized prompt
@@ -939,13 +968,34 @@ function handleGetTips() {
 
   // Tips
   if (analysis.tips.length > 0) {
-    tipsDiv.innerHTML = analysis.tips.map(tip => `
-      <div class="tip-item">
-        <div class="tip-title">${tip.title}</div>
-        <div class="tip-description">${tip.description}</div>
-        <div class="tip-impact">💡 ${tip.impact}</div>
-      </div>
-    `).join('');
+    tipsDiv.innerHTML = analysis.tips.map(tip => {
+      // Determine impact level - check for keywords or token savings
+      let impactClass = 'low-impact';
+      let impactEmoji = '💚';
+      const impactText = tip.impact.toLowerCase();
+
+      // High impact: contains "significant", "major", "substantial", or high savings
+      if (impactText.includes('significant') || impactText.includes('major') ||
+          impactText.includes('substantial') || impactText.includes('40-60%') ||
+          impactText.includes('50%') || impactText.includes('many tokens')) {
+        impactClass = 'high-impact';
+        impactEmoji = '🔴';
+      // Medium impact: contains "moderate", "several", or medium savings
+      } else if (impactText.includes('moderate') || impactText.includes('several') ||
+                 impactText.includes('20-40%') || impactText.includes('30%') ||
+                 impactText.includes('some tokens')) {
+        impactClass = 'medium-impact';
+        impactEmoji = '🟠';
+      }
+
+      return `
+        <div class="tip-item ${impactClass}">
+          <div class="tip-title">${tip.title}</div>
+          <div class="tip-description">${tip.description}</div>
+          <div class="tip-impact">${impactEmoji} ${tip.impact}</div>
+        </div>
+      `;
+    }).join('');
   } else {
     tipsDiv.innerHTML = '<p style="color: #4caf50; text-align: center;">✅ Your prompt is already well-optimized!</p>';
   }
@@ -1007,10 +1057,10 @@ function renderModelCheckboxes() {
 }
 
 function runModelComparison() {
-  const promptText = document.getElementById('optimize-prompt-input')?.value?.trim();
+  const promptText = document.getElementById('impact-prompt-input')?.value?.trim();
 
   if (!promptText) {
-    alert('Please enter a prompt first');
+    alert('Please enter a prompt in the input above first');
     return;
   }
 

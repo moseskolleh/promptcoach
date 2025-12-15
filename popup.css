@@ -340,6 +340,54 @@ section {
   margin-top: 15px;
 }
 
+/* Prominent Eco Score Style */
+.eco-score.prominent {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border: 2px solid #4caf50;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.25);
+}
+
+.eco-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.eco-score.prominent h3 {
+  font-size: 16px;
+  color: #1b5e20;
+  margin-bottom: 0;
+  text-align: left;
+}
+
+.eco-badge {
+  background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.eco-badge.excellent {
+  background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+}
+
+.eco-badge.good {
+  background: linear-gradient(135deg, #4caf50 0%, #8bc34a 100%);
+}
+
+.eco-badge.fair {
+  background: linear-gradient(135deg, #ff9800 0%, #ffc107 100%);
+}
+
+.eco-badge.poor {
+  background: linear-gradient(135deg, #f44336 0%, #ff5722 100%);
+}
+
 .eco-score h3 {
   font-size: 14px;
   color: #2e7d32;
@@ -348,17 +396,24 @@ section {
 }
 
 .score-bar {
-  height: 24px;
+  height: 28px;
   background: #e0e0e0;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.eco-score.prominent .score-bar {
+  height: 32px;
+  background: white;
+  border-radius: 16px;
 }
 
 .score-fill {
   height: 100%;
   background: linear-gradient(90deg, #f44336 0%, #ff9800 50%, #4caf50 100%);
-  border-radius: 12px;
+  border-radius: 14px;
   transition: width 0.5s ease;
   display: flex;
   align-items: center;
@@ -369,10 +424,23 @@ section {
   font-weight: 600;
 }
 
+.eco-score.prominent .score-fill {
+  border-radius: 16px;
+}
+
 #score-text {
   text-align: center;
-  font-size: 13px;
-  color: #666;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1b5e20;
+  margin-bottom: 5px;
+}
+
+.eco-hint {
+  text-align: center;
+  font-size: 11px;
+  color: #558b2f;
+  margin: 0;
 }
 
 /* Suggestions */
@@ -383,6 +451,40 @@ section {
   margin-bottom: 10px;
   border-left: 4px solid #4caf50;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* High-impact suggestions (Red) - save 50%+ */
+.suggestion-item.high-impact {
+  background: #ffebee;
+  border-left-color: #f44336;
+}
+
+.suggestion-item.high-impact h4 {
+  color: #c62828;
+}
+
+.suggestion-item.high-impact .savings {
+  color: #c62828;
+}
+
+/* Medium-impact suggestions (Orange) - save 30-49% */
+.suggestion-item.medium-impact {
+  background: #fff3e0;
+  border-left-color: #ff9800;
+}
+
+.suggestion-item.medium-impact h4 {
+  color: #e65100;
+}
+
+.suggestion-item.medium-impact .savings {
+  color: #e65100;
+}
+
+/* Low-impact suggestions (Green) - save <30% */
+.suggestion-item.low-impact {
+  background: #e8f5e9;
+  border-left-color: #4caf50;
 }
 
 .suggestion-item h4 {
@@ -733,10 +835,45 @@ textarea:focus {
   background: #f9f9f9;
   border-radius: 8px;
   margin-bottom: 8px;
+  border-left: 4px solid #4caf50;
 }
 
 .tip-item:last-child {
   margin-bottom: 0;
+}
+
+/* High-impact tips (Red) - save significant tokens */
+.tip-item.high-impact {
+  background: #ffebee;
+  border-left-color: #f44336;
+}
+
+.tip-item.high-impact .tip-title {
+  color: #c62828;
+}
+
+.tip-item.high-impact .tip-impact {
+  color: #c62828;
+}
+
+/* Medium-impact tips (Orange) */
+.tip-item.medium-impact {
+  background: #fff3e0;
+  border-left-color: #ff9800;
+}
+
+.tip-item.medium-impact .tip-title {
+  color: #e65100;
+}
+
+.tip-item.medium-impact .tip-impact {
+  color: #e65100;
+}
+
+/* Low-impact tips (Green - default) */
+.tip-item.low-impact {
+  background: #e8f5e9;
+  border-left-color: #4caf50;
 }
 
 .tip-title {
@@ -1109,6 +1246,16 @@ textarea:focus {
   font-size: 20px;
   color: #2e7d32;
   margin-bottom: 5px;
+}
+
+.storage-note {
+  font-size: 11px;
+  color: #757575;
+  background: #f5f5f5;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  text-align: center;
 }
 
 .library-subsection {
