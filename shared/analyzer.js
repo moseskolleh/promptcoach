@@ -458,6 +458,48 @@ function getModelRecommendation(taskType) {
 }
 
 // ========================================
+// TEXT SANITIZATION
+// ========================================
+
+/**
+ * Sanitize text by removing excessive punctuation and fixing spacing
+ * @param {string} text - The text to sanitize
+ * @returns {string} Sanitized text
+ */
+function sanitizeText(text) {
+  if (!text || text.trim().length === 0) return text;
+
+  let sanitized = text;
+
+  // Fix excessive punctuation
+  sanitized = sanitized.replace(/!{2,}/g, '!');  // Multiple exclamation marks -> single
+  sanitized = sanitized.replace(/\?{2,}/g, '?');  // Multiple question marks -> single
+  sanitized = sanitized.replace(/\.{4,}/g, '...');  // More than 3 dots -> ellipsis
+  sanitized = sanitized.replace(/,{2,}/g, ',');  // Multiple commas -> single
+
+  // Fix spacing errors
+  sanitized = sanitized.replace(/\s+/g, ' ');  // Multiple spaces -> single space
+  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Space before punctuation
+  sanitized = sanitized.replace(/([.,!?;:])\s*([.,!?;:])/g, '$1 ');  // Duplicate punctuation
+  sanitized = sanitized.replace(/([.!?])\s*([a-z])/g, '$1 $2');  // Ensure space after sentence-ending punctuation
+
+  // Fix common spacing issues around punctuation
+  sanitized = sanitized.replace(/([.,!?;:])/g, '$1 ');  // Add space after punctuation
+  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Remove space before punctuation
+  sanitized = sanitized.replace(/\s+/g, ' ');  // Clean up multiple spaces again
+
+  // Ensure proper capitalization after sentence-ending punctuation
+  sanitized = sanitized.replace(/([.!?])\s+([a-z])/g, (match, p1, p2) => {
+    return p1 + ' ' + p2.toUpperCase();
+  });
+
+  // Trim and ensure single space normalization
+  sanitized = sanitized.trim();
+
+  return sanitized;
+}
+
+// ========================================
 // OPTIMIZED PROMPT GENERATION
 // ========================================
 
@@ -481,8 +523,8 @@ function generateOptimizedPrompt(originalText, analysis) {
     }
   }
 
-  // Clean up double spaces and trim
-  optimized = optimized.replace(/\s+/g, ' ').trim();
+  // Sanitize text (remove excessive punctuation, fix spacing)
+  optimized = sanitizeText(optimized);
 
   // Capitalize first letter if needed
   if (optimized.length > 0) {
@@ -539,6 +581,7 @@ if (typeof window !== 'undefined') {
     getOptimizationTips,
     getEcoAlternative,
     getModelRecommendation,
+    sanitizeText,
     generateOptimizedPrompt,
     analyzePrompt,
     TASK_TYPES,
