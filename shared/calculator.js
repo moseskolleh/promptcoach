@@ -348,19 +348,26 @@ function formatEnergyComparison(wh) {
 function formatEnergyComparisonDetailed(wh) {
   const SMARTPHONE_CHARGE = 15; // Wh for 0-100%
   const ROOM_LIGHT_HOUR = 15; // Wh per hour
+  const LED_BULB_WATT = 10; // W for LED bulb
   const LAPTOP_HOUR = 50; // Wh per hour
 
   let primary = '';
   let secondary = '';
 
-  if (wh < 1) {
-    const percent = ((wh / SMARTPHONE_CHARGE) * 100).toFixed(1);
-    primary = `${percent}% smartphone charge`;
+  if (wh < 0.1) {
+    // Very small - use seconds of LED bulb
+    const seconds = Math.round((wh / LED_BULB_WATT) * 3600);
+    primary = `${seconds} second${seconds !== 1 ? 's' : ''} of LED bulb light`;
+  } else if (wh < 1) {
+    // Small - use minutes of LED bulb
+    const minutes = Math.round((wh / LED_BULB_WATT) * 60);
+    primary = `${minutes} minute${minutes !== 1 ? 's' : ''} of LED bulb light`;
   } else if (wh < 15) {
+    // Medium - use smartphone charging
     const phones = (wh / SMARTPHONE_CHARGE).toFixed(2);
-    if (phones < 0.1) {
-      const percent = ((wh / SMARTPHONE_CHARGE) * 100).toFixed(0);
-      primary = `${percent}% of a smartphone charge`;
+    const percent = ((wh / SMARTPHONE_CHARGE) * 100).toFixed(0);
+    if (parseFloat(percent) < 10) {
+      primary = `${percent}% of smartphone charge`;
     } else {
       primary = `${phones} smartphone charge${parseFloat(phones) !== 1 ? 's' : ''}`;
     }
@@ -408,7 +415,9 @@ function formatWaterComparison(ml) {
 function formatWaterComparisonDetailed(ml) {
   const liters = ml / 1000;
 
-  const GLASS = 0.25; // liters
+  const TEASPOON = 5; // mL
+  const TABLESPOON = 15; // mL
+  const GLASS = 0.25; // liters (250 mL)
   const BOTTLE = 0.5; // liters
   const DISHWASHER = 15; // liters
   const WASHING_MACHINE = 50; // liters
@@ -417,10 +426,19 @@ function formatWaterComparisonDetailed(ml) {
   let primary = '';
   let secondary = '';
 
-  if (liters < GLASS) {
-    const percent = ((ml / 250) * 100).toFixed(0);
-    primary = `${percent}% of a drinking glass`;
+  if (ml < TEASPOON) {
+    // Very small - use droplets or teaspoon fraction
+    primary = `A few drops of water`;
+  } else if (ml < TABLESPOON) {
+    // Small - use teaspoons
+    const teaspoons = Math.round(ml / TEASPOON);
+    primary = `${teaspoons} teaspoon${teaspoons !== 1 ? 's' : ''} of water`;
+  } else if (ml < 100) {
+    // Less than half a glass - use tablespoons
+    const tablespoons = Math.round(ml / TABLESPOON);
+    primary = `${tablespoons} tablespoon${tablespoons !== 1 ? 's' : ''} of water`;
   } else if (liters < 1) {
+    // Less than 1 liter - use drinking glasses
     const glasses = (liters / GLASS).toFixed(1);
     primary = `${glasses} drinking glass${parseFloat(glasses) !== 1 ? 'es' : ''}`;
   } else if (liters < 15) {
@@ -470,6 +488,7 @@ function formatCarbonComparison(gCO2e) {
  */
 function formatCarbonComparisonDetailed(gCO2e) {
   const CAR_G_PER_KM = 190; // g CO2e per km (average sedan)
+  const CAR_G_PER_METER = CAR_G_PER_KM / 1000; // g CO2e per meter
   const TREE_KG_PER_YEAR = 20; // kg CO2e per year
 
   let primary = '';
@@ -477,8 +496,12 @@ function formatCarbonComparisonDetailed(gCO2e) {
 
   const kgCO2e = gCO2e / 1000;
 
-  if (gCO2e < 20) {
-    const meters = Math.round((gCO2e / CAR_G_PER_KM) * 1000);
+  if (gCO2e < 1) {
+    // Very small - use breathing or similar
+    primary = `Taking a few breaths (avg human)`;
+  } else if (gCO2e < 20) {
+    // Small - use car meters with minimum of 1
+    const meters = Math.max(1, Math.round((gCO2e / CAR_G_PER_KM) * 1000));
     primary = `Driving ${meters} meter${meters !== 1 ? 's' : ''} in a sedan`;
   } else if (gCO2e < 1000) {
     const km = (gCO2e / CAR_G_PER_KM).toFixed(2);

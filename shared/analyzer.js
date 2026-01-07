@@ -488,12 +488,18 @@ function sanitizeText(text) {
   sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Remove space before punctuation
   sanitized = sanitized.replace(/\s+/g, ' ');  // Clean up multiple spaces again
 
+  // Trim first
+  sanitized = sanitized.trim();
+
+  // Remove leading punctuation (commas, semicolons, etc.) that might be left after removing phrases
+  sanitized = sanitized.replace(/^[,;:]+\s*/, '');
+
   // Ensure proper capitalization after sentence-ending punctuation
   sanitized = sanitized.replace(/([.!?])\s+([a-z])/g, (match, p1, p2) => {
     return p1 + ' ' + p2.toUpperCase();
   });
 
-  // Trim and ensure single space normalization
+  // Final trim
   sanitized = sanitized.trim();
 
   return sanitized;
