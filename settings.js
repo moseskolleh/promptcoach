@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   showModelComparison: false,
   trackHistory: false,
   userRegion: 'default',
+  theme: 'green',  // Default eco-friendly green theme
   taskMultipliers: {
     IMAGE_GENERATION: 3.0,
     AGENTIC_TASK: 2.0,
@@ -48,6 +49,58 @@ const REGIONS = {
   'china': { name: 'China', cif: 0.60 },
   'australia': { name: 'Australia', cif: 0.65 },
   'brazil': { name: 'Brazil', cif: 0.10 }
+};
+
+const THEMES = {
+  'green': {
+    name: 'Eco Green (Default)',
+    primary: '#4caf50',
+    primaryLight: '#8bc34a',
+    primaryDark: '#2e7d32',
+    background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)',
+    headerBg: 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
+  },
+  'blue': {
+    name: 'Ocean Blue',
+    primary: '#2196f3',
+    primaryLight: '#64b5f6',
+    primaryDark: '#1976d2',
+    background: 'linear-gradient(135deg, #e3f2fd 0%, #e1f5fe 100%)',
+    headerBg: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)'
+  },
+  'purple': {
+    name: 'Purple Haze',
+    primary: '#9c27b0',
+    primaryLight: '#ba68c8',
+    primaryDark: '#7b1fa2',
+    background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+    headerBg: 'linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)'
+  },
+  'orange': {
+    name: 'Sunset Orange',
+    primary: '#ff9800',
+    primaryLight: '#ffb74d',
+    primaryDark: '#f57c00',
+    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+    headerBg: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)'
+  },
+  'teal': {
+    name: 'Teal Breeze',
+    primary: '#009688',
+    primaryLight: '#4db6ac',
+    primaryDark: '#00796b',
+    background: 'linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)',
+    headerBg: 'linear-gradient(135deg, #009688 0%, #4db6ac 100%)'
+  },
+  'dark': {
+    name: 'Dark Mode',
+    primary: '#90caf9',
+    primaryLight: '#64b5f6',
+    primaryDark: '#42a5f5',
+    background: 'linear-gradient(135deg, #263238 0%, #37474f 100%)',
+    headerBg: 'linear-gradient(135deg, #37474f 0%, #455a64 100%)',
+    isDark: true
+  }
 };
 
 // Storage keys
@@ -180,6 +233,7 @@ async function loadSettings() {
       document.getElementById('show-model-comparison').checked = settings.showModelComparison;
       document.getElementById('track-history').checked = settings.trackHistory;
       document.getElementById('user-region').value = settings.userRegion || 'default';
+      document.getElementById('theme-select').value = settings.theme || 'green';
 
       // Apply multipliers
       if (settings.taskMultipliers) {
@@ -194,6 +248,9 @@ async function loadSettings() {
 
       // Update model select visibility
       updateModelSelectVisibility(settings.autoDetect);
+
+      // Apply theme
+      applyTheme(settings.theme || 'green');
 
       resolve(settings);
     });
@@ -220,6 +277,7 @@ async function saveSettings() {
     showModelComparison: document.getElementById('show-model-comparison').checked,
     trackHistory: document.getElementById('track-history').checked,
     userRegion: document.getElementById('user-region').value,
+    theme: document.getElementById('theme-select').value,
     taskMultipliers: taskMultipliers
   };
 
@@ -284,10 +342,40 @@ function updateModelSelectVisibility(autoDetect) {
   container.style.opacity = autoDetect ? '0.6' : '1';
 }
 
+function applyTheme(themeName) {
+  const theme = THEMES[themeName] || THEMES['green'];
+  const root = document.documentElement;
+
+  // Apply CSS variables
+  root.style.setProperty('--primary-color', theme.primary);
+  root.style.setProperty('--primary-light', theme.primaryLight);
+  root.style.setProperty('--primary-dark', theme.primaryDark);
+  root.style.setProperty('--background-gradient', theme.background);
+  root.style.setProperty('--header-gradient', theme.headerBg);
+
+  // For dark theme, adjust text colors
+  if (theme.isDark) {
+    document.body.classList.add('dark-theme');
+  } else {
+    document.body.classList.remove('dark-theme');
+  }
+}
+
 function showNotification(message, type = 'success') {
   const notification = document.getElementById('notification');
   notification.textContent = message;
-  notification.style.background = type === 'success' ? '#4caf50' : '#f44336';
+
+  // Set background color based on type
+  if (type === 'success') {
+    notification.style.background = '#4caf50';
+  } else if (type === 'error') {
+    notification.style.background = '#f44336';
+  } else if (type === 'info') {
+    notification.style.background = '#2196f3';
+  } else {
+    notification.style.background = '#4caf50';
+  }
+
   notification.style.display = 'block';
 
   setTimeout(() => {
@@ -389,6 +477,21 @@ function setupEventListeners() {
   // Model selection change
   document.getElementById('default-model').addEventListener('change', (e) => {
     updateModelInfo(e.target.value);
+  });
+
+  // Track history toggle - show notification when enabled
+  document.getElementById('track-history').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      showNotification('Session tracking enabled! Your query history will now be recorded locally.', 'info');
+    } else {
+      showNotification('Session tracking disabled. No new data will be recorded.', 'info');
+    }
+  });
+
+  // Theme selection - apply immediately for preview
+  document.getElementById('theme-select').addEventListener('change', (e) => {
+    applyTheme(e.target.value);
+    showNotification('Theme preview applied. Click "Save Settings" to keep changes.', 'info');
   });
 
   // Save button
