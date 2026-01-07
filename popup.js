@@ -557,11 +557,11 @@ function calculateImpact() {
     return;
   }
 
-  // Get comparisons
+  // Get comparisons (detailed with primary/secondary)
   const comparisons = {
-    energy: EcoPromptCalculator.formatEnergyComparison(impact.energy.wh),
-    water: EcoPromptCalculator.formatWaterComparison(impact.water.ml),
-    carbon: EcoPromptCalculator.formatCarbonComparison(impact.carbon.gCO2e)
+    energy: EcoPromptCalculator.formatEnergyComparisonDetailed(impact.energy.wh),
+    water: EcoPromptCalculator.formatWaterComparisonDetailed(impact.water.ml),
+    carbon: EcoPromptCalculator.formatCarbonComparisonDetailed(impact.carbon.gCO2e)
   };
 
   // Calculate eco score
@@ -621,9 +621,13 @@ function displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions) 
   const resultsSection = document.getElementById('results');
   resultsSection.classList.remove('hidden');
 
-  // Energy
+  // Energy - Dual-layer display
   document.getElementById('energy-value').textContent = `${impact.energy.wh.toFixed(3)} Wh`;
-  document.getElementById('energy-comparison').textContent = comparisons.energy;
+  const energyComparisonEl = document.getElementById('energy-comparison');
+  energyComparisonEl.innerHTML = `
+    <div class="comparison-primary">${comparisons.energy.primary}</div>
+    <div class="comparison-secondary">${comparisons.energy.secondary}</div>
+  `;
 
   // Confidence interval
   const confidenceEl = document.getElementById('energy-confidence');
@@ -634,13 +638,21 @@ function displayResults(impact, comparisons, ecoScore, scoreLabel, suggestions) 
     confidenceEl.style.display = 'none';
   }
 
-  // Water
+  // Water - Dual-layer display
   document.getElementById('water-value').textContent = `${impact.water.ml.toFixed(2)} mL`;
-  document.getElementById('water-comparison').textContent = comparisons.water;
+  const waterComparisonEl = document.getElementById('water-comparison');
+  waterComparisonEl.innerHTML = `
+    <div class="comparison-primary">${comparisons.water.primary}</div>
+    <div class="comparison-secondary">${comparisons.water.secondary}</div>
+  `;
 
-  // Carbon
+  // Carbon - Dual-layer display
   document.getElementById('carbon-value').textContent = `${impact.carbon.gCO2e.toFixed(3)} gCO2e`;
-  document.getElementById('carbon-comparison').textContent = comparisons.carbon;
+  const carbonComparisonEl = document.getElementById('carbon-comparison');
+  carbonComparisonEl.innerHTML = `
+    <div class="comparison-primary">${comparisons.carbon.primary}</div>
+    <div class="comparison-secondary">${comparisons.carbon.secondary}</div>
+  `;
 
   // Eco Score
   const scoreFill = document.getElementById('score-fill');

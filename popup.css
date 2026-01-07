@@ -357,6 +357,22 @@ section {
   line-height: 1.4;
 }
 
+/* Dual-layer comparison display */
+.comparison-primary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.comparison-secondary {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-lighter);
+  line-height: 1.3;
+}
+
 /* Eco Score */
 .eco-score {
   background: white;
