@@ -324,98 +324,183 @@ function calculateAverageImpact(inputTokens, outputTokens, energyMultiplier = 1.
 // ========================================
 
 /**
- * Format energy into relatable comparison using lightbulb hours
- * A standard LED lightbulb uses about 10W (0.01 kW)
+ * Format energy into relatable comparison with dual-layer display
+ * Scientific conversion factors based on real-world measurements
  * @param {number} wh - Energy in watt-hours
- * @returns {string} Human-readable comparison
+ * @returns {string} Human-readable comparison for backwards compatibility
+ * Use formatEnergyComparisonDetailed() for dual-layer display
  */
 function formatEnergyComparison(wh) {
-  // LED lightbulb: 10W = 10Wh per hour
-  const lightbulbWatts = 10;
-  const hours = wh / lightbulbWatts;
-
-  if (hours < 1/60) {
-    // Less than 1 minute - show seconds
-    const seconds = Math.round(hours * 3600);
-    return `${seconds} second${seconds !== 1 ? 's' : ''} of lightbulb use`;
-  } else if (hours < 1) {
-    // Less than 1 hour - show minutes
-    const minutes = Math.round(hours * 60);
-    return `${minutes} minute${minutes !== 1 ? 's' : ''} of lightbulb use`;
-  } else if (hours < 24) {
-    // Less than a day - show hours
-    const roundedHours = hours.toFixed(1);
-    return `${roundedHours} hour${parseFloat(roundedHours) !== 1 ? 's' : ''} of lightbulb use`;
-  } else {
-    // More than a day - show days
-    const days = (hours / 24).toFixed(1);
-    return `${days} day${parseFloat(days) !== 1 ? 's' : ''} of lightbulb use`;
-  }
+  const detailed = formatEnergyComparisonDetailed(wh);
+  return detailed.primary;
 }
 
 /**
- * Format water into relatable accumulated comparison
- * Uses meaningful visualizations for emotional impact
+ * Format energy with dual-layer display (relatable + technical)
+ * Conversion factors:
+ * - Smartphone (0-100%): 15 Wh (iPhone 14 Pro: 14.2Wh, Samsung S23: 15.5Wh)
+ * - LED bulb (10W): 10 Wh per hour
+ * - Room lighting: 15 Wh per hour (typical LED room setup)
+ * - Laptop: 50 Wh per hour (average usage)
+ * @param {number} wh - Energy in watt-hours
+ * @returns {Object} {primary: relatable metric, secondary: technical measurement}
+ */
+function formatEnergyComparisonDetailed(wh) {
+  const SMARTPHONE_CHARGE = 15; // Wh for 0-100%
+  const ROOM_LIGHT_HOUR = 15; // Wh per hour
+  const LAPTOP_HOUR = 50; // Wh per hour
+
+  let primary = '';
+  let secondary = '';
+
+  if (wh < 1) {
+    const percent = ((wh / SMARTPHONE_CHARGE) * 100).toFixed(1);
+    primary = `${percent}% smartphone charge`;
+  } else if (wh < 15) {
+    const phones = (wh / SMARTPHONE_CHARGE).toFixed(2);
+    if (phones < 0.1) {
+      const percent = ((wh / SMARTPHONE_CHARGE) * 100).toFixed(0);
+      primary = `${percent}% of a smartphone charge`;
+    } else {
+      primary = `${phones} smartphone charge${parseFloat(phones) !== 1 ? 's' : ''}`;
+    }
+  } else if (wh < 50) {
+    const hours = (wh / ROOM_LIGHT_HOUR).toFixed(1);
+    primary = `Light a room for ${hours} hour${parseFloat(hours) !== 1 ? 's' : ''}`;
+  } else {
+    const hours = (wh / LAPTOP_HOUR).toFixed(1);
+    primary = `Run a laptop for ${hours} hour${parseFloat(hours) !== 1 ? 's' : ''}`;
+  }
+
+  if (wh < 1) {
+    secondary = `${wh.toFixed(3)} Wh`;
+  } else if (wh < 1000) {
+    secondary = `${wh.toFixed(2)} Wh`;
+  } else {
+    const kwh = (wh / 1000).toFixed(3);
+    secondary = `${kwh} kWh`;
+  }
+
+  return { primary, secondary };
+}
+
+/**
+ * Format water into relatable comparison for backwards compatibility
  * @param {number} ml - Water in milliliters
  * @returns {string} Human-readable comparison
  */
 function formatWaterComparison(ml) {
-  // Convert to liters for easier calculations
-  const liters = ml / 1000;
-
-  if (liters < 0.01) {
-    // Less than 10ml - use teaspoons (5ml each)
-    const teaspoons = Math.round(ml / 5);
-    return `~${teaspoons} teaspoon${teaspoons !== 1 ? 's' : ''} of water`;
-  } else if (liters < 0.25) {
-    // Less than a cup - show as portion of a cup
-    const percent = ((ml / 250) * 100).toFixed(0);
-    return `${percent}% of a drinking glass`;
-  } else if (liters < 1) {
-    // Less than 1 liter - show as glasses
-    const glasses = (ml / 250).toFixed(1);
-    return `${glasses} drinking glass${parseFloat(glasses) !== 1 ? 'es' : ''}`;
-  } else if (liters < 10) {
-    // 1-10 liters - show as water bottles
-    const bottles = liters.toFixed(1);
-    return `${bottles} liter${parseFloat(bottles) !== 1 ? 's' : ''} (bottles)`;
-  } else if (liters < 100) {
-    // 10-100 liters - show as buckets (~10L each)
-    const buckets = (liters / 10).toFixed(1);
-    return `${buckets} bucket${parseFloat(buckets) !== 1 ? 's' : ''} of water`;
-  } else if (liters < 1000) {
-    // 100-1000 liters - show as bathtubs (~150L each)
-    const bathtubs = (liters / 150).toFixed(1);
-    return `${bathtubs} bathtub${parseFloat(bathtubs) !== 1 ? 's' : ''} of water`;
-  } else if (liters < 100000) {
-    // 1000-100000 liters - show as small pools
-    const pools = (liters / 20000).toFixed(2);
-    return `${pools} small swimming pool${parseFloat(pools) !== 1 ? 's' : ''}`;
-  } else {
-    // Very large amounts - show as small lake portions
-    // Average small lake: ~10 million liters
-    const lakePercent = ((liters / 10000000) * 100).toFixed(4);
-    return `${lakePercent}% of a small lake`;
-  }
+  const detailed = formatWaterComparisonDetailed(ml);
+  return detailed.primary;
 }
 
 /**
- * Format carbon into relatable comparison
+ * Format water with dual-layer display (relatable + technical)
+ * Conversion factors:
+ * - Shower (10 min): 100 liters (10L/min average flow)
+ * - Dishwasher cycle: 15 liters (modern energy-efficient)
+ * - Washing machine cycle: 50 liters (average load)
+ * - Drinking glass: 250 ml
+ * - Water bottle: 500 ml
+ * @param {number} ml - Water in milliliters
+ * @returns {Object} {primary: relatable metric, secondary: technical measurement}
+ */
+function formatWaterComparisonDetailed(ml) {
+  const liters = ml / 1000;
+
+  const GLASS = 0.25; // liters
+  const BOTTLE = 0.5; // liters
+  const DISHWASHER = 15; // liters
+  const WASHING_MACHINE = 50; // liters
+  const SHOWER_10MIN = 100; // liters
+
+  let primary = '';
+  let secondary = '';
+
+  if (liters < GLASS) {
+    const percent = ((ml / 250) * 100).toFixed(0);
+    primary = `${percent}% of a drinking glass`;
+  } else if (liters < 1) {
+    const glasses = (liters / GLASS).toFixed(1);
+    primary = `${glasses} drinking glass${parseFloat(glasses) !== 1 ? 'es' : ''}`;
+  } else if (liters < 15) {
+    const bottles = (liters / BOTTLE).toFixed(1);
+    primary = `${bottles} water bottle${parseFloat(bottles) !== 1 ? 's' : ''}`;
+  } else if (liters < 50) {
+    const dishwashers = (liters / DISHWASHER).toFixed(1);
+    primary = `${dishwashers} dishwasher cycle${parseFloat(dishwashers) !== 1 ? 's' : ''}`;
+  } else if (liters < 100) {
+    const washers = (liters / WASHING_MACHINE).toFixed(1);
+    primary = `${washers} washing machine cycle${parseFloat(washers) !== 1 ? 's' : ''}`;
+  } else {
+    const showers = (liters / SHOWER_10MIN).toFixed(1);
+    primary = `${showers} 10-minute shower${parseFloat(showers) !== 1 ? 's' : ''}`;
+  }
+
+  if (ml < 1000) {
+    secondary = `${ml.toFixed(1)} mL`;
+  } else if (liters < 1000) {
+    secondary = `${liters.toFixed(2)} L`;
+  } else {
+    const m3 = (liters / 1000).toFixed(3);
+    secondary = `${m3} m³`;
+  }
+
+  return { primary, secondary };
+}
+
+/**
+ * Format carbon into relatable comparison for backwards compatibility
  * @param {number} gCO2e - Carbon in grams CO2 equivalent
  * @returns {string} Human-readable comparison
  */
 function formatCarbonComparison(gCO2e) {
-  // Car emissions: ~200g CO2e per km
+  const detailed = formatCarbonComparisonDetailed(gCO2e);
+  return detailed.primary;
+}
+
+/**
+ * Format carbon with dual-layer display (relatable + technical)
+ * Conversion factors:
+ * - Standard sedan: 180-200 g CO2e per km (EPA average for gas vehicles)
+ * - Tree absorption: ~20 kg CO2e per year per mature tree
+ * - Smartphone production: ~80 kg CO2e
+ * @param {number} gCO2e - Carbon in grams CO2 equivalent
+ * @returns {Object} {primary: relatable metric, secondary: technical measurement}
+ */
+function formatCarbonComparisonDetailed(gCO2e) {
+  const CAR_G_PER_KM = 190; // g CO2e per km (average sedan)
+  const TREE_KG_PER_YEAR = 20; // kg CO2e per year
+
+  let primary = '';
+  let secondary = '';
+
+  const kgCO2e = gCO2e / 1000;
+
   if (gCO2e < 20) {
-    const meters = Math.round((gCO2e / 200) * 1000);
-    return `Driving ${meters} meter${meters !== 1 ? 's' : ''}`;
-  } else if (gCO2e < 200) {
-    const meters = Math.round((gCO2e / 200) * 1000);
-    return `Driving ${meters} meters`;
+    const meters = Math.round((gCO2e / CAR_G_PER_KM) * 1000);
+    primary = `Driving ${meters} meter${meters !== 1 ? 's' : ''} in a sedan`;
+  } else if (gCO2e < 1000) {
+    const km = (gCO2e / CAR_G_PER_KM).toFixed(2);
+    primary = `Driving ${km} km in a standard sedan`;
+  } else if (kgCO2e < 100) {
+    const km = (gCO2e / CAR_G_PER_KM).toFixed(1);
+    primary = `Driving ${km} km in a standard sedan`;
   } else {
-    const km = (gCO2e / 200).toFixed(2);
-    return `Driving ${km} kilometers`;
+    const treePercent = ((kgCO2e / TREE_KG_PER_YEAR) * 100).toFixed(1);
+    primary = `${treePercent}% of yearly tree CO₂ absorption`;
   }
+
+  if (gCO2e < 1000) {
+    secondary = `${gCO2e.toFixed(2)} g CO₂e`;
+  } else if (kgCO2e < 1000) {
+    secondary = `${kgCO2e.toFixed(3)} kg CO₂e`;
+  } else {
+    const tonnes = (kgCO2e / 1000).toFixed(3);
+    secondary = `${tonnes} tonnes CO₂e`;
+  }
+
+  return { primary, secondary };
 }
 
 /**
@@ -567,6 +652,9 @@ if (typeof window !== 'undefined') {
     formatEnergyComparison,
     formatWaterComparison,
     formatCarbonComparison,
+    formatEnergyComparisonDetailed,
+    formatWaterComparisonDetailed,
+    formatCarbonComparisonDetailed,
     getComparisons,
     calculateEcoScore,
     getScoreLabel,

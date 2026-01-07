@@ -17,7 +17,60 @@ let settings = {
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,
-  trackHistory: false
+  trackHistory: false,
+  theme: 'green'
+};
+
+const THEMES = {
+  'green': {
+    name: 'Eco Green (Default)',
+    primary: '#4caf50',
+    primaryLight: '#8bc34a',
+    primaryDark: '#2e7d32',
+    background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)',
+    headerBg: 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
+  },
+  'blue': {
+    name: 'Ocean Blue',
+    primary: '#2196f3',
+    primaryLight: '#64b5f6',
+    primaryDark: '#1976d2',
+    background: 'linear-gradient(135deg, #e3f2fd 0%, #e1f5fe 100%)',
+    headerBg: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)'
+  },
+  'purple': {
+    name: 'Purple Haze',
+    primary: '#9c27b0',
+    primaryLight: '#ba68c8',
+    primaryDark: '#7b1fa2',
+    background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+    headerBg: 'linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)'
+  },
+  'orange': {
+    name: 'Sunset Orange',
+    primary: '#ff9800',
+    primaryLight: '#ffb74d',
+    primaryDark: '#f57c00',
+    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+    headerBg: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)'
+  },
+  'teal': {
+    name: 'Teal Breeze',
+    primary: '#009688',
+    primaryLight: '#4db6ac',
+    primaryDark: '#00796b',
+    background: 'linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)',
+    headerBg: 'linear-gradient(135deg, #009688 0%, #4db6ac 100%)'
+  },
+  'dark': {
+    name: 'Dark Mode',
+    primary: '#90caf9',
+    primaryLight: '#64b5f6',
+    primaryDark: '#42a5f5',
+    background: 'linear-gradient(135deg, #263238 0%, #37474f 100%)',
+    headerBg: 'linear-gradient(135deg, #37474f 0%, #455a64 100%)',
+    isDark: true
+  }
 };
 
 let currentModel = null;
@@ -81,6 +134,28 @@ function applySettings() {
     } else {
       comparisonSection.classList.add('hidden');
     }
+  }
+
+  // Apply theme
+  applyTheme(settings.theme || 'green');
+}
+
+function applyTheme(themeName) {
+  const theme = THEMES[themeName] || THEMES['green'];
+  const root = document.documentElement;
+
+  // Apply CSS variables
+  root.style.setProperty('--primary-color', theme.primary);
+  root.style.setProperty('--primary-light', theme.primaryLight);
+  root.style.setProperty('--primary-dark', theme.primaryDark);
+  root.style.setProperty('--background-gradient', theme.background);
+  root.style.setProperty('--header-gradient', theme.headerBg);
+
+  // For dark theme, adjust text colors
+  if (theme.isDark) {
+    document.body.classList.add('dark-theme');
+  } else {
+    document.body.classList.remove('dark-theme');
   }
 }
 
@@ -328,6 +403,87 @@ function setupEventListeners() {
       });
     }
   });
+
+  // Drag and drop for Impact Calculator input
+  setupDragAndDrop('impact-prompt-input');
+
+  // Drag and drop for Optimizer input
+  setupDragAndDrop('optimize-prompt-input');
+}
+
+// ========================================
+// DRAG AND DROP FUNCTIONALITY
+// ========================================
+
+function setupDragAndDrop(textareaId) {
+  const textarea = document.getElementById(textareaId);
+  if (!textarea) return;
+
+  // Prevent default drag behaviors
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    textarea.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Highlight drop area when item is dragged over it
+  ['dragenter', 'dragover'].forEach(eventName => {
+    textarea.addEventListener(eventName, () => {
+      textarea.classList.add('drag-highlight');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    textarea.addEventListener(eventName, () => {
+      textarea.classList.remove('drag-highlight');
+    }, false);
+  });
+
+  // Handle dropped files
+  textarea.addEventListener('drop', handleDrop, false);
+
+  function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+
+    if (files.length > 0) {
+      handleFiles(files, textarea);
+    } else {
+      // Handle dropped text
+      const text = dt.getData('text');
+      if (text) {
+        textarea.value = text;
+        textarea.dispatchEvent(new Event('input'));
+        showNotification('Text pasted from drag');
+      }
+    }
+  }
+
+  function handleFiles(files, textarea) {
+    const file = files[0];
+
+    // Only accept text files
+    if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        textarea.value = e.target.result;
+        textarea.dispatchEvent(new Event('input'));
+        showNotification(`Loaded: ${file.name}`);
+      };
+
+      reader.onerror = () => {
+        showNotification('Error reading file', 'error');
+      };
+
+      reader.readAsText(file);
+    } else {
+      showNotification('Please drop a text file (.txt, .md)', 'error');
+    }
+  }
 }
 
 // ========================================
@@ -957,6 +1113,25 @@ function handleGetTips() {
   // Analyze prompt
   const analysis = EcoPromptAnalyzer.analyzePrompt(promptText);
   currentOptimizeAnalysis = analysis;
+
+  // Track query if tracking is enabled
+  if (settings.trackHistory && typeof EcoPromptCalculator !== 'undefined') {
+    const taskType = EcoPromptAnalyzer.detectTaskType(promptText);
+    const outputEstimate = EcoPromptAnalyzer.estimateOutputTokens(taskType.type, analysis.tokens);
+    const modelId = currentModel || settings.defaultModel;
+
+    // Calculate impact for tracking
+    const impact = EcoPromptCalculator.calculateImpact(
+      modelId,
+      analysis.tokens,
+      outputEstimate.estimated,
+      taskType.energyMultiplier
+    );
+
+    if (impact) {
+      trackQuery(impact, promptText);
+    }
+  }
 
   // Display results
   const resultsSection = document.getElementById('tips-results');
