@@ -174,6 +174,133 @@ function detectTaskType(text) {
 }
 
 // ========================================
+// SPECIAL QUERY TYPE DETECTION
+// ========================================
+
+/**
+ * Detect special query types that should use alternative tools
+ * @param {string} text - The query text
+ * @returns {Object|null} Special query suggestion or null
+ */
+function detectSpecialQueryType(text) {
+  const lowerText = text.toLowerCase();
+
+  // Location-based queries (restaurants, addresses, directions, places)
+  const locationKeywords = [
+    'restaurant', 'cafe', 'coffee shop', 'food near', 'near me',
+    'address', 'directions to', 'how to get to', 'location of',
+    'where is', 'closest', 'nearest', 'find a place', 'place to eat',
+    'parking', 'hotel', 'gas station', 'store near', 'open now'
+  ];
+
+  for (const keyword of locationKeywords) {
+    if (lowerText.includes(keyword)) {
+      return {
+        type: 'location',
+        title: '🗺️ Use a Maps App Instead',
+        description: 'For location searches, restaurants, directions, and places, use Google Maps, Apple Maps, or Waze. They provide real-time info, ratings, and navigation.',
+        impact: 'Get accurate, real-time location data',
+        priority: 'critical',
+        savingsPercent: 100,
+        alternativeTool: 'Google Maps, Apple Maps, or Waze'
+      };
+    }
+  }
+
+  // Weather queries
+  const weatherKeywords = [
+    'weather', 'temperature', 'forecast', 'rain', 'snow',
+    'sunny', 'cloudy', 'humidity', 'wind', 'storm',
+    'hot', 'cold', 'degrees'
+  ];
+
+  for (const keyword of weatherKeywords) {
+    if (lowerText.includes(keyword) && (
+      lowerText.includes('today') ||
+      lowerText.includes('tomorrow') ||
+      lowerText.includes('what') ||
+      lowerText.includes('current') ||
+      lowerText.includes('now')
+    )) {
+      return {
+        type: 'weather',
+        title: '🌤️ Use a Weather App',
+        description: 'For current weather and forecasts, use dedicated weather apps (Weather.com, Weather Channel, AccuWeather) or your device\'s built-in weather app.',
+        impact: 'Get real-time, accurate weather data',
+        priority: 'critical',
+        savingsPercent: 100,
+        alternativeTool: 'Weather app or weather.com'
+      };
+    }
+  }
+
+  // Time and date queries
+  const timeKeywords = [
+    'what time', 'current time', 'time in', 'timezone',
+    'what day', 'what date', 'today\'s date', 'current date',
+    'time now', 'clock'
+  ];
+
+  for (const keyword of timeKeywords) {
+    if (lowerText.includes(keyword)) {
+      return {
+        type: 'time',
+        title: '⏰ Check Your Device Clock',
+        description: 'For time and date information, check your device\'s clock, calendar app, or search "time in [city]" on Google for instant results.',
+        impact: 'Instant answer, zero energy',
+        priority: 'critical',
+        savingsPercent: 100,
+        alternativeTool: 'Device clock or Google search'
+      };
+    }
+  }
+
+  // Math and calculations
+  const mathKeywords = [
+    'calculate', 'compute', 'solve', 'equation', 'formula',
+    'what is', 'how much is', 'add', 'subtract', 'multiply', 'divide',
+    'percentage', 'convert', 'conversion'
+  ];
+
+  const hasMathSymbols = /[\d+\-*/=()%]/.test(text);
+  const isMathQuery = mathKeywords.some(kw => lowerText.includes(kw)) && hasMathSymbols;
+
+  if (isMathQuery) {
+    return {
+      type: 'math',
+      title: '🧮 Use a Calculator App',
+      description: 'For calculations, use your device\'s calculator app, Google Calculator, or spreadsheet software (Excel/Google Sheets) for complex formulas.',
+      impact: 'Instant, accurate calculations',
+      priority: 'critical',
+      savingsPercent: 100,
+      alternativeTool: 'Calculator app or spreadsheet'
+    };
+  }
+
+  // Cover letter / Resume / Email writing - needs context
+  const writingKeywords = [
+    'cover letter', 'resume', 'cv', 'job application',
+    'email', 'letter', 'formal letter', 'business letter'
+  ];
+
+  for (const keyword of writingKeywords) {
+    if (lowerText.includes(keyword) && lowerText.includes('write')) {
+      return {
+        type: 'writing',
+        title: '✍️ Provide More Context First',
+        description: 'For cover letters, resumes, or formal writing, provide specific details: purpose, target audience, key points, and your background. Consider drafting first, then ask AI to improve it.',
+        impact: 'Better results with less iteration',
+        priority: 'high',
+        savingsPercent: 50,
+        alternativeTool: 'Draft manually first, then use AI to refine'
+      };
+    }
+  }
+
+  return null;
+}
+
+// ========================================
 // POLITE WORDS DETECTION
 // ========================================
 
@@ -337,10 +464,23 @@ function getEcoAlternative(taskType) {
  * @param {Object} politeWords - Detected polite words
  * @param {Object} taskType - Detected task type
  * @param {number} tokens - Token count
+ * @param {string} originalText - The original prompt text
  * @returns {Array} Array of optimization tips
  */
-function getOptimizationTips(politeWords, taskType, tokens) {
+function getOptimizationTips(politeWords, taskType, tokens, originalText = '') {
   const tips = [];
+
+  // Tip 0: Check for special query types first (highest priority)
+  if (originalText) {
+    const specialQuery = detectSpecialQueryType(originalText);
+    if (specialQuery) {
+      tips.push({
+        type: 'special_query',
+        icon: 'Alternative Available.png',
+        ...specialQuery
+      });
+    }
+  }
 
   // Tip 1: Eco-friendly alternative (if available) - prioritize this
   const ecoAlternative = getEcoAlternative(taskType.type);
@@ -556,7 +696,7 @@ function analyzePrompt(text) {
   const taskType = detectTaskType(text);
   const politeWords = detectPoliteWords(text);
   const outputEstimate = estimateOutputTokens(taskType.type, tokens);
-  const tips = getOptimizationTips(politeWords, taskType, tokens);
+  const tips = getOptimizationTips(politeWords, taskType, tokens, text);
 
   return {
     originalText: text,
@@ -582,6 +722,7 @@ if (typeof window !== 'undefined') {
   window.EcoPromptAnalyzer = {
     estimateTokens,
     detectTaskType,
+    detectSpecialQueryType,
     detectPoliteWords,
     estimateOutputTokens,
     getOptimizationTips,
@@ -600,11 +741,13 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     estimateTokens,
     detectTaskType,
+    detectSpecialQueryType,
     detectPoliteWords,
     estimateOutputTokens,
     getOptimizationTips,
     getEcoAlternative,
     getModelRecommendation,
+    sanitizeText,
     generateOptimizedPrompt,
     analyzePrompt,
     TASK_TYPES,
