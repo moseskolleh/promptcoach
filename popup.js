@@ -876,6 +876,9 @@ class PromptLibrary {
   }
 
   generateTitle(text) {
+    if (!text || typeof text !== 'string') {
+      return 'Untitled Prompt';
+    }
     const maxLength = 50;
     const trimmed = text.trim().substring(0, maxLength);
     return trimmed.length < text.trim().length ? trimmed + '...' : trimmed;
