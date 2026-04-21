@@ -72,8 +72,9 @@ const TASK_TYPES = {
   },
   CREATIVE_WRITING: {
     keywords: [
-      'write story', 'poem', 'essay', 'article', 'creative', 'blog post',
-      'narrative', 'fiction', 'novel', 'character', 'plot', 'screenplay'
+      'write story', 'write a story', 'poem', 'essay', 'blog post',
+      'narrative', 'fiction', 'novel', 'screenplay', 'short story',
+      'creative writing'
     ],
     inputMultiplier: 1.0,
     outputMultiplier: 2.0,
@@ -136,6 +137,31 @@ const TASK_TYPES = {
 };
 
 /**
+ * Escape a string for use inside a RegExp
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Match a keyword as whole word(s) or phrase in text.
+ * Uses word boundaries on the outside so "api" does NOT match "capital"
+ * and "who" does NOT match "whole".
+ * @param {string} lowerText
+ * @param {string} keyword - already lower-cased
+ * @returns {boolean}
+ */
+function matchesKeyword(lowerText, keyword) {
+  const kw = keyword.trim();
+  if (!kw) return false;
+  // Build a boundary-anchored regex. Inner spaces are literal words.
+  const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(kw)}($|[^a-z0-9])`, 'i');
+  return pattern.test(lowerText);
+}
+
+/**
  * Detect task type from prompt text
  * @param {string} text - The prompt text to analyze
  * @returns {Object} Task type information with confidence score
@@ -150,8 +176,10 @@ function detectTaskType(text) {
 
     let score = 0;
     for (const keyword of config.keywords) {
-      if (lowerText.includes(keyword)) {
-        score += 2;
+      if (matchesKeyword(lowerText, keyword)) {
+        // Multi-word phrases are stronger signals than single words.
+        const words = keyword.trim().split(/\s+/).length;
+        score += words > 1 ? 3 : 2;
       }
     }
 
@@ -194,7 +222,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of locationKeywords) {
-    if (lowerText.includes(keyword)) {
+    if (matchesKeyword(lowerText, keyword)) {
       return {
         type: 'location',
         title: '🗺️ Use a Maps App Instead',
@@ -215,12 +243,12 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of weatherKeywords) {
-    if (lowerText.includes(keyword) && (
-      lowerText.includes('today') ||
-      lowerText.includes('tomorrow') ||
-      lowerText.includes('what') ||
-      lowerText.includes('current') ||
-      lowerText.includes('now')
+    if (matchesKeyword(lowerText, keyword) && (
+      matchesKeyword(lowerText, 'today') ||
+      matchesKeyword(lowerText, 'tomorrow') ||
+      matchesKeyword(lowerText, 'what') ||
+      matchesKeyword(lowerText, 'current') ||
+      matchesKeyword(lowerText, 'now')
     )) {
       return {
         type: 'weather',
@@ -242,7 +270,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of timeKeywords) {
-    if (lowerText.includes(keyword)) {
+    if (matchesKeyword(lowerText, keyword)) {
       return {
         type: 'time',
         title: '⏰ Check Your Device Clock',
@@ -263,7 +291,7 @@ function detectSpecialQueryType(text) {
   ];
 
   const hasMathSymbols = /[\d+\-*/=()%]/.test(text);
-  const isMathQuery = mathKeywords.some(kw => lowerText.includes(kw)) && hasMathSymbols;
+  const isMathQuery = mathKeywords.some(kw => matchesKeyword(lowerText, kw)) && hasMathSymbols;
 
   if (isMathQuery) {
     return {
@@ -284,7 +312,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of writingKeywords) {
-    if (lowerText.includes(keyword) && lowerText.includes('write')) {
+    if (matchesKeyword(lowerText, keyword) && matchesKeyword(lowerText, 'write')) {
       return {
         type: 'writing',
         title: '✍️ Provide More Context First',
@@ -611,38 +639,36 @@ function sanitizeText(text) {
 
   let sanitized = text;
 
-  // Fix excessive punctuation
-  sanitized = sanitized.replace(/!{2,}/g, '!');  // Multiple exclamation marks -> single
-  sanitized = sanitized.replace(/\?{2,}/g, '?');  // Multiple question marks -> single
-  sanitized = sanitized.replace(/\.{4,}/g, '...');  // More than 3 dots -> ellipsis
-  sanitized = sanitized.replace(/,{2,}/g, ',');  // Multiple commas -> single
+  // Normalize ellipses first so later passes don't treat them as sentence ends.
+  // Three-or-more dots → "…" (single char, treated like any other letter below).
+  sanitized = sanitized.replace(/\.{3,}/g, '…');
 
-  // Fix spacing errors
-  sanitized = sanitized.replace(/\s+/g, ' ');  // Multiple spaces -> single space
-  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Space before punctuation
-  sanitized = sanitized.replace(/([.,!?;:])\s*([.,!?;:])/g, '$1 ');  // Duplicate punctuation
-  sanitized = sanitized.replace(/([.!?])\s*([a-z])/g, '$1 $2');  // Ensure space after sentence-ending punctuation
+  // Collapse repeated punctuation (except normalized ellipses).
+  sanitized = sanitized.replace(/!{2,}/g, '!');
+  sanitized = sanitized.replace(/\?{2,}/g, '?');
+  sanitized = sanitized.replace(/,{2,}/g, ',');
 
-  // Fix common spacing issues around punctuation
-  sanitized = sanitized.replace(/([.,!?;:])/g, '$1 ');  // Add space after punctuation
-  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Remove space before punctuation
-  sanitized = sanitized.replace(/\s+/g, ' ');  // Clean up multiple spaces again
+  // Remove space before punctuation and ensure one space after, except when
+  // followed by another punctuation (e.g., "hello!?" or end of string).
+  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');
+  sanitized = sanitized.replace(/([.,!?;:])(?=[^\s.,!?;:…])/g, '$1 ');
 
-  // Trim first
-  sanitized = sanitized.trim();
+  // Collapse whitespace runs.
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
 
-  // Remove leading punctuation (commas, semicolons, etc.) that might be left after removing phrases
+  // Remove leading punctuation left after stripping polite phrases.
   sanitized = sanitized.replace(/^[,;:]+\s*/, '');
 
-  // Ensure proper capitalization after sentence-ending punctuation
-  sanitized = sanitized.replace(/([.!?])\s+([a-z])/g, (match, p1, p2) => {
-    return p1 + ' ' + p2.toUpperCase();
-  });
+  // Capitalize only after a *real* sentence end ('.', '!', '?') — never after '…',
+  // which is typically mid-thought, and never after ';' or ','.
+  sanitized = sanitized.replace(/([.!?])(\s+)([a-z])/g, (m, p, s, c) => p + s + c.toUpperCase());
 
-  // Final trim
-  sanitized = sanitized.trim();
+  // Capitalize the very first character.
+  if (sanitized.length > 0) {
+    sanitized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+  }
 
-  return sanitized;
+  return sanitized.trim();
 }
 
 // ========================================

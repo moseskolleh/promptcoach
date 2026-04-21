@@ -195,34 +195,34 @@ function createFloatingBadge() {
     right: 20px;
     background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
     color: white;
-    padding: 12px 20px;
+    padding: 10px 16px;
     border-radius: 50px;
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.35);
     cursor: pointer;
     z-index: 999999;
     display: flex;
     align-items: center;
     gap: 8px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    transition: all 0.3s ease;
-    animation: ecoprompt-badge-bounce 2s infinite;
+    opacity: 0.9;
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    animation: ecoprompt-badge-in 0.35s ease-out;
   `;
 
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes ecoprompt-badge-bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
+    @keyframes ecoprompt-badge-in {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 0.9; }
     }
     .ecoprompt-floating-badge:hover {
-      transform: scale(1.05) translateY(-2px) !important;
+      opacity: 1 !important;
+      transform: translateY(-1px) !important;
       box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5) !important;
     }
-    .ecoprompt-badge-icon {
-      font-size: 20px;
-    }
+    .ecoprompt-badge-icon { font-size: 18px; }
   `;
   document.head.appendChild(style);
 }

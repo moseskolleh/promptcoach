@@ -138,7 +138,7 @@ function getQueryCategory(inputTokens, outputTokens) {
  * @returns {Object} Interpolated energy with confidence interval
  */
 function interpolateEnergy(model, inputTokens, outputTokens) {
-  const totalTokens = inputTokens + outputTokens;
+  const totalTokens = Math.max(0, (Number(inputTokens) || 0) + (Number(outputTokens) || 0));
 
   // Category boundaries (from paper)
   const categories = {
@@ -148,6 +148,7 @@ function interpolateEnergy(model, inputTokens, outputTokens) {
   };
 
   let energy, energyStd;
+  let extrapolated = false;
 
   if (totalTokens <= categories.short.tokens) {
     // Below short: linear extrapolation from 0
@@ -167,15 +168,19 @@ function interpolateEnergy(model, inputTokens, outputTokens) {
     energy = categories.medium.energy + ratio * (categories.long.energy - categories.medium.energy);
     energyStd = categories.medium.std + ratio * (categories.long.std - categories.medium.std);
   } else {
-    // Above long: linear extrapolation
+    // Above the measured range: extrapolate, but widen the uncertainty band
+    // because the paper never validated beyond ~11.5k tokens.
+    extrapolated = true;
     const ratio = totalTokens / categories.long.tokens;
     energy = categories.long.energy * ratio;
-    energyStd = categories.long.std * ratio;
+    // Double the std beyond the measured range to reflect lower confidence.
+    energyStd = Math.max(categories.long.std, categories.long.std * ratio) * 2;
   }
 
   return {
-    energy: energy,
+    energy: Math.max(0, energy),
     energyStd: energyStd,
+    extrapolated,
     confidenceInterval: {
       min: Math.max(0, energy - energyStd),
       max: energy + energyStd
@@ -205,6 +210,11 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
   const infraKey = model.hostKey;
   const infrastructure = INFRASTRUCTURE[infraKey];
   if (!infrastructure) return null;
+
+  // Clamp inputs: tokens cannot be negative; multiplier must be non-negative.
+  inputTokens = Math.max(0, Number(inputTokens) || 0);
+  outputTokens = Math.max(0, Number(outputTokens) || 0);
+  energyMultiplier = Math.max(0, Number(energyMultiplier) || 1.0);
 
   // Get interpolated energy
   const energyData = interpolateEnergy(model, inputTokens, outputTokens);
@@ -242,6 +252,7 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
     energy: {
       wh: energyWh,
       kwh: energyKwh,
+      extrapolated: !!energyData.extrapolated,
       confidenceInterval: {
         minWh: Math.max(0, energyData.confidenceInterval.min * energyMultiplier),
         maxWh: energyData.confidenceInterval.max * energyMultiplier
@@ -702,6 +713,9 @@ if (typeof module !== 'undefined' && module.exports) {
     formatEnergyComparison,
     formatWaterComparison,
     formatCarbonComparison,
+    formatEnergyComparisonDetailed,
+    formatWaterComparisonDetailed,
+    formatCarbonComparisonDetailed,
     getComparisons,
     calculateEcoScore,
     getScoreLabel,

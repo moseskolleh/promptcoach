@@ -764,9 +764,9 @@ function displayAnalysis(analysis) {
   if (analysis.tips.length > 0) {
     tipsDiv.innerHTML = analysis.tips.map(tip => `
       <div class="tip-item">
-        <div class="tip-title">${tip.title}</div>
-        <div class="tip-description">${tip.description}</div>
-        <div class="tip-impact">💡 ${tip.impact}</div>
+        <div class="tip-title">${escapeHtml(tip.title || '')}</div>
+        <div class="tip-description">${escapeHtml(tip.description || '')}</div>
+        <div class="tip-impact">💡 ${escapeHtml(tip.impact || '')}</div>
       </div>
     `).join('');
   } else {
@@ -1002,21 +1002,21 @@ async function renderLibrary() {
   }
 
   listElement.innerHTML = prompts.map(prompt => `
-    <div class="library-item" data-id="${prompt.id}">
+    <div class="library-item" data-id="${Number(prompt.id) || 0}">
       <div class="library-item-header">
         <div>
-          <div class="library-item-title">${prompt.title}</div>
-          <div class="library-item-meta">${new Date(prompt.createdAt).toLocaleDateString()}</div>
+          <div class="library-item-title">${escapeHtml(prompt.title || '')}</div>
+          <div class="library-item-meta">${escapeHtml(new Date(prompt.createdAt).toLocaleDateString())}</div>
         </div>
         <div class="library-item-actions">
           <button class="icon-btn copy-prompt" title="Copy">📋</button>
           <button class="icon-btn delete-prompt" title="Delete">🗑️</button>
         </div>
       </div>
-      <div class="library-item-prompt">${prompt.text}</div>
+      <div class="library-item-prompt">${escapeHtml(prompt.text || '')}</div>
       <div class="library-item-stats">
-        <span>🔤 ${prompt.tokens} tokens</span>
-        <span>📁 ${prompt.taskType}</span>
+        <span>🔤 ${Number(prompt.tokens) || 0} tokens</span>
+        <span>📁 ${escapeHtml(prompt.taskType || '')}</span>
       </div>
     </div>
   `).join('');
@@ -1203,9 +1203,9 @@ function handleGetTips() {
 
       return `
         <div class="tip-item ${impactClass}">
-          <div class="tip-title">${tip.title}</div>
-          <div class="tip-description">${tip.description}</div>
-          <div class="tip-impact">${impactEmoji} ${tip.impact}</div>
+          <div class="tip-title">${escapeHtml(tip.title || '')}</div>
+          <div class="tip-description">${escapeHtml(tip.description || '')}</div>
+          <div class="tip-impact">${impactEmoji} ${escapeHtml(tip.impact || '')}</div>
         </div>
       `;
     }).join('');

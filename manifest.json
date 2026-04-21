@@ -21,7 +21,24 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://*.openai.com/*",
+        "https://claude.ai/*",
+        "https://*.anthropic.com/*",
+        "https://gemini.google.com/*",
+        "https://bard.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://poe.com/*",
+        "https://*.perplexity.ai/*",
+        "https://you.com/*",
+        "https://*.mistral.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://grok.com/*",
+        "https://x.ai/*"
+      ],
       "js": ["shared/analyzer.js", "shared/calculator.js", "content.js"],
       "run_at": "document_idle"
     }
@@ -29,7 +46,24 @@
   "web_accessible_resources": [
     {
       "resources": ["assets/*", "tooltip.css", "data/*.json", "shared/*.js"],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://*.openai.com/*",
+        "https://claude.ai/*",
+        "https://*.anthropic.com/*",
+        "https://gemini.google.com/*",
+        "https://bard.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://poe.com/*",
+        "https://*.perplexity.ai/*",
+        "https://you.com/*",
+        "https://*.mistral.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://grok.com/*",
+        "https://x.ai/*"
+      ]
     }
   ],
   "options_page": "settings.html"
