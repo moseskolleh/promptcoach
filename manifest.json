@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EcoPrompt Coach",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Making AI Sustainability Visible and Actionable - Track environmental impact of AI queries",
   "icons": {
     "16": "assets/icon16.png",
@@ -24,20 +24,14 @@
       "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
-        "https://*.openai.com/*",
         "https://claude.ai/*",
-        "https://*.anthropic.com/*",
         "https://gemini.google.com/*",
-        "https://bard.google.com/*",
         "https://copilot.microsoft.com/*",
-        "https://www.bing.com/chat*",
         "https://poe.com/*",
-        "https://*.perplexity.ai/*",
+        "https://www.perplexity.ai/*",
         "https://you.com/*",
-        "https://*.mistral.ai/*",
         "https://chat.mistral.ai/*",
-        "https://grok.com/*",
-        "https://x.ai/*"
+        "https://grok.com/*"
       ],
       "js": ["shared/analyzer.js", "shared/calculator.js", "content.js"],
       "run_at": "document_idle"
@@ -45,26 +39,23 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/*", "tooltip.css", "data/*.json", "shared/*.js"],
+      "resources": ["assets/*", "tooltip.css", "data/*.json"],
       "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
-        "https://*.openai.com/*",
         "https://claude.ai/*",
-        "https://*.anthropic.com/*",
         "https://gemini.google.com/*",
-        "https://bard.google.com/*",
         "https://copilot.microsoft.com/*",
-        "https://www.bing.com/chat*",
         "https://poe.com/*",
-        "https://*.perplexity.ai/*",
+        "https://www.perplexity.ai/*",
         "https://you.com/*",
-        "https://*.mistral.ai/*",
         "https://chat.mistral.ai/*",
-        "https://grok.com/*",
-        "https://x.ai/*"
+        "https://grok.com/*"
       ]
     }
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'; frame-ancestors 'none'"
+  },
   "options_page": "settings.html"
 }
