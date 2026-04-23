@@ -40,10 +40,12 @@ async function loadData() {
         name: model.name,
         provider: model.provider,
         host: model.host,
-        hostKey: model.host.toLowerCase().replace(' ', '_'),
+        hostKey: model.host.toLowerCase().replace(/\s+/g, '_'),
         sizeClass: model.size_class,
         gpuCount: model.gpu_count,
         criticalPowerKw: model.critical_power_kw,
+        isReasoning: !!model.is_reasoning,
+        reasoningMultiplier: model.reasoning_multiplier || 1.0,
         short: {
           energy: model.performance.short.energy_wh_mean,
           energyStd: model.performance.short.energy_wh_std,
@@ -219,8 +221,14 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
   // Get interpolated energy
   const energyData = interpolateEnergy(model, inputTokens, outputTokens);
 
-  // Apply task type multiplier
-  const energyWh = energyData.energy * energyMultiplier;
+  // Reasoning / thinking models emit hidden chain-of-thought tokens that
+  // aren't reflected in the output_tokens benchmark. The per-model factor
+  // approximates the typical extra compute.
+  const reasoningFactor = model.isReasoning ? (model.reasoningMultiplier || 1.0) : 1.0;
+
+  // Apply task type × reasoning multipliers
+  const totalMultiplier = energyMultiplier * reasoningFactor;
+  const energyWh = energyData.energy * totalMultiplier;
   const energyKwh = energyWh / 1000;
 
   // Calculate water consumption
@@ -254,8 +262,8 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
       kwh: energyKwh,
       extrapolated: !!energyData.extrapolated,
       confidenceInterval: {
-        minWh: Math.max(0, energyData.confidenceInterval.min * energyMultiplier),
-        maxWh: energyData.confidenceInterval.max * energyMultiplier
+        minWh: Math.max(0, energyData.confidenceInterval.min * totalMultiplier),
+        maxWh: energyData.confidenceInterval.max * totalMultiplier
       }
     },
     water: {
@@ -272,6 +280,7 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
     },
     multipliers: {
       energy: energyMultiplier,
+      reasoning: reasoningFactor,
       pue: infrastructure.pue,
       wueOnsite: infrastructure.wueOnsite,
       wueOffsite: infrastructure.wueOffsite,

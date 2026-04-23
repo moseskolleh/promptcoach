@@ -5,6 +5,24 @@
 console.log('EcoPrompt Coach content script loaded');
 
 // ========================================
+// HTML ESCAPING
+// ========================================
+
+// Escape untrusted text before interpolating into innerHTML templates.
+// Tip titles/descriptions are analyzer-authored today, but can contain user-
+// derived fragments (e.g. matched polite phrases) — defence in depth.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ========================================
 // SETTINGS & STATE
 // ========================================
 
@@ -28,6 +46,11 @@ let currentAnalysis = null;
 let bannerShown = false;
 let calculatorLoaded = false;
 
+// Resolves once both stored settings and benchmark data have loaded.
+// Input handlers await this so the first prompt uses the user's saved model,
+// not the hardcoded gpt-4o default.
+let initReady;
+
 // ========================================
 // INITIALIZATION
 // ========================================
@@ -38,12 +61,21 @@ cssLink.rel = 'stylesheet';
 cssLink.href = chrome.runtime.getURL('tooltip.css');
 document.head.appendChild(cssLink);
 
-// Load settings
-chrome.storage.local.get([SETTINGS_KEY], (result) => {
-  if (result[SETTINGS_KEY]) {
-    settings = { ...settings, ...result[SETTINGS_KEY] };
-  }
-});
+function loadSettings() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get([SETTINGS_KEY], (result) => {
+        if (result && result[SETTINGS_KEY]) {
+          settings = { ...settings, ...result[SETTINGS_KEY] };
+        }
+        resolve();
+      });
+    } catch (e) {
+      console.error('EcoPrompt: failed to load settings', e);
+      resolve();
+    }
+  });
+}
 
 // Load calculator data
 async function initCalculator() {
@@ -58,7 +90,7 @@ async function initCalculator() {
   }
 }
 
-initCalculator();
+initReady = Promise.all([loadSettings(), initCalculator()]);
 
 // ========================================
 // PLATFORM DETECTION
@@ -98,45 +130,18 @@ function detectAIPlatform() {
 
 function analyzePrompt(text) {
   if (!text || text.trim().length === 0) return null;
-
-  // Use shared analyzer if available
-  if (typeof EcoPromptAnalyzer !== 'undefined') {
-    return EcoPromptAnalyzer.analyzePrompt(text);
+  if (typeof EcoPromptAnalyzer === 'undefined') {
+    console.warn('EcoPrompt: shared analyzer not yet loaded');
+    return null;
   }
-
-  // Fallback to basic analysis
-  const words = text.trim().split(/\s+/).length;
-  const tokens = Math.ceil(words / 0.75);
-
-  return {
-    tokens,
-    taskType: { type: 'GENERAL', displayName: 'General', energyMultiplier: 1.0 },
-    politeWords: { found: [], totalTokensSaved: 0 },
-    tips: [{
-      type: 'general',
-      icon: 'Optimise Prompt.png',
-      title: 'Analyzer Loading...',
-      description: 'Please wait while the analyzer loads.',
-      impact: 'Full analysis coming soon',
-      priority: 'medium'
-    }],
-    optimizedTokens: tokens
-  };
-}
-
-function getModelRecommendation(taskType) {
-  if (typeof EcoPromptAnalyzer !== 'undefined') {
-    return EcoPromptAnalyzer.getModelRecommendation(taskType);
-  }
-
-  return 'Start with smaller models: GPT-4o mini, Gemini Flash, or Claude 3.5 Haiku (70% less energy).';
+  return EcoPromptAnalyzer.analyzePrompt(text);
 }
 
 // ========================================
 // IMPACT CALCULATION (Using Shared Calculator)
 // ========================================
 
-async function calculateQuickImpact(tokens, taskType) {
+async function calculateQuickImpact(analysis) {
   if (!calculatorLoaded || typeof EcoPromptCalculator === 'undefined') {
     return null;
   }
@@ -144,24 +149,28 @@ async function calculateQuickImpact(tokens, taskType) {
   const platform = detectAIPlatform();
   let modelId = settings.defaultModel;
 
-  // Auto-detect model based on platform
   if (settings.autoDetect && platform) {
     const detected = EcoPromptCalculator.autoDetectModel(window.location.hostname);
     if (detected) modelId = detected;
   }
 
+  // analyzePrompt() returns taskType as a display string and exposes
+  // the raw key as taskTypeRaw and the multiplier at the top level.
+  const taskKey = analysis.taskTypeRaw || 'GENERAL';
+  const multiplier = typeof analysis.energyMultiplier === 'number'
+    ? analysis.energyMultiplier
+    : 1.0;
+
   const outputEstimate = typeof EcoPromptAnalyzer !== 'undefined'
-    ? EcoPromptAnalyzer.estimateOutputTokens(taskType.type || taskType, tokens)
+    ? EcoPromptAnalyzer.estimateOutputTokens(taskKey, analysis.tokens)
     : { estimated: 300 };
 
-  const impact = EcoPromptCalculator.calculateImpact(
+  return EcoPromptCalculator.calculateImpact(
     modelId,
-    tokens,
+    analysis.tokens,
     outputEstimate.estimated,
-    taskType.energyMultiplier || 1.0
+    multiplier
   );
-
-  return impact;
 }
 
 // ========================================
@@ -262,9 +271,9 @@ function showNotificationBanner(analysis) {
     <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
       <span style="font-size: 24px;">🌱</span>
       <div style="flex: 1;">
-        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${topTip.title}${energyInfo}</div>
-        <div style="font-size: 13px; opacity: 0.95;">${topTip.description}</div>
-        <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">💚 ${topTip.impact}</div>
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${escapeHtml(topTip.title)}${energyInfo}</div>
+        <div style="font-size: 13px; opacity: 0.95;">${escapeHtml(topTip.description)}</div>
+        <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">💚 ${escapeHtml(topTip.impact)}</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
@@ -333,10 +342,10 @@ function createTooltip(analysis, element) {
   tokenInfo.className = 'ecoprompt-token-info';
   tokenInfo.innerHTML = `
     <div class="ecoprompt-token-count">
-      <strong>${analysis.tokens}</strong>
+      <strong>${Number(analysis.tokens) || 0}</strong>
       <span>Tokens</span>
     </div>
-    <div class="ecoprompt-task-type">${taskTypeDisplay}</div>
+    <div class="ecoprompt-task-type">${escapeHtml(taskTypeDisplay)}</div>
   `;
   tooltip.appendChild(tokenInfo);
 
@@ -403,11 +412,11 @@ function createTooltip(analysis, element) {
     const iconUrl = chrome.runtime.getURL(`assets/${tip.icon}`);
 
     tipElement.innerHTML = `
-      <img src="${iconUrl}" alt="${tip.title}" class="ecoprompt-tip-icon" onerror="this.style.display='none'" />
+      <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(tip.title)}" class="ecoprompt-tip-icon" onerror="this.style.display='none'" />
       <div class="ecoprompt-tip-content">
-        <h4 class="ecoprompt-tip-title">${tip.title}</h4>
-        <p class="ecoprompt-tip-description">${tip.description}</p>
-        <p class="ecoprompt-tip-impact">💚 ${tip.impact}</p>
+        <h4 class="ecoprompt-tip-title">${escapeHtml(tip.title)}</h4>
+        <p class="ecoprompt-tip-description">${escapeHtml(tip.description)}</p>
+        <p class="ecoprompt-tip-impact">💚 ${escapeHtml(tip.impact)}</p>
       </div>
     `;
     tipsContainer.appendChild(tipElement);
@@ -498,14 +507,14 @@ async function handlePaste(event) {
   }
 
   setTimeout(async () => {
+    await initReady;
     const text = element.value || element.textContent || element.innerText;
 
     if (!text || text.trim().length < 10) return;
 
     const analysis = analyzePrompt(text);
     if (analysis) {
-      // Calculate energy estimate
-      const impact = await calculateQuickImpact(analysis.tokens, analysis.taskType || analysis.taskTypeRaw);
+      const impact = await calculateQuickImpact(analysis);
       if (impact) {
         analysis.energyEstimate = impact.energy.wh;
         analysis.waterEstimate = impact.water.ml;
@@ -531,10 +540,10 @@ function handleInput(event) {
   if (text && text.trim().length > 50) {
     clearTimeout(element._ecopromptTimeout);
     element._ecopromptTimeout = setTimeout(async () => {
+      await initReady;
       const analysis = analyzePrompt(text);
       if (analysis) {
-        // Calculate energy estimate
-        const impact = await calculateQuickImpact(analysis.tokens, analysis.taskType || analysis.taskTypeRaw);
+        const impact = await calculateQuickImpact(analysis);
         if (impact) {
           analysis.energyEstimate = impact.energy.wh;
           analysis.waterEstimate = impact.water.ml;

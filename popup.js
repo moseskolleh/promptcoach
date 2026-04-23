@@ -286,43 +286,57 @@ function setupEventListeners() {
     }
   });
 
-  // Tab switching
-  const tabButtons = document.querySelectorAll('.tab-btn');
+  // Tab switching (click + ARIA roving-tabindex keyboard navigation)
+  const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
   const tabContents = document.querySelectorAll('.tab-content');
 
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
+  function activateTab(btn, { focus = false } = {}) {
+    const tabName = btn.dataset.tab;
 
-      tabButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+    tabButtons.forEach(b => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      b.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
 
-      tabContents.forEach(content => {
-        content.classList.remove('active');
-        if (content.id === `${tabName}-tab`) {
-          content.classList.add('active');
+    tabContents.forEach(content => {
+      const isActive = content.id === `${tabName}-tab`;
+      content.classList.toggle('active', isActive);
+      content.classList.toggle('hidden', !isActive);
+    });
+
+    if (focus) btn.focus();
+
+    if (tabName === 'library') {
+      renderTemplates();
+      renderLibrary();
+    } else if (tabName === 'stats') {
+      loadStats();
+    } else if (tabName === 'impact') {
+      const comparisonSection = document.getElementById('model-comparison-section');
+      if (comparisonSection) {
+        if (settings.showModelComparison) {
+          comparisonSection.classList.remove('hidden');
+          renderModelCheckboxes();
+        } else {
+          comparisonSection.classList.add('hidden');
         }
-      });
+      }
+    }
+  }
 
-      // Refresh tab-specific content
-      if (tabName === 'library') {
-        renderTemplates();
-        renderLibrary();
-      } else if (tabName === 'stats') {
-        loadStats();
-      } else if (tabName === 'optimize') {
-        // Initialize optimizer tab
-      } else if (tabName === 'impact') {
-        // Show/hide model comparison based on settings
-        const comparisonSection = document.getElementById('model-comparison-section');
-        if (comparisonSection) {
-          if (settings.showModelComparison) {
-            comparisonSection.classList.remove('hidden');
-            renderModelCheckboxes();
-          } else {
-            comparisonSection.classList.add('hidden');
-          }
-        }
+  tabButtons.forEach((btn, idx) => {
+    btn.addEventListener('click', () => activateTab(btn));
+    btn.addEventListener('keydown', (e) => {
+      let next = null;
+      if (e.key === 'ArrowRight') next = tabButtons[(idx + 1) % tabButtons.length];
+      else if (e.key === 'ArrowLeft') next = tabButtons[(idx - 1 + tabButtons.length) % tabButtons.length];
+      else if (e.key === 'Home') next = tabButtons[0];
+      else if (e.key === 'End') next = tabButtons[tabButtons.length - 1];
+      if (next) {
+        e.preventDefault();
+        activateTab(next, { focus: true });
       }
     });
   });

@@ -18,16 +18,16 @@
     </header>
 
     <!-- Tab Navigation -->
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="optimize">Optimizer</button>
-      <button class="tab-btn" data-tab="library">Library</button>
-      <button class="tab-btn" data-tab="stats">Stats</button>
-      <button class="tab-btn" data-tab="impact">Impacts</button>
+    <nav class="tabs" role="tablist" aria-label="EcoPrompt sections">
+      <button class="tab-btn active" data-tab="optimize" role="tab" aria-selected="true" aria-controls="optimize-tab" id="tab-btn-optimize" tabindex="0">Optimizer</button>
+      <button class="tab-btn" data-tab="library" role="tab" aria-selected="false" aria-controls="library-tab" id="tab-btn-library" tabindex="-1">Library</button>
+      <button class="tab-btn" data-tab="stats" role="tab" aria-selected="false" aria-controls="stats-tab" id="tab-btn-stats" tabindex="-1">Stats</button>
+      <button class="tab-btn" data-tab="impact" role="tab" aria-selected="false" aria-controls="impact-tab" id="tab-btn-impact" tabindex="-1">Impacts</button>
     </nav>
 
     <main>
       <!-- Impact Calculator Tab -->
-      <div id="impact-tab" class="tab-content hidden">
+      <div id="impact-tab" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-impact" tabindex="0">
       <!-- Model Selection -->
       <section class="model-select-section">
         <div class="model-select-row">
@@ -133,7 +133,7 @@
       </div>
 
       <!-- Optimizer Tab (Priority view) -->
-      <div id="optimize-tab" class="tab-content active">
+      <div id="optimize-tab" class="tab-content active" role="tabpanel" aria-labelledby="tab-btn-optimize" tabindex="0">
         <section class="optimize-section">
           <h2>✨ Optimizer</h2>
           <p class="section-desc">Get optimization tips for your prompts</p>
@@ -177,7 +177,7 @@
       </div>
 
       <!-- Library Tab -->
-      <div id="library-tab" class="tab-content hidden">
+      <div id="library-tab" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-library" tabindex="0">
         <section class="library-section">
           <h2>📚 Prompt Library</h2>
           <p class="section-desc">Efficient templates and saved prompts</p>
@@ -213,7 +213,7 @@
       </div>
 
       <!-- Stats/Dashboard Tab -->
-      <div id="stats-tab" class="tab-content hidden">
+      <div id="stats-tab" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-stats" tabindex="0">
         <section class="stats-section">
           <h2>📈 Impact Dashboard</h2>
           <p class="section-desc">Track your environmental impact over time</p>
