@@ -286,43 +286,57 @@ function setupEventListeners() {
     }
   });
 
-  // Tab switching
-  const tabButtons = document.querySelectorAll('.tab-btn');
+  // Tab switching (click + ARIA roving-tabindex keyboard navigation)
+  const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
   const tabContents = document.querySelectorAll('.tab-content');
 
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
+  function activateTab(btn, { focus = false } = {}) {
+    const tabName = btn.dataset.tab;
 
-      tabButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+    tabButtons.forEach(b => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      b.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
 
-      tabContents.forEach(content => {
-        content.classList.remove('active');
-        if (content.id === `${tabName}-tab`) {
-          content.classList.add('active');
+    tabContents.forEach(content => {
+      const isActive = content.id === `${tabName}-tab`;
+      content.classList.toggle('active', isActive);
+      content.classList.toggle('hidden', !isActive);
+    });
+
+    if (focus) btn.focus();
+
+    if (tabName === 'library') {
+      renderTemplates();
+      renderLibrary();
+    } else if (tabName === 'stats') {
+      loadStats();
+    } else if (tabName === 'impact') {
+      const comparisonSection = document.getElementById('model-comparison-section');
+      if (comparisonSection) {
+        if (settings.showModelComparison) {
+          comparisonSection.classList.remove('hidden');
+          renderModelCheckboxes();
+        } else {
+          comparisonSection.classList.add('hidden');
         }
-      });
+      }
+    }
+  }
 
-      // Refresh tab-specific content
-      if (tabName === 'library') {
-        renderTemplates();
-        renderLibrary();
-      } else if (tabName === 'stats') {
-        loadStats();
-      } else if (tabName === 'optimize') {
-        // Initialize optimizer tab
-      } else if (tabName === 'impact') {
-        // Show/hide model comparison based on settings
-        const comparisonSection = document.getElementById('model-comparison-section');
-        if (comparisonSection) {
-          if (settings.showModelComparison) {
-            comparisonSection.classList.remove('hidden');
-            renderModelCheckboxes();
-          } else {
-            comparisonSection.classList.add('hidden');
-          }
-        }
+  tabButtons.forEach((btn, idx) => {
+    btn.addEventListener('click', () => activateTab(btn));
+    btn.addEventListener('keydown', (e) => {
+      let next = null;
+      if (e.key === 'ArrowRight') next = tabButtons[(idx + 1) % tabButtons.length];
+      else if (e.key === 'ArrowLeft') next = tabButtons[(idx - 1 + tabButtons.length) % tabButtons.length];
+      else if (e.key === 'Home') next = tabButtons[0];
+      else if (e.key === 'End') next = tabButtons[tabButtons.length - 1];
+      if (next) {
+        e.preventDefault();
+        activateTab(next, { focus: true });
       }
     });
   });
@@ -764,9 +778,9 @@ function displayAnalysis(analysis) {
   if (analysis.tips.length > 0) {
     tipsDiv.innerHTML = analysis.tips.map(tip => `
       <div class="tip-item">
-        <div class="tip-title">${tip.title}</div>
-        <div class="tip-description">${tip.description}</div>
-        <div class="tip-impact">💡 ${tip.impact}</div>
+        <div class="tip-title">${escapeHtml(tip.title || '')}</div>
+        <div class="tip-description">${escapeHtml(tip.description || '')}</div>
+        <div class="tip-impact">💡 ${escapeHtml(tip.impact || '')}</div>
       </div>
     `).join('');
   } else {
@@ -876,6 +890,9 @@ class PromptLibrary {
   }
 
   generateTitle(text) {
+    if (!text || typeof text !== 'string') {
+      return 'Untitled Prompt';
+    }
     const maxLength = 50;
     const trimmed = text.trim().substring(0, maxLength);
     return trimmed.length < text.trim().length ? trimmed + '...' : trimmed;
@@ -999,21 +1016,21 @@ async function renderLibrary() {
   }
 
   listElement.innerHTML = prompts.map(prompt => `
-    <div class="library-item" data-id="${prompt.id}">
+    <div class="library-item" data-id="${Number(prompt.id) || 0}">
       <div class="library-item-header">
         <div>
-          <div class="library-item-title">${prompt.title}</div>
-          <div class="library-item-meta">${new Date(prompt.createdAt).toLocaleDateString()}</div>
+          <div class="library-item-title">${escapeHtml(prompt.title || '')}</div>
+          <div class="library-item-meta">${escapeHtml(new Date(prompt.createdAt).toLocaleDateString())}</div>
         </div>
         <div class="library-item-actions">
           <button class="icon-btn copy-prompt" title="Copy">📋</button>
           <button class="icon-btn delete-prompt" title="Delete">🗑️</button>
         </div>
       </div>
-      <div class="library-item-prompt">${prompt.text}</div>
+      <div class="library-item-prompt">${escapeHtml(prompt.text || '')}</div>
       <div class="library-item-stats">
-        <span>🔤 ${prompt.tokens} tokens</span>
-        <span>📁 ${prompt.taskType}</span>
+        <span>🔤 ${Number(prompt.tokens) || 0} tokens</span>
+        <span>📁 ${escapeHtml(prompt.taskType || '')}</span>
       </div>
     </div>
   `).join('');
@@ -1200,9 +1217,9 @@ function handleGetTips() {
 
       return `
         <div class="tip-item ${impactClass}">
-          <div class="tip-title">${tip.title}</div>
-          <div class="tip-description">${tip.description}</div>
-          <div class="tip-impact">${impactEmoji} ${tip.impact}</div>
+          <div class="tip-title">${escapeHtml(tip.title || '')}</div>
+          <div class="tip-description">${escapeHtml(tip.description || '')}</div>
+          <div class="tip-impact">${impactEmoji} ${escapeHtml(tip.impact || '')}</div>
         </div>
       `;
     }).join('');

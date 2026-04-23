@@ -72,8 +72,9 @@ const TASK_TYPES = {
   },
   CREATIVE_WRITING: {
     keywords: [
-      'write story', 'poem', 'essay', 'article', 'creative', 'blog post',
-      'narrative', 'fiction', 'novel', 'character', 'plot', 'screenplay'
+      'write story', 'write a story', 'poem', 'essay', 'blog post',
+      'narrative', 'fiction', 'novel', 'screenplay', 'short story',
+      'creative writing'
     ],
     inputMultiplier: 1.0,
     outputMultiplier: 2.0,
@@ -136,6 +137,31 @@ const TASK_TYPES = {
 };
 
 /**
+ * Escape a string for use inside a RegExp
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Match a keyword as whole word(s) or phrase in text.
+ * Uses word boundaries on the outside so "api" does NOT match "capital"
+ * and "who" does NOT match "whole".
+ * @param {string} lowerText
+ * @param {string} keyword - already lower-cased
+ * @returns {boolean}
+ */
+function matchesKeyword(lowerText, keyword) {
+  const kw = keyword.trim();
+  if (!kw) return false;
+  // Build a boundary-anchored regex. Inner spaces are literal words.
+  const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(kw)}($|[^a-z0-9])`, 'i');
+  return pattern.test(lowerText);
+}
+
+/**
  * Detect task type from prompt text
  * @param {string} text - The prompt text to analyze
  * @returns {Object} Task type information with confidence score
@@ -150,8 +176,10 @@ function detectTaskType(text) {
 
     let score = 0;
     for (const keyword of config.keywords) {
-      if (lowerText.includes(keyword)) {
-        score += 2;
+      if (matchesKeyword(lowerText, keyword)) {
+        // Multi-word phrases are stronger signals than single words.
+        const words = keyword.trim().split(/\s+/).length;
+        score += words > 1 ? 3 : 2;
       }
     }
 
@@ -194,7 +222,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of locationKeywords) {
-    if (lowerText.includes(keyword)) {
+    if (matchesKeyword(lowerText, keyword)) {
       return {
         type: 'location',
         title: '🗺️ Use a Maps App Instead',
@@ -215,12 +243,12 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of weatherKeywords) {
-    if (lowerText.includes(keyword) && (
-      lowerText.includes('today') ||
-      lowerText.includes('tomorrow') ||
-      lowerText.includes('what') ||
-      lowerText.includes('current') ||
-      lowerText.includes('now')
+    if (matchesKeyword(lowerText, keyword) && (
+      matchesKeyword(lowerText, 'today') ||
+      matchesKeyword(lowerText, 'tomorrow') ||
+      matchesKeyword(lowerText, 'what') ||
+      matchesKeyword(lowerText, 'current') ||
+      matchesKeyword(lowerText, 'now')
     )) {
       return {
         type: 'weather',
@@ -242,7 +270,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of timeKeywords) {
-    if (lowerText.includes(keyword)) {
+    if (matchesKeyword(lowerText, keyword)) {
       return {
         type: 'time',
         title: '⏰ Check Your Device Clock',
@@ -263,7 +291,7 @@ function detectSpecialQueryType(text) {
   ];
 
   const hasMathSymbols = /[\d+\-*/=()%]/.test(text);
-  const isMathQuery = mathKeywords.some(kw => lowerText.includes(kw)) && hasMathSymbols;
+  const isMathQuery = mathKeywords.some(kw => matchesKeyword(lowerText, kw)) && hasMathSymbols;
 
   if (isMathQuery) {
     return {
@@ -284,7 +312,7 @@ function detectSpecialQueryType(text) {
   ];
 
   for (const keyword of writingKeywords) {
-    if (lowerText.includes(keyword) && lowerText.includes('write')) {
+    if (matchesKeyword(lowerText, keyword) && matchesKeyword(lowerText, 'write')) {
       return {
         type: 'writing',
         title: '✍️ Provide More Context First',
@@ -304,23 +332,42 @@ function detectSpecialQueryType(text) {
 // POLITE WORDS DETECTION
 // ========================================
 
+// Order matters: compound phrases must be listed BEFORE their shorter
+// variants so that removal leaves no orphan fragments (e.g. we need to
+// strip "thanks in advance" as a unit, otherwise "thanks" alone leaves
+// a dangling "in advance").
 const POLITE_PHRASES = [
+  // Compound closings — must come before "thanks" / "I appreciate"
+  { pattern: /\bthank\s+you\s+(?:so\s+much\s+)?for\s+your\s+(?:help|time|assistance)[.!]?/gi, word: 'thank you for your help', tokens: 6 },
+  { pattern: /\bthanks\s+(?:so\s+much\s+)?(?:in\s+advance|a\s+lot|a\s+million)\b/gi, word: 'thanks in advance', tokens: 4 },
+  { pattern: /\bthank\s+you\s+(?:so\s+much|very\s+much|in\s+advance|kindly)\b/gi, word: 'thank you so much', tokens: 4 },
+  { pattern: /\bi\s+(?:really\s+|truly\s+)?appreciate\s+(?:it|your\s+help|your\s+time|the\s+help)\b/gi, word: 'I appreciate it', tokens: 4 },
+  { pattern: /\bif\s+(?:it'?s|it\s+is)\s+(?:not\s+too\s+much(?:\s+trouble)?|possible|ok(?:ay)?)\b/gi, word: "if it's possible", tokens: 5 },
+  { pattern: /\bif\s+you\s+don'?t\s+mind\b/gi, word: "if you don't mind", tokens: 4 },
+  // "I was wondering if you could" has to be tried BEFORE "if you could"
+  // so the whole hedge is stripped rather than leaving a dangling
+  // "I was wondering" fragment.
+  { pattern: /\bi\s+was\s+wondering\s+if\s+you\s+(?:could|would|can)\b/gi, word: 'I was wondering if you could', tokens: 6 },
+  { pattern: /\bi\s+was\s+wondering\s+if\b/gi, word: 'I was wondering if', tokens: 4 },
+  { pattern: /\bi\s+just\s+wanted\s+to\s+(?:ask|know|check)\b/gi, word: 'I just wanted to ask', tokens: 4 },
+  { pattern: /\bwould\s+you\s+mind\b/gi, word: 'would you mind', tokens: 3 },
+  { pattern: /\bif\s+you\s+(?:could|would|can)\b/gi, word: 'if you could', tokens: 3 },
+  { pattern: /\bi\s+would\s+like\s+to\b/gi, word: 'I would like to', tokens: 4 },
+  { pattern: /\bi'd\s+like\s+to\b/gi, word: "I'd like to", tokens: 3 },
+  // Openings and vocative greetings — drop the leading salutation entirely
+  { pattern: /^(?:hi|hey|hello|greetings)[,!.\s]+/gi, word: 'hi', tokens: 1 },
+  // Mid-sentence greeters after a comma
+  { pattern: /,\s*(?:hi|hey|hello)\s*(?=,|$)/gi, word: ', hi,', tokens: 1 },
+  // Shorter standalone phrases — safe to remove as units
+  { pattern: /\bcould\s+you\b/gi, word: 'could you', tokens: 2 },
+  { pattern: /\bwould\s+you\b/gi, word: 'would you', tokens: 2 },
+  { pattern: /\bcan\s+you\b/gi, word: 'can you', tokens: 2 },
+  { pattern: /\bexcuse\s+me\b/gi, word: 'excuse me', tokens: 2 },
+  { pattern: /\bthank\s+you\b/gi, word: 'thank you', tokens: 2 },
   { pattern: /\bplease\b/gi, word: 'please', tokens: 1 },
-  { pattern: /\bthank you\b/gi, word: 'thank you', tokens: 2 },
   { pattern: /\bthanks\b/gi, word: 'thanks', tokens: 1 },
   { pattern: /\bkindly\b/gi, word: 'kindly', tokens: 1 },
-  { pattern: /\bcould you\b/gi, word: 'could you', tokens: 2 },
-  { pattern: /\bwould you\b/gi, word: 'would you', tokens: 2 },
-  { pattern: /\bcan you\b/gi, word: 'can you', tokens: 2 },
-  { pattern: /\bi would like\b/gi, word: 'I would like', tokens: 3 },
-  { pattern: /\bi'd like\b/gi, word: "I'd like", tokens: 3 },
-  { pattern: /\bsorry\b/gi, word: 'sorry', tokens: 1 },
-  { pattern: /\bexcuse me\b/gi, word: 'excuse me', tokens: 2 },
-  { pattern: /\bi appreciate\b/gi, word: 'I appreciate', tokens: 2 },
-  { pattern: /\bi beg\b/gi, word: 'I beg', tokens: 2 },
-  { pattern: /\bwould you mind\b/gi, word: 'would you mind', tokens: 3 },
-  { pattern: /\bif you (?:could|would|can)\b/gi, word: 'if you could/would/can', tokens: 3 },
-  { pattern: /\bif (?:it's|it is) (?:not too much|possible)\b/gi, word: "if it's possible", tokens: 4 }
+  { pattern: /\bsorry\b/gi, word: 'sorry', tokens: 1 }
 ];
 
 /**
@@ -598,51 +645,61 @@ function getModelRecommendation(taskType) {
 }
 
 // ========================================
-// TEXT SANITIZATION
+// TEXT NORMALIZATION
 // ========================================
 
-/**
- * Sanitize text by removing excessive punctuation and fixing spacing
- * @param {string} text - The text to sanitize
- * @returns {string} Sanitized text
- */
-function sanitizeText(text) {
+// NOTE: this only fixes whitespace and punctuation — it does NOT strip HTML
+// or protect against XSS. Use stripHtml() for that and always prefer
+// textContent over innerHTML when rendering user-derived strings.
+function normalizeWhitespace(text) {
   if (!text || text.trim().length === 0) return text;
 
   let sanitized = text;
 
-  // Fix excessive punctuation
-  sanitized = sanitized.replace(/!{2,}/g, '!');  // Multiple exclamation marks -> single
-  sanitized = sanitized.replace(/\?{2,}/g, '?');  // Multiple question marks -> single
-  sanitized = sanitized.replace(/\.{4,}/g, '...');  // More than 3 dots -> ellipsis
-  sanitized = sanitized.replace(/,{2,}/g, ',');  // Multiple commas -> single
+  // Normalize ellipses first so later passes don't treat them as sentence ends.
+  // Three-or-more dots → "…" (single char, treated like any other letter below).
+  sanitized = sanitized.replace(/\.{3,}/g, '…');
 
-  // Fix spacing errors
-  sanitized = sanitized.replace(/\s+/g, ' ');  // Multiple spaces -> single space
-  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Space before punctuation
-  sanitized = sanitized.replace(/([.,!?;:])\s*([.,!?;:])/g, '$1 ');  // Duplicate punctuation
-  sanitized = sanitized.replace(/([.!?])\s*([a-z])/g, '$1 $2');  // Ensure space after sentence-ending punctuation
+  // Collapse repeated punctuation (except normalized ellipses).
+  sanitized = sanitized.replace(/!{2,}/g, '!');
+  sanitized = sanitized.replace(/\?{2,}/g, '?');
+  sanitized = sanitized.replace(/,{2,}/g, ',');
 
-  // Fix common spacing issues around punctuation
-  sanitized = sanitized.replace(/([.,!?;:])/g, '$1 ');  // Add space after punctuation
-  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');  // Remove space before punctuation
-  sanitized = sanitized.replace(/\s+/g, ' ');  // Clean up multiple spaces again
+  // Remove space before punctuation and ensure one space after, except when
+  // followed by another punctuation (e.g., "hello!?" or end of string).
+  sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1');
+  sanitized = sanitized.replace(/([.,!?;:])(?=[^\s.,!?;:…])/g, '$1 ');
 
-  // Trim first
-  sanitized = sanitized.trim();
+  // Collapse whitespace runs.
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
 
-  // Remove leading punctuation (commas, semicolons, etc.) that might be left after removing phrases
+  // Remove leading punctuation left after stripping polite phrases.
   sanitized = sanitized.replace(/^[,;:]+\s*/, '');
 
-  // Ensure proper capitalization after sentence-ending punctuation
-  sanitized = sanitized.replace(/([.!?])\s+([a-z])/g, (match, p1, p2) => {
-    return p1 + ' ' + p2.toUpperCase();
-  });
+  // Capitalize only after a *real* sentence end ('.', '!', '?') — never after '…',
+  // which is typically mid-thought, and never after ';' or ','.
+  sanitized = sanitized.replace(/([.!?])(\s+)([a-z])/g, (m, p, s, c) => p + s + c.toUpperCase());
 
-  // Final trim
-  sanitized = sanitized.trim();
+  // Capitalize the very first character.
+  if (sanitized.length > 0) {
+    sanitized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+  }
 
-  return sanitized;
+  return sanitized.trim();
+}
+
+// Remove HTML tags and decode the common named entities. Intended as a
+// second line of defence for strings that will flow into innerHTML — prefer
+// textContent / escapeHtml when rendering user-derived text.
+function stripHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
 }
 
 // ========================================
@@ -656,23 +713,32 @@ function sanitizeText(text) {
  * @returns {string} Optimized prompt text
  */
 function generateOptimizedPrompt(originalText, analysis) {
-  let optimized = originalText;
+  if (!originalText) return '';
 
-  // Remove polite phrases
-  if (analysis.politeWords.found.length > 0) {
-    for (const polite of analysis.politeWords.found) {
-      const phrase = POLITE_PHRASES.find(p => p.word === polite.phrase);
-      if (phrase) {
-        optimized = optimized.replace(phrase.pattern, '').trim();
-        optimized = optimized.replace(/\s+/g, ' ');
-      }
-    }
+  // Apply phrase patterns in list order (longest compound first) so that
+  // e.g. "thanks in advance" is removed as a unit before "thanks" is tried.
+  let optimized = originalText;
+  for (const phrase of POLITE_PHRASES) {
+    optimized = optimized.replace(phrase.pattern, ' ');
   }
 
-  // Sanitize text (remove excessive punctuation, fix spacing)
-  optimized = sanitizeText(optimized);
+  // Clean up the fragments removal leaves behind:
+  // - collapse repeated whitespace
+  optimized = optimized.replace(/\s+/g, ' ');
+  // - remove commas/semicolons that are now adjacent: ", ," -> ","
+  optimized = optimized.replace(/([,;])(\s*[,;])+/g, '$1');
+  // - remove leading punctuation: ", write me" -> "write me"
+  optimized = optimized.replace(/^[\s,;:!?.]+/, '');
+  // - remove orphan punctuation at the end: "an essay, ," -> "an essay"
+  optimized = optimized.replace(/[\s,;]+([.!?])?\s*$/, '$1');
+  // - fix space before punctuation: "hello ," -> "hello,"
+  optimized = optimized.replace(/\s+([.,!?;:])/g, '$1');
+  // - ensure space after sentence-ending punctuation
+  optimized = optimized.replace(/([.!?])([^\s.!?])/g, '$1 $2');
 
-  // Capitalize first letter if needed
+  optimized = optimized.trim();
+
+  // Capitalize first letter
   if (optimized.length > 0) {
     optimized = optimized.charAt(0).toUpperCase() + optimized.slice(1);
   }
@@ -728,7 +794,8 @@ if (typeof window !== 'undefined') {
     getOptimizationTips,
     getEcoAlternative,
     getModelRecommendation,
-    sanitizeText,
+    normalizeWhitespace,
+    stripHtml,
     generateOptimizedPrompt,
     analyzePrompt,
     TASK_TYPES,
@@ -747,7 +814,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getOptimizationTips,
     getEcoAlternative,
     getModelRecommendation,
-    sanitizeText,
+    normalizeWhitespace,
+    stripHtml,
     generateOptimizedPrompt,
     analyzePrompt,
     TASK_TYPES,
