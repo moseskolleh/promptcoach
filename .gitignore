@@ -49,4 +49,7 @@ htmlcov/
 node_modules/
 npm-debug.log
 yarn-error.log
-.claude/
+
+# Test files (local only, not for GitHub)
+test-prompts-complex.html
+test-prompts-complex.md
