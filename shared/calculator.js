@@ -114,18 +114,63 @@ function getAvailableModels() {
 // QUERY CATEGORY DETECTION
 // ========================================
 
+// Boundaries match the bucket midpoints used by interpolateEnergy() so the
+// label we show the user always agrees with the slope we interpolated on.
+// These match the paper's bench configurations (short=400, medium=2000,
+// long=11500) — see interpolateEnergy() for the full curve.
+const CATEGORY_BOUNDARIES = {
+  shortMax: 400,
+  mediumMax: 2000
+};
+
 /**
- * Determine query category based on token counts
- * Categories from paper: short (400), medium (2000), long (11500)
+ * Determine query category based on token counts.
  * @param {number} inputTokens - Number of input tokens
  * @param {number} outputTokens - Number of output tokens
  * @returns {string} Category: 'short', 'medium', or 'long'
  */
 function getQueryCategory(inputTokens, outputTokens) {
-  const totalTokens = inputTokens + outputTokens;
-  if (totalTokens <= 500) return 'short';
-  if (totalTokens <= 2500) return 'medium';
+  const totalTokens = (Number(inputTokens) || 0) + (Number(outputTokens) || 0);
+  if (totalTokens <= CATEGORY_BOUNDARIES.shortMax) return 'short';
+  if (totalTokens <= CATEGORY_BOUNDARIES.mediumMax) return 'medium';
   return 'long';
+}
+
+// ========================================
+// REGION / CARBON-INTENSITY OVERRIDE
+// ========================================
+//
+// Carbon intensity factor (kgCO2e per kWh) varies wildly by grid. The model's
+// host data center has its own published CIF, but if the user knows their
+// queries route to a specific region (or wants to model "what if my data
+// center were on a clean grid?") they can override.
+// Source notes: figures rounded from Ember/IEA 2024 grid data.
+const REGION_CIF = {
+  default: null,             // null = use host's own CIF
+  'us-west': 0.25,           // California ISO
+  'us-east': 0.35,           // PJM / Virginia
+  'us-central': 0.40,        // ERCOT / Texas
+  'europe-west': 0.30,       // NL / DE mix
+  'europe-north': 0.05,      // SE / NO hydro+nuclear
+  'asia-east': 0.45,         // JP / KR
+  'asia-south': 0.70,        // IN coal-heavy
+  china: 0.60,
+  australia: 0.65,
+  brazil: 0.10
+};
+
+/**
+ * Look up the CIF (kgCO2e/kWh) for a region key. Returns null when the user
+ * picked "default" or an unknown region — caller should fall back to the
+ * model's host CIF.
+ * @param {string} regionKey
+ * @returns {number|null}
+ */
+function getRegionCif(regionKey) {
+  if (!regionKey || regionKey === 'default') return null;
+  return Object.prototype.hasOwnProperty.call(REGION_CIF, regionKey)
+    ? REGION_CIF[regionKey]
+    : null;
 }
 
 // ========================================
@@ -195,14 +240,21 @@ function interpolateEnergy(model, inputTokens, outputTokens) {
 // ========================================
 
 /**
- * Calculate environmental impact for a specific model
+ * Calculate environmental impact for a specific model.
+ *
  * @param {string} modelId - Model identifier
  * @param {number} inputTokens - Number of input tokens
  * @param {number} outputTokens - Number of output tokens
  * @param {number} energyMultiplier - Task type energy multiplier (default 1.0)
+ * @param {Object} [options]
+ * @param {string} [options.regionKey] - User-selected region (overrides
+ *   the host's CIF for the carbon calculation only — energy and water are
+ *   physical to the host data center).
+ * @param {number} [options.cifOverride] - Direct CIF override (kgCO2e/kWh).
+ *   Wins over regionKey if both are provided.
  * @returns {Object|null} Impact data or null if model not found
  */
-function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 1.0) {
+function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 1.0, options = {}) {
   if (!MODEL_DATA || !INFRASTRUCTURE) return null;
 
   const model = MODEL_DATA[modelId];
@@ -238,9 +290,25 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
   const waterL = waterOnsite + waterOffsite;
   const waterMl = waterL * 1000;
 
+  // CIF: prefer explicit override, then region lookup, then host default.
+  // We don't override PUE/WUE because those are physical to the host data
+  // center — the user's grid only affects scope-2 carbon, not water cooling.
+  let cif = infrastructure.cif;
+  let cifSource = 'host';
+  if (typeof options.cifOverride === 'number' && options.cifOverride >= 0) {
+    cif = options.cifOverride;
+    cifSource = 'override';
+  } else if (options.regionKey) {
+    const regionCif = getRegionCif(options.regionKey);
+    if (regionCif !== null) {
+      cif = regionCif;
+      cifSource = `region:${options.regionKey}`;
+    }
+  }
+
   // Calculate carbon emissions
   // Formula: Carbon (kgCO2e) = E × CIF
-  const carbonKg = energyKwh * infrastructure.cif;
+  const carbonKg = energyKwh * cif;
   const carbonG = carbonKg * 1000;
 
   return {
@@ -284,7 +352,9 @@ function calculateImpact(modelId, inputTokens, outputTokens, energyMultiplier = 
       pue: infrastructure.pue,
       wueOnsite: infrastructure.wueOnsite,
       wueOffsite: infrastructure.wueOffsite,
-      cif: infrastructure.cif
+      cif: cif,
+      cifSource: cifSource,
+      cifHostDefault: infrastructure.cif
     }
   };
 }
@@ -688,6 +758,7 @@ if (typeof window !== 'undefined') {
     loadData,
     isDataLoaded,
     getAvailableModels,
+    getRegionCif,
     getQueryCategory,
     interpolateEnergy,
     calculateImpact,
@@ -715,6 +786,7 @@ if (typeof module !== 'undefined' && module.exports) {
     loadData,
     isDataLoaded,
     getAvailableModels,
+    getRegionCif,
     getQueryCategory,
     interpolateEnergy,
     calculateImpact,

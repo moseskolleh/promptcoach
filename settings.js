@@ -9,7 +9,10 @@ const DEFAULT_SETTINGS = {
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,
-  trackHistory: false,
+  // Tracking is on by default. All history is stored locally in
+  // chrome.storage.local and never leaves the device. Users can disable
+  // it here or wipe history with "Clear history".
+  trackHistory: true,
   userRegion: 'default',
   theme: 'green',  // Default eco-friendly green theme
   taskMultipliers: {
