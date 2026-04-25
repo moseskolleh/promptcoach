@@ -36,8 +36,39 @@ let settings = {
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,
-  trackHistory: false
+  trackHistory: true,
+  userRegion: 'default'
 };
+
+// Dedup buffer for history writes. We hash recent prompts so the same text
+// submitted twice in a short window doesn't double-count. 60s is long enough
+// to swallow accidental double-Enter, short enough that a deliberate retry
+// after iteration still records.
+const RECENT_PROMPT_TTL_MS = 60_000;
+const recentPrompts = new Map(); // hash -> timestamp
+
+function hashPrompt(text) {
+  // Tiny non-cryptographic hash; collisions are fine here, it's only used
+  // to dedup local history writes.
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = ((h << 5) - h) + text.charCodeAt(i);
+    h |= 0;
+  }
+  return String(h);
+}
+
+function shouldRecordPrompt(text) {
+  const now = Date.now();
+  // Sweep expired entries.
+  for (const [k, t] of recentPrompts) {
+    if (now - t > RECENT_PROMPT_TTL_MS) recentPrompts.delete(k);
+  }
+  const key = hashPrompt(text);
+  if (recentPrompts.has(key)) return false;
+  recentPrompts.set(key, now);
+  return true;
+}
 
 let currentTooltip = null;
 let lastAnalyzedElement = null;
@@ -169,8 +200,56 @@ async function calculateQuickImpact(analysis) {
     modelId,
     analysis.tokens,
     outputEstimate.estimated,
-    multiplier
+    multiplier,
+    { regionKey: settings.userRegion || 'default' }
   );
+}
+
+// ========================================
+// HISTORY RECORDING
+// ========================================
+//
+// We can't reliably write to chrome.storage.local from a content script in
+// every browsing context (cross-origin pages have varied behaviour), so we
+// route history writes through the background service worker.
+//
+// We only record when there's strong intent to submit:
+//   - paste of a long prompt
+//   - Enter pressed in a textarea / contenteditable (without Shift)
+//   - click on a Send-shaped button
+// Plus 60s dedup in shouldRecordPrompt() so retries don't spam.
+
+function recordHistory(text, analysis, impact) {
+  if (!settings.trackHistory) return;
+  if (!text || !impact || !analysis) return;
+  if (text.trim().length < 20) return;
+  if (!shouldRecordPrompt(text)) return;
+
+  const platform = detectAIPlatform() || '';
+  const modelId = (settings.autoDetect && platform && typeof EcoPromptCalculator !== 'undefined')
+    ? (EcoPromptCalculator.autoDetectModel(window.location.hostname) || settings.defaultModel)
+    : settings.defaultModel;
+
+  try {
+    chrome.runtime.sendMessage({
+      action: 'recordHistory',
+      entry: {
+        timestamp: Date.now(),
+        date: new Date().toISOString(),
+        model: modelId,
+        platform: platform,
+        tokens: analysis.tokens || 0,
+        energy: impact.energy?.wh || 0,
+        water: impact.water?.ml || 0,
+        carbon: impact.carbon?.gCO2e || 0,
+        promptPreview: text.slice(0, 80),
+        source: 'content_script'
+      }
+    });
+  } catch (e) {
+    // Background SW may be cold / restarting — non-fatal.
+    console.debug('EcoPrompt: recordHistory send failed', e);
+  }
 }
 
 // ========================================
@@ -411,14 +490,19 @@ function createTooltip(analysis, element) {
 
     const iconUrl = chrome.runtime.getURL(`assets/${tip.icon}`);
 
+    // Inline onerror is blocked by the extension CSP (script-src 'self'),
+    // so we attach the handler after rendering and let it hide the broken
+    // icon without leaving an alt-text artefact.
     tipElement.innerHTML = `
-      <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(tip.title)}" class="ecoprompt-tip-icon" onerror="this.style.display='none'" />
+      <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(tip.title)}" class="ecoprompt-tip-icon" />
       <div class="ecoprompt-tip-content">
         <h4 class="ecoprompt-tip-title">${escapeHtml(tip.title)}</h4>
         <p class="ecoprompt-tip-description">${escapeHtml(tip.description)}</p>
         <p class="ecoprompt-tip-impact">💚 ${escapeHtml(tip.impact)}</p>
       </div>
     `;
+    const img = tipElement.querySelector('img.ecoprompt-tip-icon');
+    if (img) img.addEventListener('error', () => { img.style.display = 'none'; });
     tipsContainer.appendChild(tipElement);
   });
 
@@ -529,8 +613,36 @@ async function handlePaste(event) {
       if (!bannerShown && text.trim().length > 50) {
         showNotificationBanner(analysis);
       }
+
+      // A paste of a substantial prompt is strong intent — record now.
+      // (Enter / send-button paths below also record, dedup catches the
+      // overlap when the user pastes-and-hits-Enter.)
+      recordHistory(text, analysis, impact);
     }
   }, 100);
+}
+
+// Capture Enter-to-submit on AI sites. We listen on the document so we don't
+// have to know each platform's exact textarea selector. Shift+Enter inserts
+// a newline and is excluded.
+async function handleSubmitKeydown(event) {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+  const element = event.target;
+  if (
+    element.tagName !== 'TEXTAREA' &&
+    !element.isContentEditable &&
+    element.tagName !== 'INPUT'
+  ) {
+    return;
+  }
+  await initReady;
+  const text = element.value || element.textContent || element.innerText || '';
+  if (!text || text.trim().length < 20) return;
+  const analysis = analyzePrompt(text);
+  if (!analysis) return;
+  const impact = await calculateQuickImpact(analysis);
+  if (!impact) return;
+  recordHistory(text, analysis, impact);
 }
 
 function handleInput(event) {
@@ -579,6 +691,7 @@ if (platform) {
 
 document.addEventListener('paste', handlePaste, true);
 document.addEventListener('input', handleInput, true);
+document.addEventListener('keydown', handleSubmitKeydown, true);
 
 document.addEventListener('click', (event) => {
   if (currentTooltip && !currentTooltip.contains(event.target)) {

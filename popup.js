@@ -17,7 +17,10 @@ let settings = {
   showConfidence: true,
   liveCalculation: true,
   showModelComparison: false,
-  trackHistory: false,
+  // Tracking is on by default — the Stats tab is empty without it, and
+  // history is stored locally only (never leaves the device).
+  trackHistory: true,
+  userRegion: 'default',
   theme: 'green'
 };
 
@@ -83,6 +86,12 @@ let selectedTemplateCategory = 'all';
 // ========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // The background SW set a badge "!" if a recent analysis is waiting.
+  // Now that the user has opened the popup, clear it.
+  try {
+    chrome.runtime.sendMessage({ action: 'clearBadge' });
+  } catch (e) { /* SW may not be alive yet — alarm is the backstop */ }
+
   // Load settings
   await loadSettings();
 
@@ -549,13 +558,16 @@ function calculateImpact() {
   let impact;
   const modelId = currentModel || settings.defaultModel;
 
+  const calcOptions = { regionKey: settings.userRegion || 'default' };
+
   if (modelId && modelId !== 'auto') {
     // Calculate for specific model
     impact = EcoPromptCalculator.calculateImpact(
       modelId,
       tokens,
       outputEstimate.estimated,
-      taskType.energyMultiplier
+      taskType.energyMultiplier,
+      calcOptions
     );
   } else {
     // Calculate average across all models
@@ -1154,7 +1166,8 @@ function handleGetTips() {
       modelId,
       analysis.tokens,
       outputEstimate.estimated,
-      taskType.energyMultiplier
+      taskType.energyMultiplier,
+      { regionKey: settings.userRegion || 'default' }
     );
 
     if (impact) {
