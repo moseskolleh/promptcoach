@@ -50,6 +50,12 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # Test files (local only, not for GitHub)
 test-prompts-complex.html
 test-prompts-complex.md
