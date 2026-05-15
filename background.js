@@ -20,7 +20,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     console.log('EcoPrompt Coach installed successfully');
     chrome.storage.local.set({
-      defaultModel: 'gpt-4o',
+      defaultModel: 'gpt-5',
       trackingEnabled: true,
       [COUNTER_KEY]: 0
     });

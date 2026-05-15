@@ -723,25 +723,37 @@ function compareModels(modelIds, inputTokens, outputTokens) {
  * @returns {string|null} Suggested model ID or null
  */
 function autoDetectModel(hostname) {
+  // Picks the most-likely default model for each chat host. The chosen IDs must
+  // exist in data/model_benchmarks.json AND map to a host in data/infrastructure.json,
+  // otherwise calculateImpact() returns null and the tooltip silently fails.
+  // For multi-model hosts (Poe, Perplexity, You.com) we default to the model the
+  // user is most likely on; users can override via the popup model selector.
   const modelMap = {
-    'chatgpt.com': 'gpt-4o',
-    'chat.openai.com': 'gpt-4o',
-    'openai.com': 'gpt-4o',
-    'claude.ai': 'claude-3.5-sonnet',
-    'anthropic.com': 'claude-3.5-sonnet',
-    'gemini.google.com': 'gemini-2.0-flash',
-    'bard.google.com': 'gemini-2.0-flash',
-    'copilot.microsoft.com': 'gpt-4o',
-    'bing.com': 'gpt-4o',
-    'poe.com': 'claude-3.5-sonnet', // Default, Poe has multiple
-    'perplexity.ai': 'gpt-4o-mini', // Uses multiple, default to efficient
+    'chatgpt.com': 'gpt-5',
+    'chat.openai.com': 'gpt-5',
+    'openai.com': 'gpt-5',
+    'claude.ai': 'claude-4.7-opus',
+    'anthropic.com': 'claude-4.7-opus',
+    'gemini.google.com': 'gemini-2.5-pro',
+    'bard.google.com': 'gemini-2.5-pro',
+    'copilot.microsoft.com': 'gpt-5',
+    'bing.com': 'gpt-5',
+    'poe.com': 'claude-4.5-sonnet',
+    'perplexity.ai': 'gpt-4o-mini',
     'you.com': 'gpt-4o-mini',
-    'mistral.ai': 'mistral-large'
+    'mistral.ai': 'mistral-large',
+    'grok.com': 'llama-3.3-70b', // Closest size-class proxy until xAI-Grok benchmarks added
+    'x.ai': 'llama-3.3-70b'
   };
+
+  if (!hostname || typeof hostname !== 'string') return null;
 
   for (const [domain, modelId] of Object.entries(modelMap)) {
     if (hostname.includes(domain)) {
-      return modelId;
+      // Defend against typos: only return models that actually exist in MODEL_DATA.
+      if (!MODEL_DATA || MODEL_DATA[modelId]) {
+        return modelId;
+      }
     }
   }
 

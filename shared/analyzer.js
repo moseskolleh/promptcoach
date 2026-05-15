@@ -26,6 +26,9 @@ function estimateTokens(text) {
 
   const PROSE_CHARS_PER_TOKEN = 4;
   const CODE_CHARS_PER_TOKEN = 3.5;
+  // CJK characters tokenize roughly 1:1 in cl100k/Claude/SentencePiece, not 4:1.
+  // Without this branch we under-count Chinese/Japanese/Korean prompts by ~4x.
+  const CJK_CHARS_PER_TOKEN = 1.0;
 
   // Pull fenced code blocks out so each segment is counted with its own ratio.
   const codeBlockRegex = /```[\s\S]*?```/g;
@@ -33,12 +36,20 @@ function estimateTokens(text) {
   for (const match of text.match(codeBlockRegex) || []) {
     codeChars += match.length;
   }
-  const proseChars = text.length - codeChars;
+  const nonCodeText = text.replace(codeBlockRegex, '');
+
+  // Split non-code text into CJK and Latin-prose buckets.
+  // CJK ranges cover Chinese, Japanese (Hiragana/Katakana), Korean Hangul.
+  const cjkRegex = /[぀-ゟ゠-ヿ㐀-䶿一-鿿가-힯豈-﫿]/g;
+  const cjkMatches = nonCodeText.match(cjkRegex) || [];
+  const cjkChars = cjkMatches.length;
+  const proseChars = nonCodeText.length - cjkChars;
 
   const proseTokens = proseChars > 0 ? Math.ceil(proseChars / PROSE_CHARS_PER_TOKEN) : 0;
+  const cjkTokens = cjkChars > 0 ? Math.ceil(cjkChars / CJK_CHARS_PER_TOKEN) : 0;
   const codeTokens = codeChars > 0 ? Math.ceil(codeChars / CODE_CHARS_PER_TOKEN) : 0;
 
-  return Math.max(1, proseTokens + codeTokens);
+  return Math.max(1, proseTokens + cjkTokens + codeTokens);
 }
 
 // ========================================
