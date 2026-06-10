@@ -1,6 +1,15 @@
 {
-  "devDependencies": {
-    "playwright": "^1.57.0",
-    "sharp": "^0.34.5"
-  }
+  "name": "ecoprompt-coach",
+  "version": "2.0.0",
+  "private": true,
+  "description": "EcoPrompt Coach — make the energy, water, and carbon cost of every AI query visible, relatable, and actionable.",
+  "workspaces": [
+    "packages/core"
+  ],
+  "scripts": {
+    "test": "node --test packages/core/test/core.test.js",
+    "sync": "node scripts/sync-core.js",
+    "web": "npx serve apps/web"
+  },
+  "license": "MIT"
 }

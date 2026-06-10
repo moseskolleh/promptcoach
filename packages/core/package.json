@@ -1,0 +1,10 @@
+{
+  "name": "@ecoprompt/core",
+  "version": "2.0.0",
+  "description": "Shared calculation engine for EcoPrompt Coach: per-token energy, water, and carbon estimates for LLM queries with relatable everyday equivalents.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "license": "MIT"
+}
