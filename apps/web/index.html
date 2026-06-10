@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EcoPrompt Coach — know what your AI queries really cost the planet, in units you actually understand. Energy, water and carbon estimates built on peer-reviewed 2025 research.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#10B981">
+  <title>EcoPrompt Coach — Know what your AI really costs the planet</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============================ Header ============================ -->
+  <header class="site-header" id="site-header">
+    <nav class="header-inner" aria-label="Primary">
+      <a class="brand" href="#hero">
+        <span class="brand-leaf" aria-hidden="true">🌱</span>
+        <span class="brand-name">EcoPrompt&nbsp;Coach</span>
+      </a>
+      <div class="nav-links" id="nav-links">
+        <a href="#coach">Coach</a>
+        <a href="#compare">Compare</a>
+        <a href="#models">Models</a>
+        <a href="#library">Library</a>
+        <a href="#methodology">Methodology</a>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false">
+          <span class="theme-icon-light" aria-hidden="true">☀️</span>
+          <span class="theme-icon-dark" aria-hidden="true">🌙</span>
+        </button>
+        <button type="button" class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ============================ Loading / error ============================ -->
+  <div class="app-status" id="app-loading" role="status">
+    <div class="status-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Loading impact data…</p>
+    </div>
+  </div>
+  <div class="app-status hidden" id="app-error" role="alert">
+    <div class="status-card">
+      <p class="status-emoji" aria-hidden="true">🌧️</p>
+      <h2>Couldn’t load the impact data</h2>
+      <p id="app-error-detail">The vendor data files could not be fetched.</p>
+      <p class="status-hint">If you opened this page via <code>file://</code>, browsers block local data fetches.
+        Serve the folder instead: <code>npx serve apps/web</code> or <code>python3 -m http.server -d apps/web</code>.</p>
+      <button type="button" class="btn btn-primary" id="retry-load">Try again</button>
+    </div>
+  </div>
+
+  <main id="app-main" class="hidden">
+
+    <!-- ============================ 1. Hero ============================ -->
+    <section class="hero" id="hero" aria-labelledby="hero-title">
+      <div class="hero-inner">
+        <p class="hero-eyebrow">🌱 Built on peer-reviewed 2025/2026 research</p>
+        <h1 id="hero-title">Know what your AI really costs the planet — <span class="hero-accent">in units you actually understand.</span></h1>
+        <p class="hero-sub">A typical efficient AI prompt uses just <strong>0.2–0.4&nbsp;Wh</strong> — but reasoning modes can burn
+          <strong>10–100×</strong> more. EcoPrompt Coach turns invisible watt-hours into phone charges, kettle boils and car
+          meters, then shows you how to cut them.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary btn-lg" href="#coach">Coach my prompt</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/moseskolleh/promptcoach" target="_blank" rel="noopener">Get the Chrome extension</a>
+        </div>
+        <div class="demo-strip" id="demo-strip" aria-label="Live example facts">
+          <div class="demo-fact" id="demo-fact" aria-live="polite">
+            <span class="demo-emoji" id="demo-fact-emoji" aria-hidden="true">⚡</span>
+            <span class="demo-text" id="demo-fact-text">Computing live examples…</span>
+          </div>
+          <div class="demo-dots" id="demo-dots" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="hero-glow" aria-hidden="true"></div>
+    </section>
+
+    <!-- ============================ 2. Coach ============================ -->
+    <section class="section" id="coach" aria-labelledby="coach-title">
+      <div class="section-inner">
+        <header class="section-head">
+          <h2 id="coach-title">✍️ Prompt Coach</h2>
+          <p class="section-sub">Paste a prompt, pick a model, and see its footprint live — with concrete tips to shrink it.</p>
+        </header>
+
+        <div class="coach-grid">
+          <!-- Inputs column -->
+          <div class="coach-inputs card">
+            <div class="field">
+              <label for="prompt-input">Your prompt</label>
+              <textarea id="prompt-input" rows="7" placeholder="e.g. Could you please summarize the key findings of this report in plain language? Thanks in advance!" spellcheck="true"></textarea>
+              <div class="field-meta">
+                <span id="prompt-token-count">0 tokens</span>
+                <span id="prompt-task-type"></span>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="model-select">Model</label>
+                <select id="model-select"></select>
+              </div>
+              <div class="field">
+                <label for="region-select">Where does your electricity come from? <span class="label-hint">(affects carbon)</span></label>
+                <select id="region-select"></select>
+              </div>
+            </div>
+
+            <div class="field hidden" id="reasoning-field">
+              <span class="field-label" id="reasoning-label">Reasoning effort</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="reasoning-label" id="reasoning-control">
+                <button type="button" role="radio" aria-checked="false" data-effort="low">Low</button>
+                <button type="button" role="radio" aria-checked="true" data-effort="standard">Standard</button>
+                <button type="button" role="radio" aria-checked="false" data-effort="high">High</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="output-slider">Expected answer length
+                <span class="label-hint">— <output id="output-slider-value" for="output-slider">300</output> tokens</span>
+              </label>
+              <input type="range" id="output-slider" min="100" max="2000" step="25" value="300">
+              <div class="slider-scale" aria-hidden="true"><span>Short</span><span>Medium</span><span>Long essay</span></div>
+            </div>
+          </div>
+
+          <!-- Results column -->
+          <div class="coach-results" id="coach-results" aria-live="polite">
+            <div class="results-empty" id="results-empty">
+              <p class="empty-emoji" aria-hidden="true">🔍</p>
+              <p>Type a prompt to see its environmental footprint, instantly.</p>
+            </div>
+
+            <div class="results-body hidden" id="results-body">
+              <div class="grade-row">
+                <div class="grade-badge" id="grade-badge" data-grade="A">
+                  <span class="grade-letter" id="grade-letter">A</span>
+                  <span class="grade-caption">eco-grade</span>
+                </div>
+                <div class="grade-meta">
+                  <p class="grade-summary" id="grade-summary"></p>
+                  <p class="grade-detail" id="grade-detail"></p>
+                </div>
+              </div>
+
+              <div class="metric-cards">
+                <div class="metric-card metric-energy">
+                  <div class="metric-head"><span class="metric-emoji" aria-hidden="true">⚡</span><span class="metric-name">Energy</span></div>
+                  <p class="metric-primary" id="energy-primary"></p>
+                  <p class="metric-secondary" id="energy-secondary"></p>
+                  <p class="metric-range" id="energy-range"></p>
+                </div>
+                <div class="metric-card metric-water">
+                  <div class="metric-head"><span class="metric-emoji" aria-hidden="true">💧</span><span class="metric-name">Water</span></div>
+                  <p class="metric-primary" id="water-primary"></p>
+                  <p class="metric-secondary" id="water-secondary"></p>
+                  <p class="metric-range" id="water-detail"></p>
+                </div>
+                <div class="metric-card metric-carbon">
+                  <div class="metric-head"><span class="metric-emoji" aria-hidden="true">🌍</span><span class="metric-name">Carbon</span></div>
+                  <p class="metric-primary" id="carbon-primary"></p>
+                  <p class="metric-secondary" id="carbon-secondary"></p>
+                  <p class="metric-range" id="carbon-detail"></p>
+                </div>
+              </div>
+
+              <div class="breakdown card-soft">
+                <div class="breakdown-head">
+                  <h3>Where the energy goes</h3>
+                  <span class="breakdown-note">output tokens dominate</span>
+                </div>
+                <div class="stacked-bar" id="energy-breakdown-bar" role="img" aria-label="Energy breakdown bar">
+                  <div class="bar-seg seg-fixed" id="bar-fixed"></div>
+                  <div class="bar-seg seg-input" id="bar-input"></div>
+                  <div class="bar-seg seg-output" id="bar-output"></div>
+                </div>
+                <ul class="breakdown-legend" id="breakdown-legend">
+                  <li><span class="dot dot-fixed" aria-hidden="true"></span>Fixed <span id="legend-fixed"></span></li>
+                  <li><span class="dot dot-input" aria-hidden="true"></span>Input <span id="legend-input"></span></li>
+                  <li><span class="dot dot-output" aria-hidden="true"></span>Output <span id="legend-output"></span></li>
+                </ul>
+              </div>
+
+              <div class="tips-panel" id="tips-panel">
+                <h3>💡 How to shrink this footprint</h3>
+                <div class="tips-list" id="tips-list"></div>
+              </div>
+
+              <div class="coach-actions">
+                <button type="button" class="btn btn-secondary hidden" id="copy-trimmed-btn">✂️ Copy trimmed prompt</button>
+                <button type="button" class="btn btn-primary" id="save-library-btn">📚 Save to library</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ 3. Compare ============================ -->
+    <section class="section section-alt" id="compare" aria-labelledby="compare-title">
+      <div class="section-inner">
+        <header class="section-head">
+          <h2 id="compare-title">⚖️ Compare models</h2>
+          <p class="section-sub">Pick 2–4 models and see what switching saves on the same query.</p>
+        </header>
+
+        <div class="card compare-controls">
+          <span class="field-label" id="compare-chips-label">Models to compare <span class="label-hint">(2–4)</span></span>
+          <div class="chip-row" id="compare-chips" role="group" aria-labelledby="compare-chips-label"></div>
+
+          <div class="field-row compare-sliders">
+            <div class="field">
+              <label for="compare-input-slider">Input tokens
+                <span class="label-hint">— <output id="compare-input-value" for="compare-input-slider">100</output></span>
+              </label>
+              <input type="range" id="compare-input-slider" min="50" max="10000" step="50" value="100">
+            </div>
+            <div class="field">
+              <label for="compare-output-slider">Output tokens
+                <span class="label-hint">— <output id="compare-output-value" for="compare-output-slider">300</output></span>
+              </label>
+              <input type="range" id="compare-output-slider" min="100" max="2000" step="25" value="300">
+            </div>
+          </div>
+        </div>
+
+        <div class="savings-banner hidden" id="savings-banner" aria-live="polite">
+          <span class="savings-emoji" aria-hidden="true">🎉</span>
+          <p id="savings-text"></p>
+        </div>
+
+        <div class="compare-results" id="compare-results" aria-live="polite"></div>
+
+        <div class="card chart-card">
+          <h3>Energy per query (Wh)</h3>
+          <div class="chart-wrap" id="compare-chart"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ 4. Model explorer ============================ -->
+    <section class="section" id="models" aria-labelledby="models-title">
+      <div class="section-inner">
+        <header class="section-head">
+          <h2 id="models-title">🗂️ Model explorer</h2>
+          <p class="section-sub">Every model in our dataset, graded at a standard short query (100 in / 300 out tokens).</p>
+        </header>
+        <div class="explorer-grid" id="explorer-grid"></div>
+        <p class="explorer-note">Data sources: <strong>measured</strong> = benchmarked in Jegham et al. 2025 (v6);
+          <strong>extrapolated</strong> = estimated from size class and measured siblings;
+          <strong>anchored</strong> = calibrated against a provider-reported figure.</p>
+      </div>
+    </section>
+
+    <!-- ============================ 5. Library ============================ -->
+    <section class="section section-alt" id="library" aria-labelledby="library-title">
+      <div class="section-inner">
+        <header class="section-head">
+          <h2 id="library-title">📚 Prompt library</h2>
+          <p class="section-sub">Your saved prompts live in this browser — nothing leaves your device.</p>
+        </header>
+
+        <div class="library-toolbar">
+          <div class="field library-search-field">
+            <label class="visually-hidden" for="library-search">Search saved prompts</label>
+            <input type="search" id="library-search" placeholder="Search saved prompts…">
+          </div>
+          <div class="field">
+            <label class="visually-hidden" for="library-sort">Sort prompts</label>
+            <select id="library-sort">
+              <option value="date-desc">Newest first</option>
+              <option value="date-asc">Oldest first</option>
+              <option value="energy-asc">Lowest energy</option>
+              <option value="energy-desc">Highest energy</option>
+            </select>
+          </div>
+          <div class="library-io">
+            <button type="button" class="btn btn-ghost" id="library-export">⬇️ Export JSON</button>
+            <button type="button" class="btn btn-ghost" id="library-import">⬆️ Import JSON</button>
+            <input type="file" id="library-import-file" accept=".json,application/json" class="visually-hidden" aria-hidden="true" tabindex="-1">
+          </div>
+        </div>
+
+        <div class="library-list" id="library-list"></div>
+
+        <div class="library-empty hidden" id="library-empty">
+          <p class="empty-illustration" aria-hidden="true">🌿📭🌿</p>
+          <h3>No saved prompts yet</h3>
+          <p>Coach a prompt above and hit <strong>Save to library</strong> — your greenest prompts deserve reuse.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ 6. Methodology ============================ -->
+    <section class="section" id="methodology" aria-labelledby="methodology-title">
+      <div class="section-inner methodology">
+        <header class="section-head">
+          <h2 id="methodology-title">🔬 Methodology</h2>
+          <p class="section-sub">Honest numbers, transparent math, cited sources.</p>
+        </header>
+
+        <div class="method-grid">
+          <article class="card method-card">
+            <h3>⚡ Energy</h3>
+            <p class="formula" aria-label="Energy formula">E = E<sub>fixed</sub> + e<sub>in</sub>·T<sub>in</sub> + e<sub>out</sub>·T<sub>out</sub></p>
+            <p>Each model’s three published benchmark points (short / medium / long, Jegham et&nbsp;al. 2025) are fitted to a
+              per-token linear model at load time. The fit consistently shows <strong>output tokens dominate</strong> — generating
+              text is sequential while reading your prompt is massively parallel. That’s why asking for shorter answers is the
+              single most effective habit: halving the answer length roughly halves the energy.</p>
+          </article>
+          <article class="card method-card">
+            <h3>💧 Water</h3>
+            <p class="formula" aria-label="Water formula">W = (E / PUE)·WUE<sub>site</sub> + E·WUE<sub>source</sub></p>
+            <p>On-site cooling water applies to IT energy; off-site water is consumed generating the electricity itself —
+              and often exceeds the cooling share. We include <strong>both</strong>, unlike most provider disclosures.</p>
+          </article>
+          <article class="card method-card">
+            <h3>🌍 Carbon</h3>
+            <p class="formula" aria-label="Carbon formula">C = E · CIF · 1.15</p>
+            <p>Energy times the grid’s carbon intensity (your selected region, or the host’s grid), with a
+              <strong>15% embodied uplift</strong> amortizing chip manufacturing and data-center construction — the lifecycle
+              boundary used by Google’s 2025 Gemini analysis and Mistral’s LCA.</p>
+          </article>
+        </div>
+
+        <div class="card method-card">
+          <h3>🏷️ Eco-grades</h3>
+          <p>EU-energy-label-style bands on per-query energy, anchored so a median 2025 assistant prompt (Google-reported
+            0.24&nbsp;Wh, OpenAI 0.34&nbsp;Wh) lands in A:</p>
+          <div class="table-scroll">
+            <table class="grade-table">
+              <caption class="visually-hidden">Eco-grade bands by per-query energy</caption>
+              <thead><tr><th scope="col">Grade</th><th scope="col">Per-query energy</th><th scope="col">Roughly</th></tr></thead>
+              <tbody>
+                <tr><td><span class="grade-pill" data-grade="A">A</span></td><td>≤ 0.4 Wh</td><td>seconds of an LED bulb</td></tr>
+                <tr><td><span class="grade-pill" data-grade="B">B</span></td><td>≤ 1.2 Wh</td><td>a few % of a phone charge</td></tr>
+                <tr><td><span class="grade-pill" data-grade="C">C</span></td><td>≤ 3.5 Wh</td><td>minutes of video streaming</td></tr>
+                <tr><td><span class="grade-pill" data-grade="D">D</span></td><td>≤ 10 Wh</td><td>over half a phone charge</td></tr>
+                <tr><td><span class="grade-pill" data-grade="E">E</span></td><td>&gt; 10 Wh</td><td>phone charges to kettle boils</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card method-card method-limits">
+          <h3>⚠️ Limitations</h3>
+          <p>Per-query AI footprints carry real uncertainty: providers disclose medians not distributions, hardware and batching
+            vary, and reasoning-mode token budgets are contested (estimates for one GPT-5 Thinking answer range from a few Wh to
+            ~40&nbsp;Wh). We show confidence ranges, widen them when extrapolating, and label every model’s data source.
+            Treat the numbers as honest order-of-magnitude guidance, not invoices.</p>
+        </div>
+
+        <div class="card method-card">
+          <h3>📖 Sources</h3>
+          <ul class="sources-list">
+            <li><a href="https://arxiv.org/abs/2505.09598" target="_blank" rel="noopener">Jegham et&nbsp;al. 2025 (v6) — How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference</a></li>
+            <li><a href="https://arxiv.org/abs/2508.15734" target="_blank" rel="noopener">Google 2025 — Measuring the environmental impact of delivering AI at Google (0.24&nbsp;Wh median Gemini prompt)</a></li>
+            <li><a href="https://mistral.ai/news/our-contribution-to-a-global-environmental-standard-for-ai" target="_blank" rel="noopener">Mistral AI 2025 — Lifecycle analysis of Mistral Large 2 (ISO 14040/44)</a></li>
+            <li><a href="https://epoch.ai/gradient-updates/how-much-energy-does-chatgpt-use" target="_blank" rel="noopener">Epoch AI 2025 — How much energy does ChatGPT use?</a></li>
+            <li><a href="https://arxiv.org/abs/2509.20241" target="_blank" rel="noopener">Oviedo et&nbsp;al. (Microsoft) / Joule 2026 — Energy Use of AI Inference (0.34&nbsp;Wh production median)</a></li>
+            <li><a href="https://arxiv.org/abs/2503.10666" target="_blank" rel="noopener">Adamska et&nbsp;al. 2025 — Green Prompting (response length is the dominant energy driver)</a></li>
+          </ul>
+          <p class="method-docs-link">Full write-up: <a href="https://github.com/moseskolleh/promptcoach/blob/main/docs/METHODOLOGY.md" target="_blank" rel="noopener">docs/METHODOLOGY.md on GitHub</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================ Footer ============================ -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p class="footer-brand"><span aria-hidden="true">🌱</span> EcoPrompt Coach</p>
+      <p>Built on peer-reviewed and provider-reported 2025/2026 data.</p>
+      <p>
+        <a href="https://github.com/moseskolleh/promptcoach" target="_blank" rel="noopener">GitHub</a>
+        <span aria-hidden="true"> · </span>
+        <a href="https://github.com/moseskolleh/promptcoach/blob/main/LICENSE" target="_blank" rel="noopener">MIT license</a>
+        <span aria-hidden="true"> · </span>
+        <a href="mailto:geomentaqua@gmail.com">Contact</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- ============================ Save modal ============================ -->
+  <div class="modal-backdrop hidden" id="save-modal" role="dialog" aria-modal="true" aria-labelledby="save-modal-title">
+    <div class="modal-card">
+      <h3 id="save-modal-title">Save to library</h3>
+      <div class="field">
+        <label for="save-title-input">Title</label>
+        <input type="text" id="save-title-input" maxlength="80" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="save-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-modal-confirm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/calculator.js"></script>
+  <script src="vendor/conversions.js"></script>
+  <script src="vendor/analyzer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

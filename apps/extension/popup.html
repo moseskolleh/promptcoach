@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoPrompt Coach</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <img class="header-icon" src="assets/leaf-icon.svg" alt="">
+    <h1 class="header-title">EcoPrompt Coach</h1>
+  </header>
+
+  <!-- Tab bar (segmented control) -->
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" role="tab" data-tab="coach" aria-selected="true">Coach</button>
+    <button class="tab" role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    <button class="tab" role="tab" data-tab="impact" aria-selected="false">Impact</button>
+  </nav>
+
+  <main class="main">
+
+    <!-- ============================ COACH TAB ============================ -->
+    <section class="panel is-active" id="panel-coach" role="tabpanel">
+      <textarea id="prompt-input" class="prompt-input" rows="4"
+        placeholder="Paste or write your prompt…" spellcheck="false"></textarea>
+
+      <div class="controls-row">
+        <div class="model-select-wrap">
+          <span class="grade-dot" id="model-grade-dot" title="Eco-grade of selected model"></span>
+          <select id="model-select" class="select" aria-label="Model"></select>
+        </div>
+        <select id="effort-select" class="select select-effort hidden" aria-label="Reasoning effort">
+          <option value="low">Low effort</option>
+          <option value="standard">Standard effort</option>
+          <option value="high">High effort</option>
+        </select>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="coach-empty">
+        <p class="empty-title">Write a prompt to see its footprint</p>
+        <p class="empty-sub">Energy, water and carbon — in units you can actually picture.</p>
+      </div>
+
+      <!-- Live analysis -->
+      <div class="analysis hidden" id="coach-analysis">
+        <div class="analysis-head">
+          <div class="grade-badge" id="grade-badge" title="">A</div>
+          <div class="analysis-chips">
+            <span class="chip" id="chip-tokens">0 tokens</span>
+            <span class="chip chip-task" id="chip-task">General</span>
+            <span class="chip chip-out" id="chip-output">~ out</span>
+          </div>
+        </div>
+
+        <div class="metrics card" id="coach-metrics">
+          <div class="metric-row">
+            <span class="metric-icon icon-energy" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor"/></svg>
+            </span>
+            <div class="metric-text">
+              <span class="metric-primary" id="energy-primary"></span>
+              <span class="metric-secondary"><span id="energy-secondary"></span>
+                <span class="metric-range" id="energy-range" title=""></span></span>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span class="metric-icon icon-water" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2.5S5.5 9.7 5.5 14a6.5 6.5 0 0 0 13 0c0-4.3-6.5-11.5-6.5-11.5z" fill="currentColor"/></svg>
+            </span>
+            <div class="metric-text">
+              <span class="metric-primary" id="water-primary"></span>
+              <span class="metric-secondary" id="water-secondary"></span>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span class="metric-icon icon-carbon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6.5 19a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.8 8.4 4 4 0 0 1 17.5 19h-11z" fill="currentColor"/></svg>
+            </span>
+            <div class="metric-text">
+              <span class="metric-primary" id="carbon-primary"></span>
+              <span class="metric-secondary" id="carbon-secondary"></span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary hidden" id="trim-btn">Trim &amp; copy optimized prompt</button>
+
+        <h2 class="section-title">Coaching tips</h2>
+        <ul class="tips" id="tips-list"></ul>
+      </div>
+    </section>
+
+    <!-- =========================== COMPARE TAB =========================== -->
+    <section class="panel" id="panel-compare" role="tabpanel" hidden>
+      <p class="compare-context" id="compare-context">Using your current prompt from the Coach tab.</p>
+      <div class="token-inputs">
+        <label class="token-field">
+          <span>Input tokens</span>
+          <input type="number" id="compare-in" min="1" max="200000" value="100">
+        </label>
+        <label class="token-field">
+          <span>Output tokens</span>
+          <input type="number" id="compare-out" min="1" max="200000" value="300">
+        </label>
+      </div>
+
+      <h2 class="section-title">Pick up to 4 models</h2>
+      <div class="model-checklist card" id="model-checklist"></div>
+
+      <div class="savings-banner hidden" id="savings-banner"></div>
+
+      <div class="compare-table-wrap hidden" id="compare-table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr><th>Model</th><th></th><th>Energy</th><th>Water</th><th>Carbon</th></tr>
+          </thead>
+          <tbody id="compare-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="compare-empty">
+        <p class="empty-title">Select at least 2 models</p>
+        <p class="empty-sub">See which one answers your prompt for the least energy.</p>
+      </div>
+    </section>
+
+    <!-- =========================== IMPACT TAB ============================ -->
+    <section class="panel" id="panel-impact" role="tabpanel" hidden>
+      <div class="empty-state" id="impact-empty">
+        <p class="empty-title">No queries tracked yet</p>
+        <p class="empty-sub">Visit ChatGPT, Claude, Gemini and friends — EcoPrompt Coach records each query's footprint as you send it.</p>
+      </div>
+
+      <div id="impact-dashboard" class="hidden">
+        <div class="period-grid">
+          <div class="card period-card">
+            <span class="period-label">Today</span>
+            <span class="period-value" id="period-today">0</span>
+            <span class="period-sub" id="period-today-sub"></span>
+          </div>
+          <div class="card period-card">
+            <span class="period-label">This week</span>
+            <span class="period-value" id="period-week">0</span>
+            <span class="period-sub" id="period-week-sub"></span>
+          </div>
+          <div class="card period-card">
+            <span class="period-label">All time</span>
+            <span class="period-value" id="period-all">0</span>
+            <span class="period-sub" id="period-all-sub"></span>
+          </div>
+        </div>
+
+        <p class="totals-sentence card" id="totals-sentence"></p>
+
+        <div class="stat-grid">
+          <div class="card stat-card stat-energy">
+            <span class="stat-label">Energy</span>
+            <span class="stat-primary" id="stat-energy"></span>
+            <span class="stat-secondary" id="stat-energy-sub"></span>
+          </div>
+          <div class="card stat-card stat-water">
+            <span class="stat-label">Water</span>
+            <span class="stat-primary" id="stat-water"></span>
+            <span class="stat-secondary" id="stat-water-sub"></span>
+          </div>
+          <div class="card stat-card stat-carbon">
+            <span class="stat-label">Carbon</span>
+            <span class="stat-primary" id="stat-carbon"></span>
+            <span class="stat-secondary" id="stat-carbon-sub"></span>
+          </div>
+        </div>
+
+        <h2 class="section-title">Last 7 days — energy</h2>
+        <div class="card chart-card">
+          <div class="chart" id="week-chart"></div>
+        </div>
+
+        <div class="card streak-card">
+          <span class="streak-flame" aria-hidden="true">
+            <img src="assets/leaf-icon.svg" alt="" width="20" height="20">
+          </span>
+          <div class="streak-text">
+            <span class="streak-value" id="streak-value">0-day streak</span>
+            <span class="streak-sub">consecutive days with a grade-A average</span>
+          </div>
+        </div>
+
+        <button class="btn btn-danger-outline" id="reset-btn">Reset data</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <a href="#" id="settings-link">Settings</a>
+    <span class="footer-dot">·</span>
+    <a href="https://github.com/moseskolleh/promptcoach/blob/main/docs/METHODOLOGY.md"
+       target="_blank" rel="noopener">Methodology</a>
+  </footer>
+
+  <!-- Vendored core (attaches to window.EcoPromptCore) -->
+  <script src="vendor/calculator.js"></script>
+  <script src="vendor/analyzer.js"></script>
+  <script src="vendor/conversions.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
