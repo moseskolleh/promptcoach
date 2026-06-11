@@ -1,0 +1,27 @@
+{
+  "name": "@ecoprompt/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EcoPrompt Coach mobile app (Expo / React Native) — structure only, not yet implemented.",
+  "main": "App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "@ecoprompt/core": "workspace:*",
+    "@react-native-async-storage/async-storage": "^2.x",
+    "@react-navigation/bottom-tabs": "^7.x",
+    "@react-navigation/native": "^7.x",
+    "expo": "^54.x",
+    "react": "19.x",
+    "react-native": "0.8x",
+    "react-native-safe-area-context": "^5.x",
+    "react-native-screens": "^4.x"
+  },
+  "devDependencies": {
+    "typescript": "^5.x",
+    "@types/react": "^19.x"
+  }
+}

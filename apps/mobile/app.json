@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "EcoPrompt Coach",
+    "slug": "ecoprompt-coach",
+    "scheme": "ecoprompt",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#064E3B"
+    },
+    "ios": {
+      "bundleIdentifier": "com.ecoprompt.coach",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.ecoprompt.coach"
+    }
+  }
+}

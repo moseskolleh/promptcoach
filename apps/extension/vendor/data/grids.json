@@ -1,0 +1,92 @@
+{
+  "_metadata": {
+    "version": "2.0.0",
+    "last_updated": "2026-06-10",
+    "sources": [
+      "Jegham et al. (2025), arXiv:2505.09598 (v6, Nov 2025) — provider PUE/WUE/CIF methodology",
+      "Microsoft Environmental Sustainability Report FY2024 (Azure PUE 1.12, fleet WUE 0.30 L/kWh)",
+      "AWS Sustainability Report 2024 (PUE 1.15, global WUE 0.15 L/kWh)",
+      "Google, Measuring the environmental impact of delivering AI at Google (arXiv:2508.15734, Aug 2025) — fleet PUE 1.09, consumptive WUE 1.15 L/kWh (ISO Cat 2)",
+      "Mytton (2021), Data centre water consumption, npj Clean Water — US electricity-generation water intensity ~2.18 L/kWh (off-site WUE)",
+      "IEA Electricity 2025 — global grid 445 gCO2/kWh (2024); Ember US Electricity 2025 — US 384 gCO2/kWh (2024)",
+      "ScienceDirect 2025 (US ISO 2024 averages): CAISO ~230, ERCOT ~371, PJM ~398 gCO2e/kWh"
+    ],
+    "notes": "wue_offsite is the water consumed by electricity GENERATION for the grid supplying the data center (this off-site water often exceeds on-site cooling — we include BOTH, unlike most provider disclosures); cif values are location-based unless noted."
+  },
+  "lifecycle": {
+    "embodied_factor": 1.15,
+    "notes": "Multiplier on operational carbon to amortize hardware manufacturing and data-center construction, following the lifecycle boundary used by Google's 2025 per-prompt analysis and Mistral AI's 2025 LCA. Set includeEmbodied=false in the engine to disable."
+  },
+  "providers": {
+    "microsoft_azure": {
+      "name": "Microsoft Azure",
+      "pue": 1.12,
+      "wue_onsite_l_per_kwh": 0.3,
+      "wue_offsite_l_per_kwh": 2.18,
+      "cif_kgco2e_per_kwh": 0.3528,
+      "notes": "Hosts OpenAI models",
+      "source": "Microsoft FY2024 Sustainability Report; Mytton 2021 (off-site)"
+    },
+    "aws": {
+      "name": "Amazon Web Services",
+      "pue": 1.15,
+      "wue_onsite_l_per_kwh": 0.15,
+      "wue_offsite_l_per_kwh": 2.18,
+      "cif_kgco2e_per_kwh": 0.385,
+      "notes": "Hosts Anthropic and Meta models",
+      "source": "AWS 2024 Sustainability Report; Mytton 2021 (off-site)"
+    },
+    "google_cloud": {
+      "name": "Google Cloud",
+      "pue": 1.09,
+      "wue_onsite_l_per_kwh": 1.15,
+      "wue_offsite_l_per_kwh": 2.18,
+      "cif_kgco2e_per_kwh": 0.32,
+      "notes": "Hosts Gemini models; industry-lowest fleet PUE. WUE is Google's own ISO Cat 2 consumptive figure (used in their Gemini per-prompt paper). CIF is location-based; Google's market-based figure is far lower due to clean-energy purchasing.",
+      "source": "Google arXiv:2508.15734 (Aug 2025); Google Environmental Report 2025"
+    },
+    "mistral_eu": {
+      "name": "Mistral (EU, France-dominant)",
+      "pue": 1.2,
+      "wue_onsite_l_per_kwh": 0.3,
+      "wue_offsite_l_per_kwh": 2.0,
+      "cif_kgco2e_per_kwh": 0.06,
+      "notes": "French grid is nuclear-dominant — very low carbon intensity",
+      "source": "Ember 2024 (France); Mistral AI LCA 2025"
+    },
+    "deepseek": {
+      "name": "DeepSeek (China)",
+      "pue": 1.27,
+      "wue_onsite_l_per_kwh": 1.2,
+      "wue_offsite_l_per_kwh": 6.016,
+      "cif_kgco2e_per_kwh": 0.58,
+      "notes": "Chinese data-center averages; coal-heavy grid",
+      "source": "China Communications Enterprise Association 2024; Ember 2024 (China)"
+    },
+    "xai": {
+      "name": "xAI (Memphis, TN)",
+      "pue": 1.2,
+      "wue_onsite_l_per_kwh": 0.36,
+      "wue_offsite_l_per_kwh": 2.18,
+      "cif_kgco2e_per_kwh": 0.55,
+      "notes": "Estimated — site partially powered by on-site gas turbines, raising effective carbon intensity",
+      "source": "Estimate from public reporting on the Memphis site (2025)"
+    }
+  },
+  "regions": {
+    "europe-north": { "name": "Nordics (hydro + nuclear)", "cif_kgco2e_per_kwh": 0.03 },
+    "france": { "name": "France (nuclear)", "cif_kgco2e_per_kwh": 0.056 },
+    "brazil": { "name": "Brazil (hydro)", "cif_kgco2e_per_kwh": 0.1 },
+    "eu-average": { "name": "EU average", "cif_kgco2e_per_kwh": 0.19 },
+    "uk": { "name": "United Kingdom", "cif_kgco2e_per_kwh": 0.21 },
+    "europe-west": { "name": "Western Europe (NL/DE mix)", "cif_kgco2e_per_kwh": 0.27 },
+    "us-west": { "name": "US West (CAISO 2024)", "cif_kgco2e_per_kwh": 0.23 },
+    "us-central": { "name": "US Central (ERCOT 2024)", "cif_kgco2e_per_kwh": 0.371 },
+    "us-average": { "name": "US average (2024)", "cif_kgco2e_per_kwh": 0.384 },
+    "us-east": { "name": "US East (PJM / Virginia 2024)", "cif_kgco2e_per_kwh": 0.398 },
+    "world": { "name": "World average (IEA 2024)", "cif_kgco2e_per_kwh": 0.445 },
+    "australia": { "name": "Australia", "cif_kgco2e_per_kwh": 0.55 },
+    "china": { "name": "China", "cif_kgco2e_per_kwh": 0.58 },
+    "asia-south": { "name": "India (coal-heavy)", "cif_kgco2e_per_kwh": 0.71 }
+  }
+}

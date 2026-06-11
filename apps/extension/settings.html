@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoPrompt Coach — Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <img src="assets/icon48.png" alt="" width="36" height="36" />
+      <div>
+        <h1>EcoPrompt Coach</h1>
+        <p class="sub">Settings</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Defaults</h2>
+
+      <label class="field">
+        <span class="label">Default model</span>
+        <span class="hint">Used when a chat site can't be auto-detected.</span>
+        <select id="default-model"></select>
+      </label>
+
+      <label class="field">
+        <span class="label">Your electricity region</span>
+        <span class="hint">Overrides the carbon intensity used for CO₂ estimates — energy and water stay physical to the model's data center.</span>
+        <select id="region">
+          <option value="default">Use the model host's grid (default)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="label">Reasoning effort assumption</span>
+        <span class="hint">For thinking models only: how heavy a hidden reasoning budget to assume.</span>
+        <select id="effort">
+          <option value="low">Low (quick answers)</option>
+          <option value="standard" selected>Standard (benchmark conditions)</option>
+          <option value="high">High (hard problems, extended thinking)</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Behaviour</h2>
+
+      <label class="toggle">
+        <input type="checkbox" id="show-pill" checked />
+        <span>
+          <span class="label">Show the on-page pill</span>
+          <span class="hint">Live eco-grade next to the chat box on supported sites.</span>
+        </span>
+      </label>
+
+      <label class="toggle">
+        <input type="checkbox" id="include-embodied" checked />
+        <span>
+          <span class="label">Include embodied carbon</span>
+          <span class="hint">+15% lifecycle uplift for hardware manufacturing and construction, following Google's and Mistral's 2025 accounting.</span>
+        </span>
+      </label>
+    </section>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <footer class="foot">
+      <a href="https://github.com/moseskolleh/promptcoach/blob/main/docs/METHODOLOGY.md" target="_blank" rel="noopener">Methodology &amp; sources</a>
+      <span>·</span>
+      <a href="https://github.com/moseskolleh/promptcoach" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+  </main>
+
+  <script src="vendor/calculator.js"></script>
+  <script src="vendor/analyzer.js"></script>
+  <script src="vendor/conversions.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+{
+  "_metadata": {
+    "version": "2.0.0",
+    "last_updated": "2026-06-10",
+    "primary_source": "Jegham et al. (2025), How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference, arXiv:2505.09598 (v6, Nov 2025 — 30 models, DEA eco-efficiency ranking)",
+    "anchor_sources": [
+      "Google (Aug 2025), Measuring the environmental impact of delivering AI at Google, arXiv:2508.15734 — median Gemini Apps text prompt: 0.24 Wh, 0.26 mL water, 0.03 gCO2e (market-based, incl. embodied)",
+      "OpenAI / Altman (Jun 2025), The Gentle Singularity — average ChatGPT query: ~0.34 Wh, ~0.32 mL water",
+      "Mistral AI (Jul 2025), lifecycle analysis of Mistral Large 2 (ISO 14040/44, peer-reviewed) — 1.14 gCO2e and 45 mL water per 400-output-token response (full lifecycle)",
+      "Epoch AI (Feb 2025), How much energy does ChatGPT use? — ~0.3 Wh per typical GPT-4o query; ~2.5 Wh at 10k-token input",
+      "Oviedo et al. (Microsoft, 2025/Joule 2026), Energy Use of AI Inference, arXiv:2509.20241 — median 0.34 Wh/query (IQR 0.18-0.67) for >200B-param models in production; non-production extrapolations overstate 4-20x",
+      "URI AI lab / Jegham dashboard (Aug 2025) — GPT-5 medium reasoning response: ~18.35 Wh average, up to ~40 Wh (contested estimate)",
+      "Adamska et al. (2025), Green Prompting, arXiv:2503.10666 — response length is the dominant energy driver (r~0.9); input length matters far less"
+    ],
+    "notes": {
+      "data_source_field": "measured = benchmarked in Jegham et al.; extrapolated = estimated from size class, hardware, and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
+      "benchmark_configurations": "short = 100 in / 300 out, medium = 1000 in / 1000 out, long = 10000 in / 1500 out tokens",
+      "reasoning_models": "Benchmark energy for reasoning models includes hidden chain-of-thought tokens at a typical thinking budget; the engine scales the decode term for low/standard/high effort."
+    }
+  },
+  "models": [
+    {
+      "model_id": "gpt-5",
+      "name": "GPT-5 (Instant)",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "provider_reported_anchor": {
+        "energy_wh": 0.34,
+        "water_ml": 0.32,
+        "label": "OpenAI-reported average ChatGPT query (Jun 2025); Microsoft/Joule 2026 production median is also 0.34 Wh"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.54, "energy_wh_std": 0.16 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.58, "energy_wh_std": 0.47 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 3.24, "energy_wh_std": 0.97 }
+      }
+    },
+    {
+      "model_id": "gpt-5-thinking",
+      "name": "GPT-5 (Thinking)",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "is_reasoning": true,
+      "provider_reported_anchor": {
+        "energy_wh": 18.35,
+        "label": "URI AI lab estimate (Aug 2025): ~18.35 Wh average for a medium reasoning response, up to ~40 Wh — contested; assumes full reasoning-mode token budgets"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 6.0, "energy_wh_std": 2.4 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 18.35, "energy_wh_std": 7.3 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 28.0, "energy_wh_std": 11.0 }
+      }
+    },
+    {
+      "model_id": "gpt-4o",
+      "name": "GPT-4o",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Large",
+      "data_source": "measured",
+      "provider_reported_anchor": {
+        "energy_wh": 0.34,
+        "water_ml": 0.32,
+        "label": "OpenAI-reported average ChatGPT query (Jun 2025)"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.421, "energy_wh_std": 0.127 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.214, "energy_wh_std": 0.391 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 1.788, "energy_wh_std": 0.363 }
+      }
+    },
+    {
+      "model_id": "gpt-4o-mini",
+      "name": "GPT-4o mini",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Small",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.185, "energy_wh_std": 0.042 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.52, "energy_wh_std": 0.095 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.89, "energy_wh_std": 0.165 }
+      }
+    },
+    {
+      "model_id": "gpt-4.1-nano",
+      "name": "GPT-4.1 nano",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Nano",
+      "data_source": "measured",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.103, "energy_wh_std": 0.037 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.271, "energy_wh_std": 0.087 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.454, "energy_wh_std": 0.208 }
+      }
+    },
+    {
+      "model_id": "o4-mini",
+      "name": "o4-mini (reasoning)",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Medium",
+      "data_source": "extrapolated",
+      "is_reasoning": true,
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 1.21, "energy_wh_std": 0.48 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 4.56, "energy_wh_std": 1.82 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 11.2, "energy_wh_std": 4.48 }
+      }
+    },
+    {
+      "model_id": "o3",
+      "name": "o3 (reasoning)",
+      "provider": "OpenAI",
+      "host": "Microsoft Azure",
+      "host_key": "microsoft_azure",
+      "size_class": "Large",
+      "data_source": "measured",
+      "is_reasoning": true,
+      "provider_reported_anchor": {
+        "energy_wh": 33.0,
+        "label": "Jegham et al. v6: >33 Wh per long prompt (short/medium points scaled from the long measurement)"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 14.0, "energy_wh_std": 4.2 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 24.0, "energy_wh_std": 7.0 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 33.5, "energy_wh_std": 9.0 }
+      }
+    },
+    {
+      "model_id": "claude-4.5-sonnet",
+      "name": "Claude Sonnet 4.5",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.14, "energy_wh_std": 0.54 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 4.35, "energy_wh_std": 1.09 }
+      }
+    },
+    {
+      "model_id": "claude-4.5-haiku",
+      "name": "Claude Haiku 4.5",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Small",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.14, "energy_wh_std": 0.04 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.42, "energy_wh_std": 0.08 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.78, "energy_wh_std": 0.14 }
+      }
+    },
+    {
+      "model_id": "claude-3.7-sonnet",
+      "name": "Claude 3.7 Sonnet",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Large",
+      "data_source": "measured",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.836, "energy_wh_std": 0.102 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.781, "energy_wh_std": 0.277 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 5.518, "energy_wh_std": 0.751 }
+      }
+    },
+    {
+      "model_id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "host_key": "google_cloud",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.42, "energy_wh_std": 0.11 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.18, "energy_wh_std": 0.3 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 2.46, "energy_wh_std": 0.62 }
+      }
+    },
+    {
+      "model_id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "host_key": "google_cloud",
+      "size_class": "Small",
+      "data_source": "anchored",
+      "provider_reported_anchor": {
+        "energy_wh": 0.24,
+        "water_ml": 0.26,
+        "carbon_g": 0.03,
+        "label": "Google-reported median Gemini Apps text prompt (Aug 2025, full-stack measurement)"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.15, "energy_wh_std": 0.05 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.45, "energy_wh_std": 0.13 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.82, "energy_wh_std": 0.22 }
+      }
+    },
+    {
+      "model_id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "provider": "Google",
+      "host": "Google Cloud",
+      "host_key": "google_cloud",
+      "size_class": "Small",
+      "data_source": "measured",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.095, "energy_wh_std": 0.018 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.285, "energy_wh_std": 0.048 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.52, "energy_wh_std": 0.092 }
+      }
+    },
+    {
+      "model_id": "mistral-large",
+      "name": "Mistral Large 2",
+      "provider": "Mistral AI",
+      "host": "Mistral (EU)",
+      "host_key": "mistral_eu",
+      "size_class": "Large",
+      "data_source": "anchored",
+      "provider_reported_anchor": {
+        "carbon_g": 1.14,
+        "water_ml": 45,
+        "label": "Mistral AI lifecycle analysis (Jul 2025): per 400-output-token response, full lifecycle incl. training and hardware"
+      },
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.68, "energy_wh_std": 0.09 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.15, "energy_wh_std": 0.27 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 4.12, "energy_wh_std": 0.55 }
+      }
+    },
+    {
+      "model_id": "mistral-small",
+      "name": "Mistral Small",
+      "provider": "Mistral AI",
+      "host": "Mistral (EU)",
+      "host_key": "mistral_eu",
+      "size_class": "Small",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.145, "energy_wh_std": 0.032 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.425, "energy_wh_std": 0.075 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.78, "energy_wh_std": 0.125 }
+      }
+    },
+    {
+      "model_id": "llama-4-scout",
+      "name": "Llama 4 Scout",
+      "provider": "Meta",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Medium",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.19, "energy_wh_std": 0.048 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.56, "energy_wh_std": 0.14 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 1.18, "energy_wh_std": 0.295 }
+      }
+    },
+    {
+      "model_id": "llama-3.3-70b",
+      "name": "Llama 3.3 70B",
+      "provider": "Meta",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Medium",
+      "data_source": "measured",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.247, "energy_wh_std": 0.032 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.857, "energy_wh_std": 0.113 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 1.646, "energy_wh_std": 0.22 }
+      }
+    },
+    {
+      "model_id": "llama-3.2-1b",
+      "name": "Llama 3.2 1B",
+      "provider": "Meta",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Nano",
+      "data_source": "measured",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.07, "energy_wh_std": 0.011 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.218, "energy_wh_std": 0.035 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 0.342, "energy_wh_std": 0.056 }
+      }
+    },
+    {
+      "model_id": "deepseek-v3",
+      "name": "DeepSeek V3",
+      "provider": "DeepSeek",
+      "host": "DeepSeek (China)",
+      "host_key": "deepseek",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.49, "energy_wh_std": 0.15 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.42, "energy_wh_std": 0.43 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 3.18, "energy_wh_std": 0.95 }
+      }
+    },
+    {
+      "model_id": "deepseek-r1",
+      "name": "DeepSeek R1 (reasoning)",
+      "provider": "DeepSeek",
+      "host": "DeepSeek (China)",
+      "host_key": "deepseek",
+      "size_class": "Large",
+      "data_source": "measured",
+      "is_reasoning": true,
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 23.815, "energy_wh_std": 2.16 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 29.0, "energy_wh_std": 3.069 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 33.634, "energy_wh_std": 3.798 }
+      }
+    },
+    {
+      "model_id": "grok-3",
+      "name": "Grok 3",
+      "provider": "xAI",
+      "host": "xAI (Memphis)",
+      "host_key": "xai",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.9, "energy_wh_std": 0.27 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.9, "energy_wh_std": 0.87 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 5.6, "energy_wh_std": 1.68 }
+      }
+    }
+  ]
+}
