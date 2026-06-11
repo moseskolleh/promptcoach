@@ -9,7 +9,6 @@
 
 function round(value) {
   if (value >= 100) return Math.round(value);
-  if (value >= 10) return Math.round(value * 10) / 10;
   if (value >= 1) return Math.round(value * 10) / 10;
   return Math.round(value * 100) / 100;
 }
@@ -152,9 +151,9 @@ function createConverters(equivalents) {
 
 const ConversionsModule = { createConverters };
 
-if (typeof window !== 'undefined') {
-  window.EcoPromptCore = window.EcoPromptCore || {};
-  Object.assign(window.EcoPromptCore, ConversionsModule);
+if (typeof globalThis !== 'undefined') {
+  globalThis.EcoPromptCore = globalThis.EcoPromptCore || {};
+  Object.assign(globalThis.EcoPromptCore, ConversionsModule);
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ConversionsModule;

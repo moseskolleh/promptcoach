@@ -410,11 +410,16 @@ function updateCoach() {
   );
 
   // Mirror tokens into Compare unless the user took over those sliders.
+  // Skip the (full-section) rebuild when the clamped values didn't change.
   if (!state.compareTouched) {
-    state.compareInput = clamp(analysis.tokens, 50, 10000);
-    state.compareOutput = state.outputTokens;
-    syncCompareSliders();
-    renderCompare();
+    const nextInput = clamp(analysis.tokens, 50, 10000);
+    const nextOutput = state.outputTokens;
+    if (nextInput !== state.compareInput || nextOutput !== state.compareOutput) {
+      state.compareInput = nextInput;
+      state.compareOutput = nextOutput;
+      syncCompareSliders();
+      renderCompare();
+    }
   }
 }
 

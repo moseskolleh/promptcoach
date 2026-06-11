@@ -341,9 +341,14 @@
   }
 
   function renderCompare() {
-    // Sync token inputs with the Coach prompt analysis.
-    $('compare-in').value = state.inputTokens;
-    $('compare-out').value = state.outputTokens;
+    // Sync token inputs with the Coach prompt analysis — but never overwrite
+    // the field the user is currently typing in.
+    if (document.activeElement !== $('compare-in')) {
+      $('compare-in').value = state.inputTokens;
+    }
+    if (document.activeElement !== $('compare-out')) {
+      $('compare-out').value = state.outputTokens;
+    }
     $('compare-context').textContent = state.analysis
       ? `Using your Coach prompt: ${state.analysis.tokens} tokens in, ` +
         `~${state.analysis.outputEstimate.estimated} expected out (${state.analysis.taskType}).`

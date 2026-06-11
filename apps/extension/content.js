@@ -428,8 +428,19 @@
     const observer = new MutationObserver(scheduleScan);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('resize', positionUi);
-    window.addEventListener('scroll', positionUi, { capture: true, passive: true });
+    // Chat pages auto-scroll continuously while responses stream; coalesce
+    // to one reposition per frame so we never thrash the host page's layout.
+    let positionQueued = false;
+    const positionOnFrame = () => {
+      if (positionQueued) return;
+      positionQueued = true;
+      requestAnimationFrame(() => {
+        positionQueued = false;
+        positionUi();
+      });
+    };
+    window.addEventListener('resize', positionOnFrame);
+    window.addEventListener('scroll', positionOnFrame, { capture: true, passive: true });
     document.addEventListener('click', onDocumentClick, true);
     document.addEventListener('focusin', scheduleScan);
   }

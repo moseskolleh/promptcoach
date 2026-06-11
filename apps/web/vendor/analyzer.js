@@ -100,10 +100,23 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// analyzePrompt runs on every debounced keystroke (including inside host
+// chat pages via the content script), so keyword regexes are compiled once
+// here instead of per call (~95 patterns per analysis otherwise).
+const KEYWORD_PATTERN_CACHE = new Map();
+
+function keywordPattern(keyword) {
+  let pattern = KEYWORD_PATTERN_CACHE.get(keyword);
+  if (!pattern) {
+    pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(keyword.trim())}($|[^a-z0-9])`, 'i');
+    KEYWORD_PATTERN_CACHE.set(keyword, pattern);
+  }
+  return pattern;
+}
+
 function matchesKeyword(lowerText, keyword) {
-  const kw = keyword.trim();
-  if (!kw) return false;
-  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(kw)}($|[^a-z0-9])`, 'i').test(lowerText);
+  if (!keyword.trim()) return false;
+  return keywordPattern(keyword).test(lowerText);
 }
 
 function detectTaskType(text) {
@@ -408,9 +421,9 @@ const AnalyzerModule = {
   POLITE_PHRASES
 };
 
-if (typeof window !== 'undefined') {
-  window.EcoPromptCore = window.EcoPromptCore || {};
-  Object.assign(window.EcoPromptCore, AnalyzerModule);
+if (typeof globalThis !== 'undefined') {
+  globalThis.EcoPromptCore = globalThis.EcoPromptCore || {};
+  Object.assign(globalThis.EcoPromptCore, AnalyzerModule);
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = AnalyzerModule;

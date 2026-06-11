@@ -429,7 +429,8 @@ function autoDetectModel(hostname) {
 }
 
 // ----------------------------------------------------------------------------
-// Exports (browser global + CommonJS, no build step required)
+// Exports (global for pages AND service workers via globalThis + CommonJS,
+// no build step required)
 // ----------------------------------------------------------------------------
 
 const CalculatorModule = {
@@ -440,9 +441,9 @@ const CalculatorModule = {
   GRADE_BANDS
 };
 
-if (typeof window !== 'undefined') {
-  window.EcoPromptCore = window.EcoPromptCore || {};
-  Object.assign(window.EcoPromptCore, CalculatorModule);
+if (typeof globalThis !== 'undefined') {
+  globalThis.EcoPromptCore = globalThis.EcoPromptCore || {};
+  Object.assign(globalThis.EcoPromptCore, CalculatorModule);
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = CalculatorModule;

@@ -145,6 +145,32 @@ test('autoDetectModel maps chat hosts', () => {
   assert.strictEqual(core.autoDetectModel('example.com'), null);
 });
 
+test('vendored copies in the apps match core exactly (run scripts/sync-core.js)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const coreSrc = path.join(__dirname, '..', 'src');
+  const apps = ['extension', 'web'];
+  const scripts = fs.readdirSync(coreSrc).filter((f) => f.endsWith('.js') && f !== 'index.js');
+  const dataFiles = fs.readdirSync(path.join(coreSrc, 'data')).filter((f) => f.endsWith('.json'));
+  for (const app of apps) {
+    const vendor = path.join(__dirname, '..', '..', '..', 'apps', app, 'vendor');
+    for (const f of scripts) {
+      assert.strictEqual(
+        fs.readFileSync(path.join(vendor, f), 'utf8'),
+        fs.readFileSync(path.join(coreSrc, f), 'utf8'),
+        `apps/${app}/vendor/${f} is stale — run node scripts/sync-core.js`
+      );
+    }
+    for (const f of dataFiles) {
+      assert.strictEqual(
+        fs.readFileSync(path.join(vendor, 'data', f), 'utf8'),
+        fs.readFileSync(path.join(coreSrc, 'data', f), 'utf8'),
+        `apps/${app}/vendor/data/${f} is stale — run node scripts/sync-core.js`
+      );
+    }
+  }
+});
+
 test('all auto-detect targets exist in the model catalog', () => {
   const ids = new Set(engine.listModels().map((m) => m.id));
   for (const id of ['gpt-5', 'claude-4.5-sonnet', 'gemini-2.5-flash', 'mistral-large', 'deepseek-v3', 'gpt-4o-mini', 'grok-3']) {
