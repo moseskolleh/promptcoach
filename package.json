@@ -9,7 +9,9 @@
   "scripts": {
     "test": "node --test packages/core/test/core.test.js",
     "sync": "node scripts/sync-core.js",
-    "web": "npx serve apps/web"
+    "web": "npx serve apps/web",
+    "icons": "node scripts/make-icons.js",
+    "package": "node scripts/package-extension.js"
   },
   "license": "MIT"
 }

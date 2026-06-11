@@ -53,3 +53,6 @@ yarn-error.log
 # Test files (local only, not for GitHub)
 test-prompts-complex.html
 test-prompts-complex.md
+
+# Build output
+dist/

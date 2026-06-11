@@ -54,11 +54,19 @@ npm test
 npx serve apps/web          # then open http://localhost:3000
 
 # Load the extension
-# chrome://extensions → Developer mode → Load unpacked → apps/extension
+# chrome://extensions → Developer mode → Load unpacked → select the
+# apps/extension FOLDER (not the repo root — the manifest lives there)
+
+# Or build a distributable zip (dist/ecoprompt-coach-extension-<version>.zip)
+npm run package
 
 # After editing packages/core, re-sync the apps' vendored copies
 node scripts/sync-core.js
 ```
+
+> ⚠️ **"Manifest file is missing or unreadable"?** You selected the repo
+> root. This is a monorepo — point *Load unpacked* at the **`apps/extension`**
+> subfolder.
 
 ## The math in one breath
 

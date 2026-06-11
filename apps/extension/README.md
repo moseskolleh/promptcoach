@@ -21,8 +21,13 @@ Everything runs locally; prompts never leave your machine.
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode** (top right)
-3. **Load unpacked** → select this `apps/extension` directory
+3. **Load unpacked** → select **this `apps/extension` directory** —
+   *not* the repo root ("Manifest file is missing or unreadable" means you
+   picked the root; the manifest lives here)
 4. Open chatgpt.com (or any supported site) and start typing
+
+Alternatively, build a Web-Store-layout zip from the repo root with
+`npm run package` (output: `dist/ecoprompt-coach-extension-<version>.zip`).
 
 ## File map
 
