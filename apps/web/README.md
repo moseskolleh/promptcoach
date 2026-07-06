@@ -5,6 +5,9 @@ and carbon cost in everyday units, compare models, browse the model
 explorer, and keep a local prompt library. Static site — no build step, no
 backend, no tracking; everything runs in the browser.
 
+**Live:** <https://moseskolleh.github.io/promptcoach/> (redeployed on every
+push to `main` by `.github/workflows/deploy-pages.yml`).
+
 ## Run locally
 
 ```bash

@@ -3,6 +3,8 @@
 Mock chat interfaces for testing the Chrome extension with real-world
 prompts, without sending anything to a real AI model.
 
+**Live:** <https://moseskolleh.github.io/promptcoach/demo/>
+
 ## What's here
 
 | Page | Mimics | Composer DOM | Simulated model |
