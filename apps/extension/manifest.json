@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EcoPrompt Coach",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "See the environmental cost of your AI queries in everyday units — phone charges, kettle boils, car meters — and learn to reduce it.",
   "icons": {
     "16": "assets/icon16.png",
@@ -34,7 +34,10 @@
         "https://chat.deepseek.com/*",
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
-        "https://grok.com/*"
+        "https://grok.com/*",
+        "https://moseskolleh.github.io/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
       ],
       "js": [
         "vendor/calculator.js",
@@ -59,7 +62,10 @@
         "https://chat.deepseek.com/*",
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
-        "https://grok.com/*"
+        "https://grok.com/*",
+        "https://moseskolleh.github.io/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
       ]
     }
   ],

@@ -1,0 +1,332 @@
+/* EcoPrompt Coach demo — shared chat layout + three provider-style skins.
+   Skins are body classes: .skin-chatgpt (dark), .skin-claude (warm cream),
+   .skin-gemini (Google light). Purely visual mimicry for testing — every
+   skin uses a different composer DOM shape on purpose. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --demo-max: 760px;
+}
+
+body {
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Fixed to the viewport so the thread scrolls internally like real chat apps */
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------- top bar */
+
+.demo-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+}
+
+.demo-topbar .demo-brand {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.demo-topbar .demo-model-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.demo-topbar .demo-spacer { flex: 1; }
+
+.demo-topbar a { color: var(--muted); text-decoration: none; font-size: 13px; }
+.demo-topbar a:hover { color: var(--ink); text-decoration: underline; }
+
+.demo-topbar button.demo-drawer-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.demo-topbar button.demo-drawer-btn:hover { background: var(--hover); }
+
+/* ---------------------------------------------------------- layout */
+
+.demo-shell {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.demo-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.demo-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 16px 12px;
+}
+
+.demo-thread-inner,
+.demo-composer-row {
+  max-width: var(--demo-max);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.demo-greeting {
+  text-align: center;
+  margin-top: 14vh;
+  color: var(--muted);
+}
+.demo-greeting h1 {
+  font-size: 28px;
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+.demo-greeting p { font-size: 14px; line-height: 1.5; max-width: 460px; margin: 0 auto; }
+
+/* ---------------------------------------------------------- messages */
+
+.demo-msg {
+  display: flex;
+  gap: 12px;
+  margin: 0 auto 22px;
+  max-width: var(--demo-max);
+}
+
+.demo-avatar {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+.demo-msg-user .demo-avatar { background: var(--user-accent); }
+
+.demo-bubble {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 15px;
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.demo-streaming::after {
+  content: "▍";
+  animation: demo-blink 1s steps(2) infinite;
+}
+@keyframes demo-blink { 50% { opacity: 0; } }
+
+/* ---------------------------------------------------------- composer */
+
+.demo-composer-area {
+  padding: 8px 16px 18px;
+}
+
+.demo-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 10px 10px 10px 18px;
+  background: var(--composer-bg);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.demo-composer {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow-y: auto;
+  min-height: 24px;
+}
+
+.demo-composer:empty::before,
+textarea.demo-composer::placeholder {
+  content: attr(data-placeholder);
+  color: var(--muted);
+}
+
+.demo-send {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+}
+.demo-send:hover { filter: brightness(1.1); }
+
+.demo-disclaimer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------- drawer */
+
+.demo-drawer {
+  width: 340px;
+  flex: 0 0 auto;
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 18px 16px 40px;
+  background: var(--drawer-bg);
+}
+
+.demo-drawer > h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.demo-drawer > .demo-drawer-sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.demo-ex-group { margin-bottom: 20px; }
+.demo-ex-group h3 { font-size: 14px; margin-bottom: 2px; color: var(--ink); }
+.demo-ex-watch { font-size: 12px; color: var(--muted); line-height: 1.45; margin-bottom: 8px; }
+
+.demo-ex-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--composer-bg);
+  color: var(--ink);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.demo-ex-item:hover { border-color: var(--accent); }
+
+.demo-ex-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.demo-ex-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .demo-drawer {
+    position: fixed;
+    right: 0;
+    top: 49px;
+    bottom: 0;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 10;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
+  }
+  .demo-drawer.open { transform: translateX(0); }
+}
+
+/* ============================================================ skins */
+
+/* --- ChatGPT-style: dark, neutral, green accent ------------------- */
+.skin-chatgpt {
+  --bg: #212121;
+  --ink: #ececec;
+  --muted: #9b9b9b;
+  --line: #3a3a3a;
+  --hover: #2f2f2f;
+  --accent: #19c37d;
+  --user-accent: #5436da;
+  --composer-bg: #2f2f2f;
+  --drawer-bg: #171717;
+  background: var(--bg);
+  color: var(--ink);
+}
+.skin-chatgpt .demo-composer-row { border-radius: 28px; box-shadow: none; }
+
+/* --- Claude-style: warm cream, serif greeting, coral accent ------- */
+.skin-claude {
+  --bg: #f5f4ee;
+  --ink: #3d3929;
+  --muted: #8a8674;
+  --line: #e3e0d3;
+  --hover: #edebe0;
+  --accent: #d97757;
+  --user-accent: #6a6653;
+  --composer-bg: #fdfcf8;
+  --drawer-bg: #efede4;
+  background: var(--bg);
+  color: var(--ink);
+}
+.skin-claude .demo-greeting h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  color: #b3552f;
+}
+.skin-claude .demo-composer-row { border-radius: 16px; }
+
+/* --- Gemini-style: Google light, blue accent, gradient greeting --- */
+.skin-gemini {
+  --bg: #ffffff;
+  --ink: #1f1f1f;
+  --muted: #747775;
+  --line: #e4e4e4;
+  --hover: #f3f6fc;
+  --accent: #1a73e8;
+  --user-accent: #188038;
+  --composer-bg: #f0f4f9;
+  --drawer-bg: #f8fafd;
+  background: var(--bg);
+  color: var(--ink);
+}
+.skin-gemini .demo-greeting h1 {
+  background: linear-gradient(90deg, #4285f4, #9b72cb, #d96570);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.skin-gemini .demo-composer-row { border-radius: 32px; border-color: transparent; box-shadow: none; }

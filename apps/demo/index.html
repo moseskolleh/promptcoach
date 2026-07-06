@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoPrompt Coach — Extension Test Playground</title>
+  <link rel="stylesheet" href="demo.css">
+  <style>
+    body.landing {
+      --bg: #f6faf7; --ink: #17301f; --muted: #5c7264; --line: #dbe7dd;
+      --hover: #ecf4ee; --accent: #10b981; --user-accent: #10b981;
+      --composer-bg: #ffffff; --drawer-bg: #ffffff;
+      background: var(--bg); color: var(--ink);
+      display: block; padding-bottom: 80px;
+      height: auto; min-height: 100vh; overflow: auto;
+    }
+    .landing main { max-width: 880px; margin: 0 auto; padding: 48px 20px 0; }
+    .landing h1 { font-size: 34px; margin-bottom: 10px; }
+    .landing .lead { font-size: 16px; line-height: 1.6; color: var(--muted); max-width: 640px; }
+    .landing h2 { font-size: 20px; margin: 40px 0 14px; }
+    .landing ol.steps { margin-left: 20px; line-height: 1.9; font-size: 15px; }
+    .landing code {
+      background: var(--hover); border: 1px solid var(--line);
+      border-radius: 6px; padding: 1px 6px; font-size: 13px;
+    }
+    .skin-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .skin-card {
+      display: block; text-decoration: none; border: 1px solid var(--line);
+      border-radius: 14px; padding: 18px; background: var(--composer-bg);
+      color: var(--ink); transition: border-color .15s, transform .15s;
+    }
+    .skin-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .skin-card .swatch { height: 56px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--line); }
+    .skin-card h3 { font-size: 16px; margin-bottom: 4px; }
+    .skin-card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .swatch-chatgpt { background: linear-gradient(135deg, #212121 60%, #19c37d); }
+    .swatch-claude { background: linear-gradient(135deg, #f5f4ee 60%, #d97757); }
+    .swatch-gemini { background: linear-gradient(135deg, #ffffff 50%, #4285f4, #d96570); }
+    .watch-list { list-style: none; }
+    .watch-list li {
+      border: 1px solid var(--line); border-radius: 10px; background: var(--composer-bg);
+      padding: 12px 14px; margin-bottom: 10px; font-size: 14px; line-height: 1.55;
+    }
+    .watch-list b { color: var(--accent); }
+    .landing .note {
+      border-left: 4px solid var(--accent); background: var(--hover);
+      padding: 12px 14px; border-radius: 0 10px 10px 0; font-size: 14px;
+      line-height: 1.55; margin-top: 14px;
+    }
+    .landing footer { max-width: 880px; margin: 48px auto 0; padding: 0 20px; font-size: 13px; color: var(--muted); }
+    .landing footer a { color: var(--accent); }
+  </style>
+</head>
+<body class="landing">
+  <main>
+    <h1>🌱 EcoPrompt Coach — Test Playground</h1>
+    <p class="lead">
+      Three mock chat interfaces that look and behave like the real thing —
+      composer, streaming replies, the lot — so you can test the EcoPrompt
+      Coach extension with real-world prompts without sending anything to an
+      actual AI model.
+    </p>
+
+    <h2>1 · Install the extension (one minute)</h2>
+    <ol class="steps">
+      <li>Clone the repo: <code>git clone https://github.com/moseskolleh/promptcoach</code></li>
+      <li>Open <code>chrome://extensions</code> in Chrome and enable <b>Developer mode</b> (top right)</li>
+      <li>Click <b>Load unpacked</b> and select the <code>apps/extension</code> folder</li>
+      <li>Come back here and open a chat below — a small eco-pill appears near the composer</li>
+    </ol>
+    <p class="note">
+      Already using the extension on real sites? It works here too: this demo's
+      address is in the extension's allowed sites, and each mock page tells the
+      extension which model it simulates, so grades match the real service.
+    </p>
+
+    <h2>2 · Pick a chat to test in</h2>
+    <div class="skin-cards">
+      <a class="skin-card" href="chatgpt.html">
+        <div class="swatch swatch-chatgpt"></div>
+        <h3>NovaChat</h3>
+        <p>ChatGPT-style: dark theme, contenteditable composer. Simulates GPT-5.</p>
+      </a>
+      <a class="skin-card" href="claude.html">
+        <div class="swatch swatch-claude"></div>
+        <h3>Clarion</h3>
+        <p>Claude-style: warm cream, serif greeting, rich-text composer. Simulates Claude Sonnet 4.5.</p>
+      </a>
+      <a class="skin-card" href="gemini.html">
+        <div class="swatch swatch-gemini"></div>
+        <h3>Lumina</h3>
+        <p>Gemini-style: Google light theme, plain textarea composer. Simulates Gemini 2.5 Flash.</p>
+      </a>
+    </div>
+
+    <h2>3 · What to try</h2>
+    <ul class="watch-list">
+      <li><b>Grades react as you type.</b> Every chat has an “Example prompts” drawer with real-world prompts. Click one and watch the pill's grade and energy line update live.</li>
+      <li><b>Output budgets pay off.</b> Type “Explain how photosynthesis works”, then add “Answer in 50 words or less” — the estimate drops and the coach acknowledges the budget instead of nagging.</li>
+      <li><b>Courtesy costs tokens.</b> The over-polite email example shows how many tokens the please-and-thank-you padding costs — open the pill's card to see the trim suggestion.</li>
+      <li><b>Some prompts shouldn't be prompts.</b> Ask for tomorrow's weather or a 15% tip and the coach recommends a weather app or calculator instead. Ask for a <i>poem</i> about weather and it correctly stays quiet.</li>
+      <li><b>Model gaps are huge.</b> Send the same prompt in NovaChat (GPT-5) and Lumina (Gemini Flash) and compare grades — then open the extension popup for the full model comparison and your recorded history.</li>
+      <li><b>Sends are recorded.</b> Every message you send here lands in the extension popup's personal impact dashboard, just like on the real sites.</li>
+    </ul>
+
+    <h2>Also in this project</h2>
+    <p class="lead" style="font-size:14px">
+      The <a href="../index.html" style="color:var(--accent)">EcoPrompt web app</a>
+      offers the same coach without any extension, plus a model explorer and the
+      methodology digest.
+    </p>
+  </main>
+
+  <footer>
+    Mock interfaces are visual look-alikes for testing only — not affiliated with
+    OpenAI, Anthropic, or Google. Replies are canned text generated locally;
+    no AI model is called and nothing leaves your browser.
+    Source: <a href="https://github.com/moseskolleh/promptcoach">github.com/moseskolleh/promptcoach</a>
+  </footer>
+</body>
+</html>

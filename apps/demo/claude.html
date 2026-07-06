@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clarion — EcoPrompt Coach demo (Claude-style)</title>
+  <!-- Tells the EcoPrompt extension which model this demo page simulates. -->
+  <meta name="ecoprompt-model" content="claude-4.5-sonnet">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body class="skin-claude" data-assistant-initial="C">
+  <header class="demo-topbar">
+    <span class="demo-brand">Clarion</span>
+    <span class="demo-model-tag">simulates: Claude Sonnet 4.5 · claude.ai</span>
+    <span class="demo-spacer"></span>
+    <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
+    <a href="index.html">← demo home</a>
+  </header>
+
+  <div class="demo-shell">
+    <main class="demo-main">
+      <div class="demo-thread" data-demo-thread>
+        <div class="demo-thread-inner">
+          <div class="demo-greeting" data-demo-greeting>
+            <h1>Good afternoon</h1>
+            <p>This is a mock chat for testing the EcoPrompt Coach extension.
+               Type a prompt (or pick an example) and watch the eco-pill grade it
+               as you type. Replies are canned — nothing reaches a real model.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-composer-area">
+        <!-- Claude-style DOM: ProseMirror-like contenteditable + aria-label send button -->
+        <div class="demo-composer-row">
+          <div class="demo-composer ProseMirror" contenteditable="true" role="textbox"
+               aria-label="Write your prompt to Clarion" data-placeholder="How can Clarion help you today?"
+               data-demo-composer></div>
+          <button type="button" class="demo-send" aria-label="Send message" data-demo-send>↑</button>
+        </div>
+        <p class="demo-disclaimer">Demo chat — responses are simulated locally. No AI model is called.</p>
+      </div>
+    </main>
+
+    <aside class="demo-drawer" data-demo-drawer>
+      <h2>Example prompts</h2>
+      <p class="demo-drawer-sub">Real-world prompts chosen to exercise each coaching feature. Click one, watch the pill, then send it.</p>
+    </aside>
+  </div>
+
+  <script src="examples.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>
