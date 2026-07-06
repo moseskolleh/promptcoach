@@ -95,7 +95,7 @@ moment.
 - ✅ Chrome extension + responsive web app
 - ✅ Demo playground for extension testing, deployed to GitHub Pages
   (web app at the root, demo at `/demo/`) via `.github/workflows/deploy-pages.yml`
-  — one-time setup: repo **Settings → Pages → Source: “GitHub Actions”**
+
 - ✅ Mobile app architecture (skeleton)
 - ⏭️ Org dashboards (team totals, goals, Slack recaps), API for enterprises,
   per-tenant grid factors, verified provider integrations
