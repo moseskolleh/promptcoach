@@ -8,10 +8,10 @@ interface Props {
   title: string;
   description: string;
   impact: string;
-  priority: 'critical' | 'high' | 'medium';
+  priority: 'critical' | 'high' | 'medium' | 'low';
 }
 
-const ACCENT = { critical: colors.danger, high: colors.amber, medium: colors.blue };
+const ACCENT = { critical: colors.danger, high: colors.amber, medium: colors.blue, low: colors.muted };
 
 export default function TipCard({ title, description, impact, priority }: Props) {
   return (

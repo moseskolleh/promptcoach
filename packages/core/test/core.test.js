@@ -132,6 +132,62 @@ test('analyzer: courtesy trimming and token estimation', () => {
   assert.ok(/summarize this report/i.test(optimized));
 });
 
+test('analyzer: explicit output budget lowers the estimate and flips the tip', () => {
+  const budgeted = core.analyzePrompt(
+    'Explain how photosynthesis works. Answer in 50 words or less, bullet points only.'
+  );
+  const free = core.analyzePrompt('Explain how photosynthesis works.');
+  assert.ok(budgeted.outputBudget, 'budget not detected');
+  assert.strictEqual(budgeted.outputBudget.kind, 'words');
+  // 50 words ≈ 67 tokens — far below the unconstrained estimate.
+  assert.ok(budgeted.outputEstimate.estimated < free.outputEstimate.estimated * 0.5);
+  // Following the coach's advice replaces the nag with an acknowledgment.
+  assert.ok(budgeted.tips.some((t) => t.kind === 'output_budget_ok'));
+  assert.ok(!budgeted.tips.some((t) => t.kind === 'output_budget'));
+  assert.ok(free.tips.some((t) => t.kind === 'output_budget'));
+  assert.strictEqual(free.outputBudget, null);
+});
+
+test('analyzer: output budget forms — sentences, yes/no, soft brevity', () => {
+  const sentence = core.detectOutputBudget('Describe quantum computing in one sentence');
+  assert.strictEqual(sentence.kind, 'sentence');
+  assert.ok(sentence.capTokens <= 30);
+  assert.strictEqual(core.detectOutputBudget('Is Rust memory safe? Just yes or no').kind, 'yes_no');
+  const soft = core.detectOutputBudget('Summarize the main plot points briefly');
+  assert.strictEqual(soft.kind, 'style');
+  assert.ok(soft.factor < 1);
+  assert.strictEqual(core.detectOutputBudget('Write an essay about the history of Rome'), null);
+  // Budget phrases inside quoted payload don't count.
+  assert.strictEqual(core.detectOutputBudget('Translate "answer in 50 words" into German'), null);
+});
+
+test('optimizer preserves quoted text and code blocks', () => {
+  const quoted = core.generateOptimizedPrompt(
+    'Could you translate "thank you so much for your help" into Japanese, please?'
+  );
+  assert.ok(quoted.includes('"thank you so much for your help"'), quoted);
+  assert.ok(!/^could you/i.test(quoted));
+  assert.ok(!/please/i.test(quoted.replace(/"[^"]*"/g, '')));
+
+  const code = core.generateOptimizedPrompt(
+    'Please fix this: ```js\nconsole.log("please wait");\n``` thanks!'
+  );
+  assert.ok(code.includes('console.log("please wait");'), code);
+
+  const single = core.generateOptimizedPrompt("Define the word 'please' and explain its etymology");
+  assert.ok(single.includes("'please'"), single);
+
+  // Courtesy words inside quotes aren't counted as trimmable either.
+  assert.strictEqual(core.detectPoliteWords('Translate "thank you so much" into French').totalTokensSaved, 0);
+});
+
+test('zero-AI tip suppressed when the user clearly wants generated content', () => {
+  const poem = core.analyzePrompt('Write a poem about the weather in Paris');
+  assert.ok(!poem.tips.some((t) => t.kind === 'special_query'), 'poem should not trigger weather-app tip');
+  const weather = core.analyzePrompt('What is the weather forecast for tomorrow?');
+  assert.ok(weather.tips.some((t) => t.kind === 'special_query'));
+});
+
 test('analyzer: zero-AI alternatives detected', () => {
   const special = core.detectSpecialQueryType('What is the weather forecast for tomorrow?');
   assert.strictEqual(special.type, 'weather');

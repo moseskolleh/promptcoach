@@ -11,7 +11,7 @@ skip the LLM entirely when a calculator or weather app does it better.
 
 ![Version](https://img.shields.io/badge/version-2.0.0-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Tests](https://img.shields.io/badge/core_tests-13_passing-brightgreen)
+![Tests](https://img.shields.io/badge/core_tests-18_passing-brightgreen)
 
 ---
 
@@ -87,7 +87,7 @@ moment.
 
 ## Status & roadmap
 
-- ✅ v2 engine with 2025/2026 evidence base, 19-model catalog, 13 passing tests
+- ✅ v2 engine with 2025/2026 evidence base, 19-model catalog, 18 passing tests
 - ✅ Chrome extension + responsive web app
 - ✅ Mobile app architecture (skeleton)
 - ⏭️ Org dashboards (team totals, goals, Slack recaps), API for enterprises,
