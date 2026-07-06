@@ -2,8 +2,7 @@
 #   /       → apps/web   (the EcoPrompt web app)
 #   /demo/  → apps/demo  (extension test playground)
 #
-# configure-pages runs with enablement: true, so the first run creates the
-# Pages site itself — no manual Settings → Pages step needed.
+# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 
 name: Deploy to GitHub Pages
 
@@ -40,8 +39,6 @@ jobs:
           cp -r apps/demo/* _site/demo/
 
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

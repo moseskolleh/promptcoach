@@ -13,6 +13,12 @@ skip the LLM entirely when a calculator or weather app does it better.
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Tests](https://img.shields.io/badge/core_tests-18_passing-brightgreen)
 
+**▶ Try it live:**
+[**Web app**](https://moseskolleh.github.io/promptcoach/) —
+the coach, model comparison and explorer, no install needed ·
+[**Extension demo playground**](https://moseskolleh.github.io/promptcoach/demo/) —
+mock ChatGPT/Claude/Gemini chats for testing the extension
+
 ---
 
 ## Why now (the 2025/2026 science)
@@ -36,8 +42,8 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 |---|---|
 | [`packages/core`](packages/core) | The shared engine: per-token energy model fitted from published benchmarks, water + carbon accounting with explicit boundaries, relatable-equivalents converter, prompt analyzer & coach. Zero dependencies, fully tested (`npm test`). |
 | [`apps/extension`](apps/extension) | Chrome extension (MV3): live eco-grade pill on ChatGPT/Claude/Gemini/Copilot/Mistral/DeepSeek/Perplexity/Poe/Grok, popup coach + model comparison + personal impact dashboard. |
-| [`apps/web`](apps/web) | Responsive web app (static, no build step): coach, model comparison, model explorer, prompt library, methodology digest. |
-| [`apps/demo`](apps/demo) | Extension test playground: three mock chat interfaces (ChatGPT-, Claude-, and Gemini-style) with fake streaming replies and a real-world example-prompt bank, so anyone can test the extension without touching a real AI service. |
+| [`apps/web`](apps/web) | Responsive web app (static, no build step): coach, model comparison, model explorer, prompt library, methodology digest. **[Live ↗](https://moseskolleh.github.io/promptcoach/)** |
+| [`apps/demo`](apps/demo) | Extension test playground: three mock chat interfaces (ChatGPT-, Claude-, and Gemini-style) with fake streaming replies and a real-world example-prompt bank, so anyone can test the extension without touching a real AI service. **[Live ↗](https://moseskolleh.github.io/promptcoach/demo/)** |
 | [`apps/mobile`](apps/mobile) | Mobile app **structure** (Expo/React Native skeleton): share-sheet prompt intake, dashboard, weekly recap — ready to implement. |
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every formula, every factor, every source, every limitation. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the pieces fit, and the product/startup roadmap. |
@@ -51,14 +57,15 @@ One engine, every surface: extension, web, and mobile all run the exact same
 # Run the engine tests
 npm test
 
-# Try the web app
-npx serve apps/web          # then open http://localhost:3000
+# Try the web app — hosted at https://moseskolleh.github.io/promptcoach/
+npx serve apps/web          # or run locally: open http://localhost:3000
 
 # Load the extension
 # chrome://extensions → Developer mode → Load unpacked → apps/extension
 
 # Test the extension in the demo playground (mock ChatGPT/Claude/Gemini chats)
-npx serve apps/demo         # then open http://localhost:3000
+# — hosted at https://moseskolleh.github.io/promptcoach/demo/
+npx serve apps/demo         # or run locally: open http://localhost:3000
 
 # After editing packages/core, re-sync the apps' vendored copies
 node scripts/sync-core.js
@@ -93,8 +100,9 @@ moment.
 
 - ✅ v2 engine with 2025/2026 evidence base, 19-model catalog, 18 passing tests
 - ✅ Chrome extension + responsive web app
-- ✅ Demo playground for extension testing, deployed to GitHub Pages
-  (web app at the root, demo at `/demo/`) via `.github/workflows/deploy-pages.yml`
+- ✅ Live on GitHub Pages — [web app](https://moseskolleh.github.io/promptcoach/)
+  at the root, [demo playground](https://moseskolleh.github.io/promptcoach/demo/)
+  at `/demo/`; every push to `main` redeploys via `.github/workflows/deploy-pages.yml`
 - ✅ Mobile app architecture (skeleton)
 - ⏭️ Org dashboards (team totals, goals, Slack recaps), API for enterprises,
   per-tenant grid factors, verified provider integrations
