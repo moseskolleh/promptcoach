@@ -147,6 +147,124 @@ function detectTaskType(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Protected spans — quoted text and code are payload, not politeness. The
+// courtesy trimmer and the budget detector must never read (or rewrite)
+// inside them: 'Translate "thank you so much" into Japanese' keeps its quote.
+// ---------------------------------------------------------------------------
+
+const PROTECTED_SPAN_PATTERNS = [
+  /```[\s\S]*?```/g, // fenced code blocks
+  /`[^`\n]+`/g, // inline code
+  /"[^"\n]+"/g, // double-quoted
+  /“[^”\n]+”/g, // curly-quoted
+  // Single-quoted, only when the quotes sit on word boundaries so
+  // apostrophes ("don't", "user's") are never mistaken for quotes.
+  /(^|[\s(,:;])'[^'\n]+'(?=[\s).,:;!?]|$)/gm
+];
+
+function findProtectedSpans(text) {
+  const spans = [];
+  for (const pattern of PROTECTED_SPAN_PATTERNS) {
+    pattern.lastIndex = 0;
+    let m;
+    while ((m = pattern.exec(text)) !== null) {
+      const prefix = m[1] || '';
+      spans.push({ start: m.index + prefix.length, end: m.index + m[0].length });
+    }
+  }
+  // Earliest first; on ties keep the longest so fenced code wins over
+  // quotes it contains.
+  return spans.sort((a, b) => a.start - b.start || b.end - a.end);
+}
+
+/**
+ * Blank out protected content (same length, whitespace kept) so
+ * keyword/phrase regexes can scan the text without matching inside payload.
+ */
+function maskProtectedSpans(text) {
+  const spans = findProtectedSpans(text);
+  if (!spans.length) return text;
+  const chars = text.split('');
+  for (const s of spans) {
+    for (let i = s.start; i < s.end; i++) {
+      if (!/\s/.test(chars[i])) chars[i] = '\u0000';
+    }
+  }
+  return chars.join('');
+}
+
+// ---------------------------------------------------------------------------
+// Output-budget detection. Response length is the dominant energy driver
+// (see docs/METHODOLOGY.md), so a prompt that already caps its answer
+// ("in 50 words", "one sentence", "bullet points only") gets a lower output
+// estimate and credit in the tips instead of the "set an output budget" nag.
+// ---------------------------------------------------------------------------
+
+const WORDS_TO_TOKENS = 4 / 3; // ≈ 0.75 English words per token
+const SENTENCE_TOKENS = 25;
+const PARAGRAPH_TOKENS = 100;
+const SMALL_NUMBERS = { one: 1, two: 2, three: 3 };
+
+const SOFT_BUDGETS = [
+  { pattern: /\b(?:bullet\s+points?\s+only|only\s+bullet\s+points?|just\s+(?:the\s+)?bullet\s+points?|(?:in|as)\s+bullet\s+points?)\b/i, factor: 0.6 },
+  { pattern: /\b(?:briefly|be\s+brief|be\s+concise|concise(?:ly)?|keep\s+it\s+(?:short|brief)|short\s+answer|in\s+short|no\s+explanations?(?:\s+needed)?|without\s+explanation)\b/i, factor: 0.5 },
+  { pattern: /\btl;?dr\b/i, factor: 0.4 }
+];
+
+/**
+ * Detect an explicit output-length constraint in the prompt.
+ * Returns { kind, phrase, capTokens } for hard caps ("50 words",
+ * "one sentence", "yes or no"), { kind: 'style', phrase, factor } for soft
+ * brevity cues ("briefly", "bullet points only"), or null.
+ */
+function detectOutputBudget(text) {
+  if (!text) return null;
+  const scannable = maskProtectedSpans(text);
+
+  let m =
+    scannable.match(/(?:\b(?:under|at\s+most|no\s+more\s+than|max(?:imum)?(?:\s+of)?|within|in|around|about|roughly|up\s+to)|≤|<=)\s*(\d{1,4})\s*words?\b/i) ||
+    scannable.match(/\b(\d{1,4})\s*words?\s*(?:,\s*)?(?:or\s+(?:less|fewer)|max(?:imum)?|tops)\b/i) ||
+    scannable.match(/\b(\d{1,4})-word\b/i);
+  if (m) {
+    return { kind: 'words', phrase: m[0].trim(), capTokens: Math.max(8, Math.round(Number(m[1]) * WORDS_TO_TOKENS)) };
+  }
+
+  m = scannable.match(/(?:\b(?:under|at\s+most|no\s+more\s+than|max(?:imum)?(?:\s+of)?|within|up\s+to)|≤|<=)\s*(\d{1,5})\s*tokens?\b/i);
+  if (m) return { kind: 'tokens', phrase: m[0].trim(), capTokens: Math.max(8, Number(m[1])) };
+
+  m =
+    scannable.match(/\b(?:in|as)\s+(?:just\s+)?(?:a|one|a\s+single)\s+(?:short\s+)?(sentence|paragraph)\b/i) ||
+    scannable.match(/\bone-(sentence|paragraph)\b/i);
+  if (m) {
+    const unit = m[1].toLowerCase();
+    return {
+      kind: unit,
+      phrase: m[0].trim(),
+      capTokens: unit === 'sentence' ? SENTENCE_TOKENS : PARAGRAPH_TOKENS
+    };
+  }
+
+  m = scannable.match(/\b(one|two|three|[1-3])\s+sentences?\s+(?:max(?:imum)?|only|tops|or\s+(?:less|fewer))\b/i);
+  if (m) {
+    const n = SMALL_NUMBERS[m[1].toLowerCase()] || Number(m[1]) || 1;
+    return { kind: 'sentence', phrase: m[0].trim(), capTokens: n * SENTENCE_TOKENS };
+  }
+
+  m = scannable.match(/\b(?:answer\s+)?(?:with\s+)?(?:just\s+)?yes\s+or\s+no\b/i);
+  if (m) return { kind: 'yes_no', phrase: m[0].trim(), capTokens: 8 };
+
+  m = scannable.match(/\b(?:in|with)\s+(?:just\s+)?one\s+word\b|\bone-word\s+answer\b/i);
+  if (m) return { kind: 'word', phrase: m[0].trim(), capTokens: 6 };
+
+  for (const soft of SOFT_BUDGETS) {
+    const sm = scannable.match(soft.pattern);
+    if (sm) return { kind: 'style', phrase: sm[0].trim(), factor: soft.factor };
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Zero-AI alternatives — some queries shouldn't go to an LLM at all.
 // ---------------------------------------------------------------------------
 
@@ -239,10 +357,12 @@ const POLITE_PHRASES = [
 ];
 
 function detectPoliteWords(text) {
+  // Quoted text and code are payload — courtesy words inside them don't count.
+  const scannable = maskProtectedSpans(text);
   const found = [];
   let totalTokensSaved = 0;
   for (const phrase of POLITE_PHRASES) {
-    const matches = text.match(phrase.pattern);
+    const matches = scannable.match(phrase.pattern);
     if (matches) {
       found.push({
         phrase: phrase.word,
@@ -258,7 +378,20 @@ function detectPoliteWords(text) {
 
 function generateOptimizedPrompt(originalText) {
   if (!originalText) return '';
-  let optimized = originalText;
+  // Pull quoted text and code out into placeholders so trimming and
+  // whitespace cleanup never rewrite payload content; restored at the end.
+  const spans = findProtectedSpans(originalText);
+  const saved = [];
+  let optimized = '';
+  let cursor = 0;
+  for (const s of spans) {
+    if (s.start < cursor) continue; // nested span already covered
+    optimized += originalText.slice(cursor, s.start) + `\u0000${saved.length}\u0000`;
+    saved.push(originalText.slice(s.start, s.end));
+    cursor = s.end;
+  }
+  optimized += originalText.slice(cursor);
+
   for (const phrase of POLITE_PHRASES) {
     optimized = optimized.replace(phrase.pattern, ' ');
   }
@@ -277,6 +410,8 @@ function generateOptimizedPrompt(originalText) {
     optimized = optimized.charAt(0).toUpperCase() + optimized.slice(1);
   }
   optimized = optimized.replace(/([.!?]\s+)([a-z])/g, (_, p, c) => p + c.toUpperCase());
+  // Restore protected spans verbatim.
+  optimized = optimized.replace(/\u0000(\d+)\u0000/g, (all, i) => saved[Number(i)] ?? all);
   return optimized;
 }
 
@@ -284,14 +419,22 @@ function generateOptimizedPrompt(originalText) {
 // Output estimation and tips
 // ---------------------------------------------------------------------------
 
-function estimateOutputTokens(taskType, inputTokens) {
+function estimateOutputTokens(taskType, inputTokens, budget = null) {
   const cfg = TASK_TYPES[taskType] || TASK_TYPES.GENERAL;
   const base = cfg.typicalOutputTokens === null ? inputTokens : cfg.typicalOutputTokens;
-  const estimated = Math.round(base + Math.min(inputTokens * 0.3, 200));
+  const baseline = Math.round(base + Math.min(inputTokens * 0.3, 200));
+  let estimated = baseline;
+  if (budget) {
+    if (typeof budget.capTokens === 'number') estimated = Math.min(estimated, budget.capTokens);
+    else if (typeof budget.factor === 'number') estimated = Math.round(estimated * budget.factor);
+    estimated = Math.max(5, estimated);
+  }
   return {
     estimated,
     min: Math.round(estimated * 0.5),
-    max: Math.round(estimated * 1.5)
+    max: Math.round(estimated * 1.5),
+    baseline,
+    budgeted: !!budget
   };
 }
 
@@ -307,10 +450,23 @@ const MODEL_RECOMMENDATIONS = {
   GENERAL: 'Start with a small efficient model; escalate only when the answer falls short.'
 };
 
-function getOptimizationTips(politeWords, taskType, tokens, originalText = '') {
+// Tasks where the user clearly wants generated content, so a keyword hit
+// like "weather" ("write a poem about the weather") must not trigger the
+// zero-AI "use another app" tip.
+const SPECIAL_QUERY_EXEMPT_TASKS = new Set([
+  'CREATIVE_WRITING',
+  'CODE_GENERATION',
+  'IMAGE_GENERATION',
+  'TRANSLATION',
+  'TEXT_SUMMARIZATION'
+]);
+
+function getOptimizationTips(politeWords, taskType, tokens, originalText = '', outputBudget = undefined) {
+  const budget =
+    outputBudget !== undefined ? outputBudget : originalText ? detectOutputBudget(originalText) : null;
   const tips = [];
 
-  if (originalText) {
+  if (originalText && !SPECIAL_QUERY_EXEMPT_TASKS.has(taskType.type)) {
     const special = detectSpecialQueryType(originalText);
     if (special) tips.push({ kind: 'special_query', priority: 'critical', ...special });
   }
@@ -349,14 +505,28 @@ function getOptimizationTips(politeWords, taskType, tokens, originalText = '') {
     });
   }
 
-  tips.push({
-    kind: 'output_budget',
-    priority: 'medium',
-    title: 'Set an output budget',
-    description: 'Output tokens dominate the energy bill. Add "answer in ≤100 words" or "bullet points only" — it typically halves generated tokens.',
-    impact: 'Up to ~50% energy reduction',
-    savingsPercent: 50
-  });
+  if (budget) {
+    const unbudgeted = estimateOutputTokens(taskType.type, tokens).estimated;
+    const budgeted = estimateOutputTokens(taskType.type, tokens, budget).estimated;
+    const savedTokens = Math.max(0, unbudgeted - budgeted);
+    tips.push({
+      kind: 'output_budget_ok',
+      priority: 'low',
+      title: 'Output budget detected ✓',
+      description: `"${budget.phrase}" already caps the response length — output tokens dominate the energy bill, so this is the single best lever.`,
+      impact: savedTokens > 0 ? `Saving ~${savedTokens} output tokens vs a typical answer` : 'Keeps the response lean',
+      savingsPercent: unbudgeted > 0 ? Math.round((savedTokens / unbudgeted) * 100) : 0
+    });
+  } else {
+    tips.push({
+      kind: 'output_budget',
+      priority: 'medium',
+      title: 'Set an output budget',
+      description: 'Output tokens dominate the energy bill. Add "answer in ≤100 words" or "bullet points only" — it typically halves generated tokens.',
+      impact: 'Up to ~50% energy reduction',
+      savingsPercent: 50
+    });
+  }
 
   tips.push({
     kind: 'model',
@@ -390,8 +560,9 @@ function analyzePrompt(text) {
   const tokens = estimateTokens(text);
   const taskType = detectTaskType(text);
   const politeWords = detectPoliteWords(text);
-  const outputEstimate = estimateOutputTokens(taskType.type, tokens);
-  const tips = getOptimizationTips(politeWords, taskType, tokens, text);
+  const outputBudget = detectOutputBudget(text);
+  const outputEstimate = estimateOutputTokens(taskType.type, tokens, outputBudget);
+  const tips = getOptimizationTips(politeWords, taskType, tokens, text, outputBudget);
   return {
     originalText: text,
     tokens,
@@ -401,6 +572,7 @@ function analyzePrompt(text) {
     taskDescription: taskType.description,
     energyMultiplier: taskType.energyMultiplier,
     politeWords,
+    outputBudget,
     outputEstimate,
     tips,
     optimizedTokenEstimate: Math.max(1, tokens - politeWords.totalTokensSaved)
@@ -412,6 +584,8 @@ const AnalyzerModule = {
   detectTaskType,
   detectSpecialQueryType,
   detectPoliteWords,
+  detectOutputBudget,
+  maskProtectedSpans,
   estimateOutputTokens,
   getOptimizationTips,
   generateOptimizedPrompt,

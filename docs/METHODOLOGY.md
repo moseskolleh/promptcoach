@@ -187,7 +187,12 @@ in D–E):
 - **Cap the output, not just the prompt.** Response length is the dominant
   energy driver (Adamska et al. 2025, r ≈ 0.9); verbosity constraints save
   up to ~60% (Poddar et al. 2025; *Green Prompt Engineering*,
-  arXiv:2509.22320). Hence the "set an output budget" tip.
+  arXiv:2509.22320). Hence the "set an output budget" tip — and when the
+  analyzer detects an explicit budget already in the prompt ("in 50 words",
+  "one sentence", "bullet points only", "yes or no"), it caps the output
+  estimate accordingly (words × 4/3 tokens, ~25 tokens/sentence,
+  ~100/paragraph; brevity cues scale by 0.4–0.6×) and swaps the nag for an
+  acknowledgment, so following the advice visibly improves the grade.
 - **Right-size the model.** The measured spread between the most and least
   efficient model on the same task exceeds 65× (Jegham v6). Small models
   (Gemini Flash, GPT-4o mini, Haiku-class) handle summarization, translation

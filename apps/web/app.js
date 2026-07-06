@@ -349,7 +349,9 @@ function updateCoach() {
   // Default expected output from the analyzer, unless the user took over.
   const slider = $('output-slider');
   if (!state.outputTouched) {
-    state.outputTokens = clamp(analysis.outputEstimate.estimated, 100, 2000);
+    // Floor matches the slider min — low enough that an explicit output
+    // budget in the prompt ("in 50 words", "yes or no") visibly lowers it.
+    state.outputTokens = clamp(analysis.outputEstimate.estimated, 25, 2000);
     slider.value = state.outputTokens;
     $('output-slider-value').textContent = String(state.outputTokens);
     paintSlider(slider);
