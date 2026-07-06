@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumina — EcoPrompt Coach demo (Gemini-style)</title>
+  <!-- Tells the EcoPrompt extension which model this demo page simulates. -->
+  <meta name="ecoprompt-model" content="gemini-2.5-flash">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body class="skin-gemini" data-assistant-initial="L">
+  <header class="demo-topbar">
+    <span class="demo-brand">Lumina</span>
+    <span class="demo-model-tag">simulates: Gemini 2.5 Flash · gemini.google.com</span>
+    <span class="demo-spacer"></span>
+    <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
+    <a href="index.html">← demo home</a>
+  </header>
+
+  <div class="demo-shell">
+    <main class="demo-main">
+      <div class="demo-thread" data-demo-thread>
+        <div class="demo-thread-inner">
+          <div class="demo-greeting" data-demo-greeting>
+            <h1>Hello, tester</h1>
+            <p>This is a mock chat for testing the EcoPrompt Coach extension.
+               Type a prompt (or pick an example) and watch the eco-pill grade it
+               as you type. Replies are canned — nothing reaches a real model.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-composer-area">
+        <!-- Gemini-style DOM: plain textarea + aria-label send button -->
+        <div class="demo-composer-row">
+          <textarea class="demo-composer" rows="1" aria-label="Enter a prompt here"
+                    placeholder="Ask Lumina" data-demo-composer></textarea>
+          <button type="button" class="demo-send" aria-label="Send" data-demo-send>➤</button>
+        </div>
+        <p class="demo-disclaimer">Demo chat — responses are simulated locally. No AI model is called.</p>
+      </div>
+    </main>
+
+    <aside class="demo-drawer" data-demo-drawer>
+      <h2>Example prompts</h2>
+      <p class="demo-drawer-sub">Real-world prompts chosen to exercise each coaching feature. Click one, watch the pill, then send it.</p>
+    </aside>
+  </div>
+
+  <script src="examples.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>

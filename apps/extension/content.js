@@ -64,9 +64,18 @@
   }
 
   function resolveModel() {
-    const detected = Core.autoDetectModel(location.hostname);
+    // On hosts we don't recognize (the demo site, localhost), a page may hint
+    // which model it simulates via <meta name="ecoprompt-model" content="...">.
+    // Known chat hosts always win so real sites can't spoof it.
+    const detected = Core.autoDetectModel(location.hostname) || metaModelHint();
     const candidate = detected || settings.defaultModel || 'gpt-4o';
     modelId = engine.getModel(candidate) ? candidate : 'gpt-4o';
+  }
+
+  function metaModelHint() {
+    const meta = document.querySelector('meta[name="ecoprompt-model"]');
+    const hint = meta && meta.content && meta.content.trim();
+    return hint && engine.getModel(hint) ? hint : null;
   }
 
   function impactOptions(extra = {}) {
