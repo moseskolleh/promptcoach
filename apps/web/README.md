@@ -35,6 +35,14 @@ Any static host. Examples:
 Hero (live computed example facts) · Coach · Compare · Model explorer ·
 Library (localStorage, JSON import/export) · Methodology digest · Footer.
 
+Coach tips are **one-click actionable**: "Trim it for me", "Add ≤100 words",
+and "Switch to <greenest capable model>" apply the fix, report the measured
+energy delta (with Undo), and update the grade live. Example-prompt chips
+seed the textarea, **🔗 Copy link** produces a `#share?…` URL that reopens
+with the same prompt and settings, a sticky mini-grade follows you while
+scrolling, and the model explorer has search/provider/type filters plus
+per-card add-to-compare.
+
 ## Updating the engine or data
 
 `vendor/` is a synced copy of `packages/core` — never edit it directly:

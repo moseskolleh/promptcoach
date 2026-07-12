@@ -99,6 +99,7 @@
                 <span id="prompt-token-count">0 tokens</span>
                 <span id="prompt-task-type"></span>
               </div>
+              <div class="example-chips" id="example-chips" role="group" aria-label="Example prompts to try"></div>
             </div>
 
             <div class="field-row">
@@ -194,6 +195,7 @@
 
               <div class="coach-actions">
                 <button type="button" class="btn btn-secondary hidden" id="copy-trimmed-btn">✂️ Copy trimmed prompt</button>
+                <button type="button" class="btn btn-ghost" id="share-link-btn">🔗 Copy link</button>
                 <button type="button" class="btn btn-primary" id="save-library-btn">📚 Save to library</button>
               </div>
             </div>
@@ -251,7 +253,26 @@
           <h2 id="models-title">🗂️ Model explorer</h2>
           <p class="section-sub">Every model in our dataset, graded at a standard short query (100 in / 300 out tokens).</p>
         </header>
+        <div class="explorer-toolbar">
+          <div class="field explorer-search-field">
+            <label class="visually-hidden" for="explorer-search">Search models</label>
+            <input type="search" id="explorer-search" placeholder="Search models…">
+          </div>
+          <div class="field">
+            <label class="visually-hidden" for="explorer-provider">Filter by provider</label>
+            <select id="explorer-provider"><option value="">All providers</option></select>
+          </div>
+          <div class="field">
+            <label class="visually-hidden" for="explorer-kind">Filter by model type</label>
+            <select id="explorer-kind">
+              <option value="">All types</option>
+              <option value="standard">Standard</option>
+              <option value="reasoning">Reasoning</option>
+            </select>
+          </div>
+        </div>
         <div class="explorer-grid" id="explorer-grid"></div>
+        <p class="explorer-note hidden" id="explorer-no-match">No models match those filters.</p>
         <p class="explorer-note">Data sources: <strong>measured</strong> = benchmarked in Jegham et al. 2025 (v6);
           <strong>extrapolated</strong> = estimated from size class and measured siblings;
           <strong>anchored</strong> = calibrated against a provider-reported figure.</p>
@@ -401,6 +422,12 @@
       </div>
     </div>
   </div>
+
+  <!-- Sticky mini grade — follows you while scrolling with an active analysis -->
+  <button type="button" class="sticky-pill hidden" id="sticky-pill" aria-label="Jump back to your prompt's footprint">
+    <span class="sticky-grade" id="sticky-grade" data-grade="A">A</span>
+    <span class="sticky-text" id="sticky-text"></span>
+  </button>
 
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
