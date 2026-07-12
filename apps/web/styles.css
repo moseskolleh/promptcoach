@@ -939,10 +939,113 @@ input[type="range"]::-moz-range-thumb {
   max-width: min(90vw, 480px);
   text-align: center;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 
 /* ---------- Large screens ---------- */
 @media (min-width: 1800px) {
   :root { font-size: 18px; }
   .section-inner, .header-inner, .hero-inner, .footer-inner { max-width: 1400px; }
 }
+
+/* ---------- Example prompt chips (coach) ---------- */
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.example-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  padding: 0.3em 0.85em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.example-chip:hover { border-color: var(--primary); color: var(--primary); border-style: solid; }
+
+/* ---------- One-click tip actions ---------- */
+.tip-action {
+  margin-top: 0.45rem;
+  padding: 0.35em 0.9em;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+/* ---------- Sticky mini grade pill ---------- */
+.sticky-pill {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4em 1em 0.4em 0.4em;
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  animation: sticky-pill-in 0.25s ease;
+}
+.sticky-pill:hover { border-color: var(--primary); }
+@keyframes sticky-pill-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sticky-grade {
+  display: grid;
+  place-items: center;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+}
+.sticky-grade[data-grade="A"] { background: var(--grade-a); }
+.sticky-grade[data-grade="B"] { background: var(--grade-b); }
+.sticky-grade[data-grade="C"] { background: var(--grade-c); }
+.sticky-grade[data-grade="D"] { background: var(--grade-d); }
+.sticky-grade[data-grade="E"] { background: var(--grade-e); }
+
+/* ---------- Explorer toolbar + compare buttons ---------- */
+.explorer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.explorer-toolbar .field { margin: 0; }
+.explorer-search-field { flex: 1 1 220px; }
+.explorer-toolbar input[type="search"],
+.explorer-toolbar select { width: 100%; }
+.explorer-compare-btn { margin-top: 0.75rem; align-self: flex-start; }
+.explorer-compare-btn[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* ---------- Toast action button ---------- */
+.toast-action {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-left: 0.9em;
+  padding: 0.2em 0.9em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+}
+.toast-action:hover { filter: brightness(1.1); }

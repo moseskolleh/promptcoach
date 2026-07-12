@@ -128,8 +128,34 @@ const state = {
   librarySearch: '',
   librarySort: 'date-desc',
 
+  // Explorer filters
+  explorerSearch: '',
+  explorerProvider: '',
+  explorerKind: '',
+
+  coachInView: true,
   demoTimer: null
 };
+
+/* Example prompts — one per coaching feature, so the first click teaches. */
+const EXAMPLE_PROMPTS = [
+  {
+    label: '🙏 Over-polite email',
+    text: 'Hi! I was wondering if you could please help me write a short email to my landlord about a broken heater? Thank you so much in advance for your help!'
+  },
+  {
+    label: '📋 Budgeted summary',
+    text: 'Summarize the key findings of the attached report. Answer in 100 words or less, bullet points only.'
+  },
+  {
+    label: '🌦️ Weather question',
+    text: "What's the weather forecast for Amsterdam tomorrow?"
+  },
+  {
+    label: '🔬 Deep research',
+    text: 'Do deep research across multiple sources on the environmental impact of data centers and compile a report.'
+  }
+];
 
 /* ============================ 4. Data loading ============================ */
 
@@ -305,6 +331,102 @@ function setSegmentWidths(impact) {
   );
 }
 
+/**
+ * Change the prompt text as a one-click coach action, report the measured
+ * energy delta in a toast, and offer Undo.
+ */
+function applyPromptChange(newText, toastPrefix) {
+  const prevText = $('prompt-input').value;
+  const beforeWh = state.impact ? state.impact.energy.wh : null;
+  const beforeGrade = state.impact ? state.impact.grade.grade : null;
+
+  $('prompt-input').value = newText;
+  state.outputTouched = false; // let the analyzer re-estimate the output
+  updateCoach();
+
+  let msg = toastPrefix;
+  if (beforeWh && state.impact && state.impact.energy.wh < beforeWh) {
+    const pct = Math.round((1 - state.impact.energy.wh / beforeWh) * 100);
+    if (pct > 0) msg += ` — ${pct}% less energy`;
+    if (beforeGrade && state.impact.grade.grade !== beforeGrade) {
+      msg += ` (${beforeGrade} → ${state.impact.grade.grade})`;
+    }
+  }
+  showToast(msg, {
+    label: 'Undo',
+    onClick: () => {
+      $('prompt-input').value = prevText;
+      state.outputTouched = false;
+      updateCoach();
+      showToast('Original prompt restored');
+    }
+  });
+}
+
+function switchModelAction(bestModel, savingsPct) {
+  state.modelId = bestModel.id;
+  $('model-select').value = bestModel.id;
+  syncReasoningControl();
+  updateCoach();
+  showToast(`🔁 Switched to ${bestModel.name} — ~${savingsPct}% less energy on this prompt`);
+}
+
+/**
+ * Map a coach tip to a one-click action button, or null when the tip is
+ * informational only.
+ */
+function tipAction(tip, analysis) {
+  if (tip.kind === 'polite_words') {
+    return {
+      label: '✂️ Trim it for me',
+      onClick: () => applyPromptChange(
+        EcoPromptCore.generateOptimizedPrompt($('prompt-input').value),
+        '✂️ Courtesy phrases trimmed'
+      )
+    };
+  }
+  if (tip.kind === 'output_budget') {
+    return {
+      label: '➕ Add "≤100 words"',
+      onClick: () => {
+        const text = $('prompt-input').value.trim();
+        const sep = /[.!?]$/.test(text) ? ' ' : '. ';
+        applyPromptChange(`${text}${sep}Answer in ≤100 words.`, '📏 Output budget added');
+      }
+    };
+  }
+  if (tip.kind === 'model') {
+    // Offer a switch only when a meaningfully greener model exists. Nano-class
+    // models are excluded — "switch to a 1B model" isn't credible advice for
+    // general tasks; Small (Haiku/mini/Flash class) is the floor the tip text
+    // itself recommends.
+    const candidates = state.engine.listModels()
+      .filter((m) => m.sizeClass !== 'Nano' && !m.isReasoning)
+      .map((m) => m.id);
+    if (!candidates.includes(state.modelId)) candidates.push(state.modelId);
+    const cmp = state.engine.compareModels({
+      modelIds: candidates,
+      inputTokens: analysis.tokens,
+      outputTokens: state.outputTokens,
+      options: {
+        taskMultiplier: analysis.energyMultiplier,
+        reasoningEffort: state.reasoningEffort,
+        regionKey: state.regionKey === 'default' ? undefined : state.regionKey
+      }
+    });
+    const best = cmp.best;
+    const current = cmp.results.find((r) => r.model.id === state.modelId);
+    if (!best || !current || best.model.id === state.modelId) return null;
+    const pct = Math.round((1 - best.energy.wh / current.energy.wh) * 100);
+    if (pct < 15) return null;
+    return {
+      label: `🔁 Switch to ${best.model.name} (−${pct}%)`,
+      onClick: () => switchModelAction(best.model, pct)
+    };
+  }
+  return null;
+}
+
 function renderTips(analysis) {
   const list = $('tips-list');
   clearChildren(list);
@@ -318,6 +440,13 @@ function renderTips(analysis) {
     body.appendChild(title);
     body.appendChild(el('p', 'tip-desc', tip.description));
     if (tip.impact) body.appendChild(el('p', 'tip-impact', `→ ${tip.impact}`));
+    const action = tipAction(tip, analysis);
+    if (action) {
+      const btn = el('button', 'btn btn-secondary tip-action', action.label);
+      btn.type = 'button';
+      btn.addEventListener('click', action.onClick);
+      body.appendChild(btn);
+    }
     item.appendChild(body);
     list.appendChild(item);
   }
@@ -338,6 +467,7 @@ function updateCoach() {
     bodyEl.classList.add('hidden');
     $('prompt-token-count').textContent = '0 tokens';
     $('prompt-task-type').textContent = '';
+    updateStickyPill();
     return;
   }
 
@@ -405,6 +535,7 @@ function updateCoach() {
 
   setSegmentWidths(impact);
   renderTips(analysis);
+  updateStickyPill();
 
   // Copy-trimmed button only when courtesy phrases were found.
   $('copy-trimmed-btn').classList.toggle(
@@ -426,6 +557,90 @@ function updateCoach() {
 }
 
 const updateCoachDebounced = debounce(updateCoach, 220);
+
+/* --- Sticky mini grade: visible while an analysis exists and the coach
+       section is scrolled out of view; clicking jumps back. --- */
+
+function updateStickyPill() {
+  const pill = $('sticky-pill');
+  if (!state.impact) {
+    pill.classList.add('hidden');
+    return;
+  }
+  const grade = $('sticky-grade');
+  grade.textContent = state.impact.grade.grade;
+  grade.dataset.grade = state.impact.grade.grade;
+  $('sticky-text').textContent = state.conv.energy(state.impact.energy.wh).primary;
+  pill.classList.toggle('hidden', state.coachInView);
+}
+
+function initStickyPill() {
+  $('sticky-pill').addEventListener('click', () => {
+    $('coach').scrollIntoView({ behavior: 'smooth' });
+    $('prompt-input').focus({ preventScroll: true });
+  });
+  if (!('IntersectionObserver' in window)) return;
+  const observer = new IntersectionObserver((entries) => {
+    state.coachInView = entries[0].isIntersecting;
+    updateStickyPill();
+  }, { rootMargin: '-64px 0px 0px 0px' });
+  observer.observe($('coach'));
+}
+
+/* --- Example chips: a first click that teaches --- */
+
+function initExampleChips() {
+  const wrap = $('example-chips');
+  clearChildren(wrap);
+  for (const ex of EXAMPLE_PROMPTS) {
+    const chip = el('button', 'example-chip', ex.label);
+    chip.type = 'button';
+    chip.title = ex.text;
+    chip.addEventListener('click', () => {
+      $('prompt-input').value = ex.text;
+      state.outputTouched = false;
+      updateCoach();
+      $('prompt-input').focus();
+    });
+    wrap.appendChild(chip);
+  }
+}
+
+/* --- Share links: #share?p=…&m=… round-trips prompt + settings --- */
+
+function buildShareLink() {
+  const text = $('prompt-input').value.trim();
+  const params = new URLSearchParams();
+  params.set('p', text.slice(0, 6000));
+  params.set('m', state.modelId);
+  if (state.regionKey !== 'default') params.set('r', state.regionKey);
+  if (state.reasoningEffort !== 'standard') params.set('e', state.reasoningEffort);
+  return `${location.origin}${location.pathname}#share?${params.toString()}`;
+}
+
+function applySharedLink() {
+  if (!location.hash.startsWith('#share?')) return false;
+  const params = new URLSearchParams(location.hash.slice('#share?'.length));
+  const p = params.get('p');
+  if (!p) return false;
+  $('prompt-input').value = p;
+  const m = params.get('m');
+  if (m && state.engine.getModel(m)) {
+    state.modelId = m;
+    $('model-select').value = m;
+  }
+  const r = params.get('r');
+  if (r && state.engine.getRegionCif(r) !== null) {
+    state.regionKey = r;
+    $('region-select').value = r;
+  }
+  const e = params.get('e');
+  if (e === 'low' || e === 'high') state.reasoningEffort = e;
+  syncReasoningControl();
+  updateCoach();
+  requestAnimationFrame(() => $('coach').scrollIntoView());
+  return true;
+}
 
 function initCoach() {
   populateModelSelect();
@@ -471,6 +686,20 @@ function initCoach() {
     showToast(ok ? `✂️ Trimmed prompt copied — ~${saved} tokens lighter` : 'Copy failed — clipboard unavailable');
   });
 
+  $('share-link-btn').addEventListener('click', async () => {
+    if (!$('prompt-input').value.trim()) {
+      showToast('Type a prompt first, then share it');
+      return;
+    }
+    const ok = await copyToClipboard(buildShareLink());
+    showToast(ok
+      ? '🔗 Link copied — it opens with this prompt and settings'
+      : 'Copy failed — clipboard unavailable');
+  });
+
+  initExampleChips();
+  initStickyPill();
+
   $('save-library-btn').addEventListener('click', () => {
     if (!state.analysis || !state.impact) {
       showToast('Type a prompt first, then save it');
@@ -515,31 +744,50 @@ function syncCompareSliders() {
   paintSlider(outSlider);
 }
 
+/**
+ * Toggle a model in/out of the compare set (shared by the Compare chips and
+ * the explorer's per-card buttons). Returns true when the set changed.
+ */
+function toggleCompareModel(modelId) {
+  const i = state.compareIds.indexOf(modelId);
+  if (i >= 0) {
+    if (state.compareIds.length <= 2) {
+      showToast('Keep at least 2 models to compare');
+      return false;
+    }
+    state.compareIds.splice(i, 1);
+  } else {
+    if (state.compareIds.length >= 4) {
+      showToast('Pick at most 4 models — remove one first');
+      return false;
+    }
+    state.compareIds.push(modelId);
+  }
+  syncCompareChipStates();
+  renderCompare();
+  return true;
+}
+
+function syncCompareChipStates() {
+  $('compare-chips').querySelectorAll('.chip').forEach((chip) => {
+    chip.setAttribute('aria-pressed', String(state.compareIds.includes(chip.dataset.modelId)));
+  });
+  document.querySelectorAll('.explorer-compare-btn').forEach((btn) => {
+    const active = state.compareIds.includes(btn.dataset.modelId);
+    btn.setAttribute('aria-pressed', String(active));
+    btn.textContent = active ? '✓ In compare' : '⚖️ Compare';
+  });
+}
+
 function renderCompareChips() {
   const wrap = $('compare-chips');
   clearChildren(wrap);
   for (const m of state.engine.listModels()) {
     const chip = el('button', 'chip', m.name);
     chip.type = 'button';
+    chip.dataset.modelId = m.id;
     chip.setAttribute('aria-pressed', String(state.compareIds.includes(m.id)));
-    chip.addEventListener('click', () => {
-      const i = state.compareIds.indexOf(m.id);
-      if (i >= 0) {
-        if (state.compareIds.length <= 2) {
-          showToast('Keep at least 2 models to compare');
-          return;
-        }
-        state.compareIds.splice(i, 1);
-      } else {
-        if (state.compareIds.length >= 4) {
-          showToast('Pick at most 4 models — remove one first');
-          return;
-        }
-        state.compareIds.push(m.id);
-      }
-      chip.setAttribute('aria-pressed', String(state.compareIds.includes(m.id)));
-      renderCompare();
-    });
+    chip.addEventListener('click', () => toggleCompareModel(m.id));
     wrap.appendChild(chip);
   }
 }
@@ -759,14 +1007,49 @@ function initCompare() {
 
 /* ============================ 8. Model explorer ============================ */
 
+function explorerMatches(meta) {
+  const q = state.explorerSearch.trim().toLowerCase();
+  if (q && !`${meta.name} ${meta.provider} ${meta.host}`.toLowerCase().includes(q)) return false;
+  if (state.explorerProvider && meta.provider !== state.explorerProvider) return false;
+  if (state.explorerKind === 'reasoning' && !meta.isReasoning) return false;
+  if (state.explorerKind === 'standard' && meta.isReasoning) return false;
+  return true;
+}
+
+function initExplorerToolbar() {
+  const providerSelect = $('explorer-provider');
+  const providers = [...new Set(state.engine.listModels().map((m) => m.provider))].sort();
+  for (const p of providers) {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    providerSelect.appendChild(opt);
+  }
+  $('explorer-search').addEventListener('input', debounce((e) => {
+    state.explorerSearch = e.target.value;
+    renderExplorer();
+  }, 120));
+  providerSelect.addEventListener('change', (e) => {
+    state.explorerProvider = e.target.value;
+    renderExplorer();
+  });
+  $('explorer-kind').addEventListener('change', (e) => {
+    state.explorerKind = e.target.value;
+    renderExplorer();
+  });
+}
+
 function renderExplorer() {
   const grid = $('explorer-grid');
   clearChildren(grid);
 
   const models = state.engine.listModels()
+    .filter(explorerMatches)
     .map((m) => ({ meta: m, short: shortQueryImpact(m.id) }))
     .filter((x) => x.short)
     .sort((a, b) => a.short.energy.wh - b.short.energy.wh);
+
+  $('explorer-no-match').classList.toggle('hidden', models.length > 0);
 
   for (const { meta, short } of models) {
     const long = state.engine.estimateImpact({
@@ -815,6 +1098,23 @@ function renderExplorer() {
       chips.appendChild(ac);
     }
     card.appendChild(chips);
+
+    const inCompare = state.compareIds.includes(meta.id);
+    const cmpBtn = el('button', 'icon-btn explorer-compare-btn',
+      inCompare ? '✓ In compare' : '⚖️ Compare');
+    cmpBtn.type = 'button';
+    cmpBtn.dataset.modelId = meta.id;
+    cmpBtn.setAttribute('aria-pressed', String(inCompare));
+    cmpBtn.addEventListener('click', () => {
+      const changed = toggleCompareModel(meta.id);
+      if (changed && state.compareIds.includes(meta.id)) {
+        showToast(`⚖️ ${meta.name} added to Compare`, {
+          label: 'View',
+          onClick: () => $('compare').scrollIntoView({ behavior: 'smooth' })
+        });
+      }
+    });
+    card.appendChild(cmpBtn);
 
     grid.appendChild(card);
   }
@@ -1026,12 +1326,22 @@ function initLibrary() {
 /* ============================ 10. Modal + toast ============================ */
 
 let toastTimer = null;
-function showToast(message) {
+function showToast(message, action) {
   const toast = $('toast');
-  toast.textContent = message;
+  clearChildren(toast);
+  toast.appendChild(document.createTextNode(message));
+  if (action) {
+    const btn = el('button', 'toast-action', action.label);
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      toast.classList.remove('show');
+      action.onClick();
+    });
+    toast.appendChild(btn);
+  }
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), action ? 5200 : 2800);
 }
 
 function openSaveModal() {
@@ -1106,9 +1416,10 @@ async function boot() {
   initDemoStrip();
   initCoach();
   initCompare();
+  initExplorerToolbar();
   renderExplorer();
   initLibrary();
-  updateCoach();
+  if (!applySharedLink()) updateCoach();
 }
 
 function init() {
