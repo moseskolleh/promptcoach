@@ -120,7 +120,9 @@ function matchesKeyword(lowerText, keyword) {
 }
 
 function detectTaskType(text) {
-  const lowerText = text.toLowerCase();
+  // Task keywords in quoted payload or code fences aren't the user's intent —
+  // 'translate "summarize" to French' is TRANSLATION, not SUMMARIZATION.
+  const lowerText = maskProtectedSpans(text).toLowerCase();
   let detected = 'GENERAL';
   let maxScore = 0;
   for (const [type, config] of Object.entries(TASK_TYPES)) {
@@ -271,9 +273,20 @@ function detectOutputBudget(text) {
 function detectSpecialQueryType(text) {
   const lowerText = text.toLowerCase();
 
+  // Every trigger below must express a locational/temporal INTENT — not just
+  // name a thing that could appear in a location. Single words like
+  // "restaurant" or "nearest" fired on prompts like "explain the nearest
+  // neighbor algorithm" or "my closest friend moved abroad", so those weak
+  // triggers now require an accompanying action verb.
   const groups = [
     {
-      keywords: ['restaurant', 'cafe', 'near me', 'directions to', 'how to get to', 'where is', 'closest', 'nearest', 'parking', 'hotel', 'open now'],
+      keywords: [
+        'near me', 'directions to', 'how to get to', 'where is', 'open now',
+        'find a restaurant', 'find a cafe', 'find a hotel', 'nearest restaurant',
+        'nearest cafe', 'nearest hotel', 'nearest gas station', 'closest restaurant',
+        'closest cafe', 'closest hotel', 'best restaurant', 'best cafe',
+        'parking near', 'parking at', 'restaurant in', 'hotel in', 'cafe in'
+      ],
       result: {
         type: 'location',
         title: 'Use a maps app instead',
@@ -283,7 +296,7 @@ function detectSpecialQueryType(text) {
       }
     },
     {
-      keywords: ['weather', 'forecast', 'temperature today', 'rain tomorrow'],
+      keywords: ["what's the weather", 'weather forecast', 'weather in', 'weather today', 'weather tomorrow', 'forecast for', 'temperature today', 'rain tomorrow', 'will it rain'],
       result: {
         type: 'weather',
         title: 'Use a weather app',
@@ -293,7 +306,9 @@ function detectSpecialQueryType(text) {
       }
     },
     {
-      keywords: ['what time', 'current time', 'time in', 'what date', "today's date"],
+      // Requires "now" / "current" / "today" framing — bare "what time" fired
+      // on legitimate questions like "what time zone is Paris in?".
+      keywords: ['what time is it', 'current time', 'time right now', "today's date", "what's the date", 'what date is it'],
       result: {
         type: 'time',
         title: 'Check your device clock',
@@ -358,7 +373,10 @@ const POLITE_PHRASES = [
 
 function detectPoliteWords(text) {
   // Quoted text and code are payload — courtesy words inside them don't count.
-  const scannable = maskProtectedSpans(text);
+  // Compound phrases are ordered first in POLITE_PHRASES; we blank out each
+  // match before running later patterns so 'Thanks in advance!' isn't counted
+  // as both 'thanks in advance' (4 tokens) AND 'thanks' (1 token).
+  let scannable = maskProtectedSpans(text);
   const found = [];
   let totalTokensSaved = 0;
   for (const phrase of POLITE_PHRASES) {
@@ -371,6 +389,7 @@ function detectPoliteWords(text) {
         example: matches[0]
       });
       totalTokensSaved += phrase.tokens * matches.length;
+      scannable = scannable.replace(phrase.pattern, (m) => ' '.repeat(m.length));
     }
   }
   return { found, totalTokensSaved };
