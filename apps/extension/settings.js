@@ -4,13 +4,7 @@
 
 'use strict';
 
-const DEFAULT_SETTINGS = {
-  defaultModel: 'gpt-4o',
-  regionKey: 'default',
-  reasoningEffort: 'standard',
-  showPill: true,
-  includeEmbodied: true
-};
+const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
 const $ = (id) => document.getElementById(id);
 

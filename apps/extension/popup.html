@@ -189,7 +189,11 @@
           </div>
         </div>
 
-        <button class="btn btn-danger-outline" id="reset-btn">Reset data</button>
+        <div class="impact-actions">
+          <button class="btn btn-secondary" id="export-csv-btn" title="Download every recorded query as a spreadsheet">Export CSV</button>
+          <button class="btn btn-secondary" id="export-json-btn" title="Download every recorded query as JSON">Export JSON</button>
+          <button class="btn btn-danger-outline" id="reset-btn">Reset data</button>
+        </div>
       </div>
     </section>
   </main>
@@ -202,7 +206,8 @@
        target="_blank" rel="noopener">Methodology</a>
   </footer>
 
-  <!-- Vendored core (attaches to window.EcoPromptCore) -->
+  <!-- Shared defaults + vendored core (attaches to window.EcoPromptCore) -->
+  <script src="shared/defaults.js"></script>
   <script src="vendor/calculator.js"></script>
   <script src="vendor/analyzer.js"></script>
   <script src="vendor/conversions.js"></script>

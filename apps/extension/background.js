@@ -8,8 +8,14 @@
 // vendor/calculator.js attaches the engine to globalThis.EcoPromptCore, so
 // the badge uses the exact same grade bands as the popup and the pill — it
 // can never drift when the bands are recalibrated in core.
+//
+// This worker and the imported script share ONE global scope, so nothing
+// here may redeclare a top-level name from calculator.js. A previous
+// `const { GRADE_BANDS } = …` collided with core's own GRADE_BANDS, threw
+// "Identifier has already been declared" during importScripts, and aborted
+// the worker on every startup — the badge never rendered.
 importScripts('vendor/calculator.js');
-const { GRADE_BANDS } = globalThis.EcoPromptCore;
+const Core = globalThis.EcoPromptCore;
 
 const GRADE_COLORS = {
   A: '#10B981',
@@ -20,7 +26,7 @@ const GRADE_COLORS = {
 };
 
 function gradeForWh(wh) {
-  return GRADE_BANDS.find((b) => wh <= b.maxWh).grade;
+  return Core.GRADE_BANDS.find((b) => wh <= b.maxWh).grade;
 }
 
 function startOfToday() {

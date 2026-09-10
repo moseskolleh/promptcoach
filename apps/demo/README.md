@@ -20,10 +20,14 @@ positioning are exercised the same way they are on the real sites. Replies
 are canned and streamed word-by-word locally; the canned answers also respect
 output budgets ("in 50 words" gets a short reply) so the coaching feels real.
 
-Each page carries a `<meta name="ecoprompt-model" content="...">` hint. On
-hostnames the extension doesn't recognize (localhost, GitHub Pages) it uses
-this hint to pick the simulated model; on real chat hosts the hostname always
-wins, so pages can't spoof it.
+Each page carries a `<meta name="ecoprompt-family" content="...">` hint
+naming the provider it mimics, and a **model switcher** in its header (cycle
+it to see the pill re-estimate: "ChatGPT 5" → "ChatGPT 5 Thinking" is ~30×).
+The extension reads the switcher's label exactly as it does on the real
+sites. A `<meta name="ecoprompt-model">` hint remains as the fallback on
+hostnames the extension doesn't recognize (localhost, GitHub Pages); on real
+chat hosts the hostname default always applies when no switcher is found, so
+pages can't spoof it.
 
 ## Run it
 

@@ -233,3 +233,132 @@ test('all auto-detect targets exist in the model catalog', () => {
     assert.ok(ids.has(id), `missing model: ${id}`);
   }
 });
+
+test('every model reproduces its own benchmark points (non-negative least squares)', () => {
+  for (const { id } of engine.listModels()) {
+    const m = engine.getModel(id);
+    const { eIn, eOut, eFixed } = m.coefficients;
+    for (const b of m.bench) {
+      const predicted = eFixed + eIn * b.input_tokens + eOut * b.output_tokens;
+      const err = Math.abs(predicted - b.energy_wh_mean) / b.energy_wh_mean;
+      assert.ok(err < 0.05, `${id} ${b.input_tokens}/${b.output_tokens}: fit off by ${(err * 100).toFixed(1)}%`);
+    }
+  }
+});
+
+test('relatable labels never show fractional sub-unit counts', () => {
+  const awkward = /^0(?:\.\d+)?\s|\b0\.\d+ /;
+  for (const { id } of engine.listModels()) {
+    for (const [inputTokens, outputTokens] of [[100, 300], [1000, 1000], [10000, 1500]]) {
+      const rel = converters.forImpact(engine.estimateImpact({ modelId: id, inputTokens, outputTokens }));
+      for (const dim of ['energy', 'water', 'carbon']) {
+        assert.ok(!awkward.test(rel[dim].primary), `${id} ${dim}: ${rel[dim].primary}`);
+      }
+    }
+  }
+  for (const v of [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000]) {
+    for (const fn of ['energy', 'water', 'carbon']) {
+      assert.ok(!awkward.test(converters[fn](v).primary), `${fn}(${v}): ${converters[fn](v).primary}`);
+    }
+  }
+  assert.strictEqual(converters.water(0.02).primary, 'less than a drop of water');
+});
+
+test('extrapolation is flagged per axis and the confidence band widens', () => {
+  const inRange = engine.estimateImpact({ modelId: 'gpt-4o', inputTokens: 100, outputTokens: 300 });
+  const longOut = engine.estimateImpact({ modelId: 'gpt-4o', inputTokens: 0, outputTokens: 8000 });
+  const longIn = engine.estimateImpact({ modelId: 'gpt-4o', inputTokens: 11000, outputTokens: 500 });
+  assert.strictEqual(inRange.energy.extrapolated, false);
+  assert.strictEqual(longOut.energy.extrapolated, true);
+  assert.strictEqual(longIn.energy.extrapolated, true);
+  const band = (i) => (i.energy.confidence.maxWh - i.energy.wh) / i.energy.wh;
+  assert.ok(Math.abs(band(longOut) - 2 * band(inRange)) < 1e-9);
+});
+
+test('compareModels never rounds a real saving up to 100%, and [] means no models', () => {
+  const all = engine.compareModels({ inputTokens: 100, outputTokens: 300 });
+  assert.ok(all.potentialSavings.percentage <= 99);
+  assert.ok(all.potentialSavings.ratio > 0.99);
+  assert.strictEqual(engine.compareModels({ modelIds: [], inputTokens: 100, outputTokens: 300 }).results.length, 0);
+  assert.strictEqual(engine.compareModels({ modelIds: ['gpt-4o', 'gpt-4o'], inputTokens: 100, outputTokens: 300 }).results.length, 1);
+});
+
+test('engine inputs are coerced safely', () => {
+  const inf = engine.estimateImpact({ modelId: 'o4-mini', inputTokens: Infinity, outputTokens: 1 });
+  assert.ok(Number.isFinite(inf.energy.wh));
+  assert.strictEqual(engine.gradeFor(NaN).grade, 'A');
+  assert.strictEqual(engine.gradeFor('abc').grade, 'A');
+  const zero = engine.estimateImpact({ modelId: 'gpt-4o', inputTokens: 100, outputTokens: 300, options: { taskMultiplier: 0 } });
+  const neg = engine.estimateImpact({ modelId: 'gpt-4o', inputTokens: 100, outputTokens: 300, options: { taskMultiplier: -2 } });
+  assert.strictEqual(zero.factors.taskMultiplier, 1);
+  assert.strictEqual(neg.factors.taskMultiplier, 1);
+  const ultra = engine.estimateImpact({ modelId: 'deepseek-r1', inputTokens: 100, outputTokens: 300, options: { reasoningEffort: 'ultra' } });
+  assert.strictEqual(ultra.factors.reasoningEffort, 'standard');
+  const high = engine.estimateImpact({ modelId: 'deepseek-r1', inputTokens: 100, outputTokens: 300, options: { reasoningEffort: 'high' } });
+  assert.ok(high.energy.perTokenOutMwh > ultra.energy.perTokenOutMwh * 2);
+  assert.deepStrictEqual(engine.aggregate(null), { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 });
+  const mixed = engine.aggregate([{ energy: {}, water: {}, carbon: {} }, { energy: { wh: '2' } }, null, { energyWh: 1, waterMl: 2, carbonG: 3 }]);
+  assert.deepStrictEqual(mixed, { queries: 3, energyWh: 3, waterMl: 2, carbonG: 3 });
+});
+
+test('a model whose host has no grid entry is rejected at construction', () => {
+  const models = { models: [{ model_id: 'x', name: 'X', provider: 'P', host: 'Nowhere Cloud', performance: {
+    short: { input_tokens: 100, output_tokens: 300, energy_wh_mean: 1 },
+    medium: { input_tokens: 1000, output_tokens: 1000, energy_wh_mean: 2 },
+    long: { input_tokens: 10000, output_tokens: 1500, energy_wh_mean: 3 } } }] };
+  assert.throws(() => new core.ImpactEngine({ models, grids: core.data.grids }), /nowhere_cloud/);
+});
+
+test('autoDetectModel matches domains and subdomains, never substrings', () => {
+  assert.strictEqual(core.autoDetectModel('www.perplexity.ai'), 'gpt-4o-mini');
+  assert.strictEqual(core.autoDetectModel('CHATGPT.COM'), 'gpt-5');
+  assert.strictEqual(core.autoDetectModel('notclaude.ai'), null);
+  assert.strictEqual(core.autoDetectModel('claude.ai.evil.example'), null);
+  assert.strictEqual(core.autoDetectModel(undefined), null);
+});
+
+test('detectModelFromLabels maps model-picker text to catalog ids per provider', () => {
+  const d = (host, labels, opts) => (core.detectModelFromLabels(host, labels, opts) || {}).modelId || null;
+  // OpenAI
+  assert.strictEqual(d('chatgpt.com', ['ChatGPT 5 Thinking']), 'gpt-5-thinking');
+  assert.strictEqual(d('chatgpt.com', ['Model selector, current model is GPT-5']), 'gpt-5');
+  assert.strictEqual(d('chatgpt.com', ['ChatGPT 5']), 'gpt-5');
+  assert.strictEqual(d('chatgpt.com', ['GPT-4o mini']), 'gpt-4o-mini');
+  assert.strictEqual(d('chatgpt.com', ['GPT-4o']), 'gpt-4o');
+  assert.strictEqual(d('chatgpt.com', ['o4-mini']), 'o4-mini');
+  assert.strictEqual(d('chatgpt.com', ['o3']), 'o3');
+  assert.strictEqual(d('chatgpt.com', ['Think longer']), 'gpt-5-thinking');
+  // Anthropic
+  assert.strictEqual(d('claude.ai', ['Sonnet 4.5']), 'claude-4.5-sonnet');
+  assert.strictEqual(d('claude.ai', ['Haiku 4.5']), 'claude-4.5-haiku');
+  assert.strictEqual(d('claude.ai', ['Claude 3.7 Sonnet']), 'claude-3.7-sonnet');
+  assert.strictEqual(d('claude.ai', ['Opus 4.1']), null, 'models outside the catalog are not guessed');
+  // Google
+  assert.strictEqual(d('gemini.google.com', ['2.5 Flash']), 'gemini-2.5-flash');
+  assert.strictEqual(d('gemini.google.com', ['2.5 Pro']), 'gemini-2.5-pro');
+  assert.strictEqual(d('gemini.google.com', ['2.0 Flash']), 'gemini-2.0-flash');
+  // DeepSeek: the DeepThink toggle only counts when it is on.
+  assert.strictEqual(d('chat.deepseek.com', [{ text: 'DeepThink (R1)', active: false }]), null);
+  assert.strictEqual(d('chat.deepseek.com', [{ text: 'DeepThink (R1)', active: true }]), 'deepseek-r1');
+  // Unknown host: nothing unless a family is given (demo pages do this).
+  assert.strictEqual(d('localhost', ['ChatGPT 5 Thinking']), null);
+  assert.strictEqual(d('localhost', ['ChatGPT 5 Thinking'], { family: 'openai' }), 'gpt-5-thinking');
+  // Noise is ignored: long strings, empty strings, wrong family.
+  assert.strictEqual(d('chatgpt.com', ['', 'x'.repeat(200) + ' Thinking']), null);
+  assert.strictEqual(d('claude.ai', ['ChatGPT 5 Thinking']), null);
+  // Every id the detector can return exists in the catalog.
+  const ids = new Set(engine.listModels().map((m) => m.id));
+  for (const [host, labels] of [
+    ['chatgpt.com', ['o4-mini', 'o3', 'Thinking', '4.1 nano', '4o mini', '4o', 'GPT-5']],
+    ['claude.ai', ['Haiku', '3.7', 'Sonnet']],
+    ['gemini.google.com', ['2.0 Flash', 'Flash', 'Pro']],
+    ['chat.mistral.ai', ['Small', 'Large']],
+    ['chat.deepseek.com', [{ text: 'DeepThink', active: true }, 'V3']],
+    ['grok.com', ['Grok 3']]
+  ]) {
+    for (const label of labels) {
+      const id = d(host, [label]);
+      assert.ok(id && ids.has(id), `${host} "${typeof label === 'string' ? label : label.text}" -> ${id}`);
+    }
+  }
+});

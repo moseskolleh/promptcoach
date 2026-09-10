@@ -9,7 +9,7 @@
 │                  zero-AI alternatives, coaching tips        │
 │  conversions.js  relatable everyday equivalents             │
 │  data/           models.json · grids.json · equivalents.json│
-│  test/           node --test (13 tests)                     │
+│  test/           node --test (engine + analyzer)            │
 └──────────────┬───────────────┬───────────────┬──────────────┘
                │ vendored copy │ vendored copy │ npm workspace
                ▼               ▼               ▼
@@ -31,7 +31,16 @@
    `window.EcoPromptCore` in browsers and export CommonJS in Node. This
    keeps the extension reviewable (Chrome Web Store likes that), makes the
    web app deployable to any static host, and keeps contributor friction
-   near zero.
+   near zero. Hand-written typings (`packages/core/src/index.d.ts`) let
+   TypeScript consumers — the mobile app, or anyone embedding the engine —
+   use it without a build step on our side.
+
+   The browser apps have no unit tests of their own, so
+   `scripts/check-apps.js` (part of `npm test` and the CI workflow) parses
+   every script and JSON file, checks that the extension manifest and every
+   HTML page reference files that exist, and cross-checks every element id a
+   page's script looks up against the ids the page defines — the class of
+   bug plain scripts wired to HTML actually ship.
 
 3. **Data as citable benchmark points, math in code.** `models.json` stores
    the three published benchmark measurements per model — numbers you can
@@ -51,13 +60,14 @@
 ## Data flow (extension)
 
 1. `content.js` watches the chat input on supported sites, estimates tokens
-   as you type, auto-detects the model from the hostname, and renders the
-   eco-grade pill.
+   as you type, detects the model from the page's model switcher (labels are
+   mapped to catalog ids by `detectModelFromLabels` in core; the hostname
+   default is the fallback), and renders the eco-grade pill.
 2. On send, it appends `{ts, host, modelId, energyWh, waterMl, carbonG,
    grade}` to `eco_history` (capped at 5000 entries).
 3. `background.js` updates the action badge from today's history.
-4. `popup.js` reads the same history for the Impact tab and runs the full
-   coach/compare flows on demand.
+4. `popup.js` reads the same history for the Impact tab (with CSV/JSON
+   export) and runs the full coach/compare flows on demand.
 
 ## Startup roadmap (product view)
 

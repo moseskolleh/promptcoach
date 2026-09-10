@@ -15,7 +15,8 @@
     "notes": {
       "data_source_field": "measured = benchmarked in Jegham et al.; extrapolated = estimated from size class, hardware, and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
       "benchmark_configurations": "short = 100 in / 300 out, medium = 1000 in / 1000 out, long = 10000 in / 1500 out tokens",
-      "reasoning_models": "Benchmark energy for reasoning models includes hidden chain-of-thought tokens at a typical thinking budget; the engine scales the decode term for low/standard/high effort."
+      "reasoning_models": "Benchmark energy for reasoning models includes hidden chain-of-thought tokens at a typical thinking budget; the engine scales the fixed and decode terms (everything except prefill) for low/standard/high effort.",
+      "provider_reported_anchor": "A provider's own published per-prompt figure, kept for reference. Each anchor states its boundary; anchors with a wider boundary than the engine (full lifecycle incl. training, or a median prompt of unknown length) are not expected to be reproduced by the engine and are labelled as such."
     }
   },
   "models": [
@@ -30,6 +31,7 @@
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
+        "boundary": "Undisclosed; average query of unknown length, on-site water only",
         "label": "OpenAI-reported average ChatGPT query (Jun 2025); Microsoft/Joule 2026 production median is also 0.34 Wh"
       },
       "performance": {
@@ -49,6 +51,7 @@
       "is_reasoning": true,
       "provider_reported_anchor": {
         "energy_wh": 18.35,
+        "boundary": "Third-party estimate of a medium-length response with full reasoning budget",
         "label": "URI AI lab estimate (Aug 2025): ~18.35 Wh average for a medium reasoning response, up to ~40 Wh — contested; assumes full reasoning-mode token budgets"
       },
       "performance": {
@@ -68,6 +71,7 @@
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
+        "boundary": "Undisclosed; average query of unknown length, on-site water only",
         "label": "OpenAI-reported average ChatGPT query (Jun 2025)"
       },
       "performance": {
@@ -130,6 +134,7 @@
       "is_reasoning": true,
       "provider_reported_anchor": {
         "energy_wh": 33.0,
+        "boundary": "Same as the engine (long benchmark prompt)",
         "label": "Jegham et al. v6: >33 Wh per long prompt (short/medium points scaled from the long measurement)"
       },
       "performance": {
@@ -206,6 +211,7 @@
         "energy_wh": 0.24,
         "water_ml": 0.26,
         "carbon_g": 0.03,
+        "boundary": "Median prompt of unknown length; on-site water only; market-based carbon incl. embodied — the engine's location-based, on-site + off-site figures are expected to be higher",
         "label": "Google-reported median Gemini Apps text prompt (Aug 2025, full-stack measurement)"
       },
       "performance": {
@@ -235,10 +241,11 @@
       "host": "Mistral (EU)",
       "host_key": "mistral_eu",
       "size_class": "Large",
-      "data_source": "anchored",
+      "data_source": "extrapolated",
       "provider_reported_anchor": {
         "carbon_g": 1.14,
         "water_ml": 45,
+        "boundary": "Cradle-to-grave LCA including training amortisation and embodied hardware — a far wider boundary than the engine's inference-only estimate, so these figures are ~25× higher than the engine's and are not comparable",
         "label": "Mistral AI lifecycle analysis (Jul 2025): per 400-output-token response, full lifecycle incl. training and hardware"
       },
       "performance": {

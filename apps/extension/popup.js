@@ -15,13 +15,7 @@
     E: '#EF4444'
   };
 
-  const DEFAULT_SETTINGS = {
-    defaultModel: 'gpt-4o',
-    regionKey: 'default',
-    reasoningEffort: 'standard',
-    showPill: true,
-    includeEmbodied: true
-  };
+  const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
   // Shared popup state (Coach <-> Compare share prompt/token inputs).
   const state = {
@@ -546,6 +540,60 @@
   }
 
   // --------------------------------------------------------------------------
+  // History export — the raw per-query records, for spreadsheets, team
+  // roll-ups and sustainability reporting. Nothing leaves the machine unless
+  // the user shares the file.
+  // --------------------------------------------------------------------------
+
+  function csvCell(value) {
+    const s = value === undefined || value === null ? '' : String(value);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  function historyToCsv(history) {
+    const header = ['timestamp_ms', 'datetime_iso', 'host', 'model_id', 'energy_wh', 'water_ml', 'carbon_g', 'grade'];
+    const rows = history.map((e) => [
+      e.ts,
+      Number.isFinite(e.ts) ? new Date(e.ts).toISOString() : '',
+      e.host,
+      e.modelId,
+      Number(e.energyWh) || 0,
+      Number(e.waterMl) || 0,
+      Number(e.carbonG) || 0,
+      e.grade
+    ].map(csvCell).join(','));
+    return header.join(',') + '\n' + rows.join('\n') + '\n';
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function exportHistory(format) {
+    const history = await loadHistory();
+    if (!history.length) return;
+    const date = new Date().toISOString().slice(0, 10);
+    if (format === 'csv') {
+      downloadBlob(new Blob([historyToCsv(history)], { type: 'text/csv' }), `ecoprompt-history-${date}.csv`);
+    } else {
+      const payload = {
+        exported_at: new Date().toISOString(),
+        source: 'EcoPrompt Coach extension',
+        totals: state.engine.aggregate(history),
+        queries: history
+      };
+      downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), `ecoprompt-history-${date}.json`);
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Init
   // --------------------------------------------------------------------------
 
@@ -610,6 +658,8 @@
     $('compare-in').addEventListener('input', onTokensInput);
     $('compare-out').addEventListener('input', onTokensInput);
     $('reset-btn').addEventListener('click', onResetClick);
+    $('export-csv-btn').addEventListener('click', () => exportHistory('csv'));
+    $('export-json-btn').addEventListener('click', () => exportHistory('json'));
     $('settings-link').addEventListener('click', (e) => {
       e.preventDefault();
       chrome.runtime.openOptionsPage();

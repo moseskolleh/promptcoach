@@ -6,7 +6,7 @@ boundary, and the known limitations — in that order, because the most common
 failure mode of "AI footprint" tools is mixing numbers from incompatible
 boundaries.
 
-Last updated: 2026-06-10.
+Last updated: 2026-09-10.
 
 ---
 
@@ -59,10 +59,15 @@ E_query [Wh] = E_fixed + e_in · T_in + e_out · T_out_effective
   provisioning share (the components Google's full-stack measurement showed
   make up ~42% of real per-prompt energy).
 
-The 3×3 system is solved exactly (Cramer's rule); if measurement noise
-produces a negative coefficient, the offending term is pinned to zero and
-the rest re-fitted by least squares, so estimates are always monotonic in
-both token counts.
+The 3×3 system is solved exactly; if measurement noise produces a negative
+coefficient, every subset of the three terms is re-fitted by least squares
+and the best-fitting non-negative subset is kept (non-negative least squares
+for a three-parameter model). Estimates are therefore always monotonic in
+both token counts and reproduce every published benchmark point within 5%.
+(An earlier fallback pinned the *input* term whenever *any* coefficient went
+negative, which overstated o4-mini's and Llama 3.3 70B's short-query energy
+by 100% and 40% respectively; `npm test` now asserts the reproduction for
+every model.)
 
 *Worked example (GPT-4o, measured points 0.421 / 1.214 / 1.788 Wh):*
 fit yields `e_in ≈ 0.0000009`, `e_out ≈ 0.00113`, `E_fixed ≈ 0.081` —
@@ -84,8 +89,9 @@ E_query = effort · (E_fixed + e_out · T_out) + e_in · T_in
 ```
 
 `standard` reproduces the benchmark conditions. Uncertainty bands are
-doubled whenever effort ≠ standard or tokens exceed the measured range
-(11.5k), because we are extrapolating.
+doubled whenever effort ≠ standard or the request exceeds the measured range
+on either axis (10k input or 1.5k output tokens), because we are
+extrapolating.
 
 ### 2.3 Task multipliers
 
@@ -189,10 +195,20 @@ in D–E):
   up to ~60% (Poddar et al. 2025; *Green Prompt Engineering*,
   arXiv:2509.22320). Hence the "set an output budget" tip — and when the
   analyzer detects an explicit budget already in the prompt ("in 50 words",
-  "one sentence", "bullet points only", "yes or no"), it caps the output
-  estimate accordingly (words × 4/3 tokens, ~25 tokens/sentence,
-  ~100/paragraph; brevity cues scale by 0.4–0.6×) and swaps the nag for an
-  acknowledgment, so following the advice visibly improves the grade.
+  "two sentences", "3 bullet points", "under 280 characters", "one word",
+  "yes or no", "briefly"), it sets the output estimate accordingly
+  (words × 4/3 tokens, characters ÷ 4, ~25 tokens/sentence, ~15/line,
+  ~20/bullet, ~35/list item, ~100/paragraph; brevity cues scale by 0.4–0.7×)
+  and swaps the nag for an acknowledgment, so following the advice visibly
+  improves the grade. A length phrase only counts when it is about the
+  answer (it ends the clause, follows a directive verb, or opens the prompt)
+  and is not negated — "the use of commas in a sentence I will paste" and
+  "do not answer with just yes or no" are content. A requested *long* answer
+  ("in 2000 words") raises the estimate instead and earns a warning.
+- **Count tokens honestly.** Prompt tokens are estimated at ~4 characters
+  per token for Latin prose and ~3.5 for code; CJK scripts are counted at
+  one token per character and emoji at two, since those tokenize far denser
+  (a Japanese prompt was previously undercounted ~3×).
 - **Right-size the model.** The measured spread between the most and least
   efficient model on the same task exceeds 65× (Jegham v6). Small models
   (Gemini Flash, GPT-4o mini, Haiku-class) handle summarization, translation
@@ -226,6 +242,18 @@ in D–E):
    our embodied factor covers hardware, not training).
 5. **Medians vs means.** Provider anchors are medians; heavy-tail prompts
    (long context, reasoning) dominate real fleet totals.
+6. **Anchors have their own boundaries.** Each provider-reported figure in
+   `models.json` now states its boundary. Mistral's 1.14 gCO₂e / 45 mL per
+   response is a cradle-to-grave LCA including training amortisation and
+   embodied hardware — roughly 25× the engine's inference-only figure — so
+   it is kept for reference, not reproduced; Google's 0.24 Wh median is for
+   a prompt of unknown length with on-site water only. Anchors are never
+   used to override the fitted curve.
+7. **Which model the user actually selected.** The extension reads the chat
+   page's model switcher ("GPT-5 Thinking", "2.5 Pro", an active DeepThink
+   toggle) and falls back to the site's default model when it cannot; the
+   difference between a standard and a reasoning selection is 10–30× and
+   is the largest single source of error in per-query estimates.
 
 ---
 

@@ -11,7 +11,7 @@ skip the LLM entirely when a calculator or weather app does it better.
 
 ![Version](https://img.shields.io/badge/version-2.0.0-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Tests](https://img.shields.io/badge/core_tests-18_passing-brightgreen)
+[![CI](https://github.com/moseskolleh/promptcoach/actions/workflows/ci.yml/badge.svg)](https://github.com/moseskolleh/promptcoach/actions/workflows/ci.yml)
 
 **▶ Try it live:**
 [**Web app**](https://moseskolleh.github.io/promptcoach/) —
@@ -40,8 +40,8 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 
 | Directory | What it is |
 |---|---|
-| [`packages/core`](packages/core) | The shared engine: per-token energy model fitted from published benchmarks, water + carbon accounting with explicit boundaries, relatable-equivalents converter, prompt analyzer & coach. Zero dependencies, fully tested (`npm test`). |
-| [`apps/extension`](apps/extension) | Chrome extension (MV3): live eco-grade pill on ChatGPT/Claude/Gemini/Copilot/Mistral/DeepSeek/Perplexity/Poe/Grok, popup coach + model comparison + personal impact dashboard. |
+| [`packages/core`](packages/core) | The shared engine: per-token energy model fitted from published benchmarks, water + carbon accounting with explicit boundaries, relatable-equivalents converter, prompt analyzer & coach. Zero dependencies, TypeScript typings, fully tested (`npm test`). |
+| [`apps/extension`](apps/extension) | Chrome extension (MV3): live eco-grade pill on ChatGPT/Claude/Gemini/Copilot/Mistral/DeepSeek/Perplexity/Poe/Grok that reads the page's model switcher (a "Thinking" selection is ~30× a standard one), popup coach + model comparison + personal impact dashboard with CSV/JSON export. |
 | [`apps/web`](apps/web) | Responsive web app (static, no build step): coach, model comparison, model explorer, prompt library, methodology digest. **[Live ↗](https://moseskolleh.github.io/promptcoach/)** |
 | [`apps/demo`](apps/demo) | Extension test playground: three mock chat interfaces (ChatGPT-, Claude-, and Gemini-style) with fake streaming replies and a real-world example-prompt bank, so anyone can test the extension without touching a real AI service. **[Live ↗](https://moseskolleh.github.io/promptcoach/demo/)** |
 | [`apps/mobile`](apps/mobile) | Mobile app **structure** (Expo/React Native skeleton): share-sheet prompt intake, dashboard, weekly recap — ready to implement. |
@@ -54,7 +54,7 @@ One engine, every surface: extension, web, and mobile all run the exact same
 ## Quick start
 
 ```bash
-# Run the engine tests
+# Run the engine tests + static checks of the apps (also runs in CI on every push/PR)
 npm test
 
 # Try the web app — hosted at https://moseskolleh.github.io/promptcoach/
@@ -98,7 +98,7 @@ moment.
 
 ## Status & roadmap
 
-- ✅ v2 engine with 2025/2026 evidence base, 19-model catalog, 18 passing tests
+- ✅ v2 engine with 2025/2026 evidence base, 21-model catalog, regression-tested analyzer and engine, CI on every push
 - ✅ Chrome extension + responsive web app
 - ✅ Live on GitHub Pages — [web app](https://moseskolleh.github.io/promptcoach/)
   at the root, [demo playground](https://moseskolleh.github.io/promptcoach/demo/)

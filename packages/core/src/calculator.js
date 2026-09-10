@@ -11,7 +11,8 @@
 // the engine derives a smooth, physically sensible curve. Decode (output)
 // dominates because generation is sequential, while prefill (input) is
 // massively parallel — the fit consistently recovers e_in ≈ 0 and
-// e_out ≈ 1–10 mWh/token, matching the literature.
+// e_out ≈ 0.2–20 mWh/token (small models ~0.2–0.5, frontier chat ~1–3,
+// reasoning ~7–18), matching the literature.
 //
 // Water:  W (L)      = E_IT · WUE_site + E_query · WUE_source,  E_IT = E_query / PUE
 // Carbon: C (kgCO2e) = E_query · CIF · embodiedFactor
@@ -23,63 +24,89 @@
 'use strict';
 
 // ----------------------------------------------------------------------------
-// Linear algebra helper: exact solve of the 3×3 system for (e_in, e_out, E_fixed)
+// Linear algebra helpers: least squares for E = a·x + b·y + c with any
+// subset of the three terms active.
 // ----------------------------------------------------------------------------
 
+/** Gaussian elimination with partial pivoting; null when singular. */
+function solveLinear(M, v) {
+  const n = v.length;
+  const A = M.map((row, i) => [...row, v[i]]);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(A[r][col]) > Math.abs(A[pivot][col])) pivot = r;
+    }
+    if (Math.abs(A[pivot][col]) < 1e-12) return null;
+    [A[col], A[pivot]] = [A[pivot], A[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = A[r][col] / A[col][col];
+      for (let c = col; c <= n; c++) A[r][c] -= f * A[col][c];
+    }
+  }
+  return A.map((row, i) => row[n] / row[i]);
+}
+
 /**
- * Solve E = a·x + b·y + c for three (x, y, E) benchmark points (Cramer's rule).
- * Returns null when the system is singular.
+ * Least-squares fit of E = a·x + b·y + c over the benchmark points using
+ * only the terms flagged active (the others are pinned to zero). With three
+ * points and all three terms active this is the exact solve.
  */
-function solve3(points) {
-  const [p1, p2, p3] = points;
-  const m = [
-    [p1.x, p1.y, 1],
-    [p2.x, p2.y, 1],
-    [p3.x, p3.y, 1]
-  ];
-  const v = [p1.e, p2.e, p3.e];
-
-  const det = (M) =>
-    M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
-    M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) +
-    M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
-
-  const d = det(m);
-  if (Math.abs(d) < 1e-12) return null;
-
-  const withCol = (col) => m.map((row, i) => row.map((val, j) => (j === col ? v[i] : val)));
+function leastSquares(points, useA, useB, useC) {
+  const cols = [];
+  if (useA) cols.push((p) => p.x);
+  if (useB) cols.push((p) => p.y);
+  if (useC) cols.push(() => 1);
+  const k = cols.length;
+  const M = Array.from({ length: k }, () => Array(k).fill(0));
+  const v = Array(k).fill(0);
+  for (const p of points) {
+    const row = cols.map((f) => f(p));
+    for (let i = 0; i < k; i++) {
+      v[i] += row[i] * p.e;
+      for (let j = 0; j < k; j++) M[i][j] += row[i] * row[j];
+    }
+  }
+  const sol = solveLinear(M, v);
+  if (!sol) return null;
+  let idx = 0;
   return {
-    a: det(withCol(0)) / d,
-    b: det(withCol(1)) / d,
-    c: det(withCol(2)) / d
+    a: useA ? sol[idx++] : 0,
+    b: useB ? sol[idx++] : 0,
+    c: useC ? sol[idx++] : 0
   };
 }
 
-/**
- * Least-squares fit of E = b·y + c (input term pinned to zero) over the
- * benchmark points. Used as fallback when the exact solve goes negative.
- */
-function fitOutputOnly(points) {
-  const n = points.length;
-  let sy = 0, se = 0, syy = 0, sye = 0;
+function residual(points, fit) {
+  let rss = 0;
   for (const p of points) {
-    sy += p.y;
-    se += p.e;
-    syy += p.y * p.y;
-    sye += p.y * p.e;
+    const d = fit.a * p.x + fit.b * p.y + fit.c - p.e;
+    rss += d * d;
   }
-  const denom = n * syy - sy * sy;
-  if (Math.abs(denom) < 1e-12) return null;
-  const b = (n * sye - sy * se) / denom;
-  const c = (se - b * sy) / n;
-  return { a: 0, b, c };
+  return rss;
 }
+
+// Every subset of {e_in, e_out, E_fixed}, fullest first. Trying them all and
+// keeping the best non-negative fit is non-negative least squares for a
+// three-parameter model — cheap, exact, and it never discards a term that
+// was positive just because a different one went negative.
+const TERM_SUBSETS = [
+  [true, true, true],
+  [true, true, false],
+  [false, true, true],
+  [true, false, true],
+  [false, true, false],
+  [true, false, false],
+  [false, false, true]
+];
 
 /**
  * Fit per-token energy coefficients for one model from its three benchmark
- * points. Negative coefficients (possible with noisy measurements) are
- * projected to zero and the remaining terms re-fitted, so the resulting
- * curve is always monotonic in both token counts.
+ * points. If the exact solve produces a negative coefficient (possible with
+ * noisy measurements), the best-fitting non-negative subset of terms is used
+ * instead, so the resulting curve is always monotonic in both token counts
+ * and reproduces the measurements as closely as a physical model can.
  *
  * @param {Array<{input_tokens:number, output_tokens:number, energy_wh_mean:number, energy_wh_std:number}>} bench
  * @returns {{eIn:number, eOut:number, eFixed:number, relStd:number}}
@@ -91,11 +118,18 @@ function fitCoefficients(bench) {
     e: b.energy_wh_mean
   }));
 
-  let fit = solve3(points);
-  if (!fit || fit.a < 0 || fit.b < 0 || fit.c < 0) {
-    fit = fitOutputOnly(points);
+  let fit = null;
+  let bestRss = Infinity;
+  for (const [useA, useB, useC] of TERM_SUBSETS) {
+    const candidate = leastSquares(points, useA, useB, useC);
+    if (!candidate || candidate.a < -1e-12 || candidate.b < -1e-12 || candidate.c < -1e-12) continue;
+    const rss = residual(points, candidate);
+    if (rss < bestRss - 1e-12) {
+      bestRss = rss;
+      fit = candidate;
+    }
   }
-  if (!fit || fit.b < 0) {
+  if (!fit) {
     // Degenerate data: fall back to pure proportional model on total tokens.
     const ratios = points.map((p) => p.e / Math.max(1, p.x + p.y));
     const perTok = ratios.reduce((s, r) => s + r, 0) / ratios.length;
@@ -121,6 +155,12 @@ function fitCoefficients(bench) {
 // ----------------------------------------------------------------------------
 // Engine
 // ----------------------------------------------------------------------------
+
+/** Coerce to a non-negative finite number; anything else counts as 0. */
+function finiteOrZero(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 const REASONING_EFFORT = {
   low: 0.4, // minimal thinking budget
@@ -163,19 +203,33 @@ class ImpactEngine {
       (bundle.grids.lifecycle && bundle.grids.lifecycle.embodied_factor) || 1.15;
 
     this.models = {};
-    for (const m of bundle.models.models) {
-      const bench = ['short', 'medium', 'long'].map((k) => m.performance[k]);
+    for (const m of bundle.models.models || []) {
+      if (!m || !m.model_id) throw new Error('models.json: every model needs a model_id');
+      const perf = m.performance || {};
+      const bench = ['short', 'medium', 'long'].map((k) => {
+        const p = perf[k];
+        if (!p || typeof p.energy_wh_mean !== 'number') {
+          throw new Error(`models.json: ${m.model_id} is missing performance.${k}`);
+        }
+        return p;
+      });
+      const hostKey = m.host_key || String(m.host || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      if (!this.grids.providers || !this.grids.providers[hostKey]) {
+        throw new Error(`models.json: ${m.model_id} host_key "${hostKey}" has no entry in grids.providers`);
+      }
       this.models[m.model_id] = {
         id: m.model_id,
         name: m.name,
         provider: m.provider,
         host: m.host,
-        hostKey: m.host_key || m.host.toLowerCase().replace(/\s+/g, '_'),
+        hostKey,
         sizeClass: m.size_class,
         dataSource: m.data_source || 'measured',
         isReasoning: !!m.is_reasoning,
         anchor: m.provider_reported_anchor || null,
         bench,
+        benchMaxInput: Math.max(...bench.map((b) => b.input_tokens)),
+        benchMaxOutput: Math.max(...bench.map((b) => b.output_tokens)),
         coefficients: fitCoefficients(bench)
       };
     }
@@ -198,7 +252,7 @@ class ImpactEngine {
   }
 
   getCategory(inputTokens, outputTokens) {
-    const total = Math.max(0, inputTokens) + Math.max(0, outputTokens);
+    const total = finiteOrZero(inputTokens) + finiteOrZero(outputTokens);
     return QUERY_CATEGORIES.find((c) => total <= c.maxTokens).id;
   }
 
@@ -241,11 +295,13 @@ class ImpactEngine {
     const infra = this.grids.providers[model.hostKey];
     if (!infra) return null;
 
-    const tIn = Math.max(0, Number(inputTokens) || 0);
-    const tOut = Math.max(0, Number(outputTokens) || 0);
-    const taskMult = Math.max(0, Number(options.taskMultiplier) || 1);
-    const effortKey = options.reasoningEffort || 'standard';
-    const effort = model.isReasoning ? (REASONING_EFFORT[effortKey] || 1) : 1;
+    const tIn = finiteOrZero(inputTokens);
+    const tOut = finiteOrZero(outputTokens);
+    const tm = Number(options.taskMultiplier);
+    const taskMult = Number.isFinite(tm) && tm > 0 ? tm : 1;
+    // Unknown effort keys fall back to the benchmark condition — and say so.
+    const effortKey = REASONING_EFFORT[options.reasoningEffort] ? options.reasoningEffort : 'standard';
+    const effort = model.isReasoning ? REASONING_EFFORT[effortKey] : 1;
     const includeEmbodied = options.includeEmbodied !== false;
 
     const { eIn, eOut, eFixed, relStd } = model.coefficients;
@@ -281,9 +337,10 @@ class ImpactEngine {
     const carbonKg = energyKwh * cif * embodied;
 
     // Honest uncertainty: benchmark scatter, widened when we extrapolate
-    // beyond the measured token range or away from 'standard' effort.
-    const maxBenchTokens = 11500;
-    const extrapolated = tIn + tOut > maxBenchTokens || effort !== 1;
+    // beyond the measured range on either axis (the benchmarks top out at
+    // 10k input / 1.5k output tokens) or away from 'standard' effort.
+    const extrapolated =
+      tIn > model.benchMaxInput || tOut > model.benchMaxOutput || effort !== 1;
     const band = relStd * (extrapolated ? 2 : 1);
 
     return {
@@ -306,7 +363,7 @@ class ImpactEngine {
           inputWh: eIn * tIn * taskMult,
           outputWh: decodeWh * taskMult
         },
-        perTokenOutMwh: eOut * 1000,
+        perTokenOutMwh: eOut * effort * 1000,
         extrapolated,
         confidence: {
           minWh: Math.max(0, energyWh * (1 - band)),
@@ -344,8 +401,8 @@ class ImpactEngine {
    * plus a 0–100 score for sorting/visuals (log scale).
    */
   gradeFor(energyWh) {
-    const wh = Math.max(0.001, energyWh);
-    const band = GRADE_BANDS.find((b) => wh <= b.maxWh);
+    const wh = Math.max(0.001, finiteOrZero(energyWh));
+    const band = GRADE_BANDS.find((b) => wh <= b.maxWh) || GRADE_BANDS[GRADE_BANDS.length - 1];
     // 0.05 Wh → ~100, 30 Wh → ~0 (log interpolation)
     const logMin = Math.log(0.05);
     const logMax = Math.log(30);
@@ -360,7 +417,8 @@ class ImpactEngine {
    * first, with potential savings vs the worst option.
    */
   compareModels({ modelIds, inputTokens, outputTokens, options = {} }) {
-    const ids = modelIds && modelIds.length ? modelIds : Object.keys(this.models);
+    // Omitting modelIds means "all models"; an explicit empty list means none.
+    const ids = [...new Set(Array.isArray(modelIds) ? modelIds : Object.keys(this.models))];
     const results = [];
     for (const id of ids) {
       const impact = this.estimateImpact({ modelId: id, inputTokens, outputTokens, options });
@@ -381,8 +439,11 @@ class ImpactEngine {
               energyWh: worst.energy.wh - best.energy.wh,
               waterMl: worst.water.ml - best.water.ml,
               carbonG: worst.carbon.gCO2e - best.carbon.gCO2e,
-              percentage: Math.round(
-                ((worst.energy.wh - best.energy.wh) / worst.energy.wh) * 100
+              ratio: (worst.energy.wh - best.energy.wh) / worst.energy.wh,
+              // Never round a real saving up to "100% less energy".
+              percentage: Math.min(
+                best.energy.wh > 0 ? 99 : 100,
+                Math.round(((worst.energy.wh - best.energy.wh) / worst.energy.wh) * 100)
               )
             }
           : null
@@ -394,36 +455,138 @@ class ImpactEngine {
    */
   aggregate(impacts) {
     const totals = { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 };
-    for (const i of impacts) {
-      if (!i) continue;
+    for (const i of Array.isArray(impacts) ? impacts : []) {
+      if (!i || typeof i !== 'object') continue;
       totals.queries += 1;
-      totals.energyWh += i.energy ? i.energy.wh : i.energyWh || 0;
-      totals.waterMl += i.water ? i.water.ml : i.waterMl || 0;
-      totals.carbonG += i.carbon ? i.carbon.gCO2e : i.carbonG || 0;
+      totals.energyWh += finiteOrZero(i.energy ? i.energy.wh : i.energyWh);
+      totals.waterMl += finiteOrZero(i.water ? i.water.ml : i.waterMl);
+      totals.carbonG += finiteOrZero(i.carbon ? i.carbon.gCO2e : i.carbonG);
     }
     return totals;
   }
 }
 
+// ----------------------------------------------------------------------------
+// Which model is this chat page using?
+// ----------------------------------------------------------------------------
+
+const HOST_DEFAULTS = {
+  'chatgpt.com': 'gpt-5',
+  'chat.openai.com': 'gpt-5',
+  'claude.ai': 'claude-4.5-sonnet',
+  'gemini.google.com': 'gemini-2.5-flash',
+  'copilot.microsoft.com': 'gpt-5',
+  'chat.mistral.ai': 'mistral-large',
+  'chat.deepseek.com': 'deepseek-v3',
+  'perplexity.ai': 'gpt-4o-mini',
+  'poe.com': 'claude-4.5-sonnet',
+  'you.com': 'gpt-4o-mini',
+  'grok.com': 'grok-3'
+};
+
+function hostMatches(hostname, domain) {
+  return hostname === domain || hostname.endsWith('.' + domain);
+}
+
 /**
- * Map a chat site hostname to the model most likely serving it.
+ * Map a chat site hostname to the model most likely serving it (the site's
+ * default). Matches the domain or a subdomain of it — never a substring, so
+ * "notclaude.ai" is not Claude.
  */
 function autoDetectModel(hostname) {
-  const map = {
-    'chatgpt.com': 'gpt-5',
-    'chat.openai.com': 'gpt-5',
-    'claude.ai': 'claude-4.5-sonnet',
-    'gemini.google.com': 'gemini-2.5-flash',
-    'copilot.microsoft.com': 'gpt-5',
-    'chat.mistral.ai': 'mistral-large',
-    'chat.deepseek.com': 'deepseek-v3',
-    'perplexity.ai': 'gpt-4o-mini',
-    'poe.com': 'claude-4.5-sonnet',
-    'you.com': 'gpt-4o-mini',
-    'grok.com': 'grok-3'
-  };
-  for (const [domain, modelId] of Object.entries(map)) {
-    if (hostname && hostname.includes(domain)) return modelId;
+  const host = String(hostname || '').toLowerCase();
+  for (const [domain, modelId] of Object.entries(HOST_DEFAULTS)) {
+    if (hostMatches(host, domain)) return modelId;
+  }
+  return null;
+}
+
+// The model the user has *selected* is the single largest source of error in
+// the extension's estimates: the same ChatGPT tab is a 0.5 Wh gpt-5 answer or
+// a 30× costlier "Thinking" answer depending on one dropdown. Chat UIs show
+// the selection as short text in a model-switcher button; the content script
+// collects such labels and this pure function maps them to catalog ids.
+// Patterns are ordered most-specific first, per provider family. A label
+// that names no catalog model returns null so the caller keeps its default.
+const MODEL_LABEL_PATTERNS = {
+  openai: [
+    { re: /\bo4[\s-]?mini\b/i, id: 'o4-mini' },
+    { re: /\bo3\b(?![\s-]?mini)/i, id: 'o3' },
+    { re: /\b(?:gpt[\s-]?)?5(?:\.\d)?[\s-]*(?:thinking|pro|reasoning)\b|\bthinking\b|\bthink\s+longer\b|\bdeep\s+research\b/i, id: 'gpt-5-thinking' },
+    { re: /\b4\.1[\s-]?nano\b/i, id: 'gpt-4.1-nano' },
+    { re: /\b4o[\s-]?mini\b/i, id: 'gpt-4o-mini' },
+    { re: /\b(?:gpt[\s-]?)?4o\b/i, id: 'gpt-4o' },
+    { re: /\b(?:gpt[\s-]?|chatgpt\s+)?5(?:\.\d)?\b(?:[\s-]*(?:instant|chat|auto|fast|mini|nano))?/i, id: 'gpt-5' }
+  ],
+  anthropic: [
+    { re: /\bhaiku\b/i, id: 'claude-4.5-haiku' },
+    { re: /\b3\.7\b|\bsonnet\s+3\.7\b/i, id: 'claude-3.7-sonnet' },
+    { re: /\bsonnet\b/i, id: 'claude-4.5-sonnet' }
+  ],
+  google: [
+    { re: /\b2\.0[\s-]?flash\b/i, id: 'gemini-2.0-flash' },
+    { re: /\bflash(?:[\s-]?lite)?\b/i, id: 'gemini-2.5-flash' },
+    { re: /\bpro\b|\bdeep\s+think\b|\bthinking\b/i, id: 'gemini-2.5-pro' }
+  ],
+  mistral: [
+    { re: /\bsmall\b|\bministral\b/i, id: 'mistral-small' },
+    { re: /\blarge\b|\bmedium\b/i, id: 'mistral-large' }
+  ],
+  deepseek: [
+    // DeepThink is a toggle: only an *active* toggle means R1 is in use.
+    { re: /\bdeep\s*think\b|\br1\b|\breason(?:er|ing)?\b/i, id: 'deepseek-r1', requiresActive: true },
+    { re: /\bv3\b|\bchat\b/i, id: 'deepseek-v3' }
+  ],
+  xai: [
+    { re: /\bgrok[\s-]?3\b/i, id: 'grok-3' }
+  ]
+};
+
+const HOST_FAMILY = [
+  ['chatgpt.com', 'openai'],
+  ['chat.openai.com', 'openai'],
+  ['copilot.microsoft.com', 'openai'],
+  ['claude.ai', 'anthropic'],
+  ['gemini.google.com', 'google'],
+  ['chat.mistral.ai', 'mistral'],
+  ['chat.deepseek.com', 'deepseek'],
+  ['grok.com', 'xai']
+];
+
+function familyForHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  for (const [domain, family] of HOST_FAMILY) {
+    if (hostMatches(host, domain)) return family;
+  }
+  return null;
+}
+
+/**
+ * Detect the selected model from model-picker labels scraped off a chat
+ * page.
+ *
+ * @param {string} hostname   page hostname (chooses the provider family)
+ * @param {Array<string|{text:string, active?:boolean}>} labels
+ *        short UI strings: the model switcher's text and aria-label, any
+ *        pressed/checked toggle; {active} marks toggles that are on
+ * @param {Object} [opts]
+ * @param {string} [opts.family]  override the family (demo pages, unknown hosts)
+ * @returns {{modelId:string, matchedText:string}|null}
+ */
+function detectModelFromLabels(hostname, labels, opts = {}) {
+  const family = opts.family || familyForHost(hostname);
+  const patterns = MODEL_LABEL_PATTERNS[family];
+  if (!patterns || !Array.isArray(labels)) return null;
+  const items = labels
+    .map((l) => (typeof l === 'string' ? { text: l, active: false } : l))
+    .filter((l) => l && typeof l.text === 'string')
+    .map((l) => ({ text: l.text.replace(/\s+/g, ' ').trim(), active: !!l.active }))
+    .filter((l) => l.text.length > 0 && l.text.length <= 80);
+  for (const { re, id, requiresActive } of patterns) {
+    for (const item of items) {
+      if (requiresActive && !item.active) continue;
+      if (re.test(item.text)) return { modelId: id, matchedText: item.text };
+    }
   }
   return null;
 }
@@ -437,6 +600,8 @@ const CalculatorModule = {
   ImpactEngine,
   fitCoefficients,
   autoDetectModel,
+  detectModelFromLabels,
+  familyForHost,
   REASONING_EFFORT,
   GRADE_BANDS
 };

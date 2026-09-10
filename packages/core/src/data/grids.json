@@ -51,7 +51,7 @@
       "wue_onsite_l_per_kwh": 0.3,
       "wue_offsite_l_per_kwh": 2.0,
       "cif_kgco2e_per_kwh": 0.06,
-      "notes": "French grid is nuclear-dominant — very low carbon intensity",
+      "notes": "French grid is nuclear-dominant — very low carbon intensity. 0.06 is a France-dominant EU blend (Mistral also serves from other EU regions); the pure France region factor is 0.056.",
       "source": "Ember 2024 (France); Mistral AI LCA 2025"
     },
     "deepseek": {
