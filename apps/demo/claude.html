@@ -4,14 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clarion — EcoPrompt Coach demo (Claude-style)</title>
-  <!-- Tells the EcoPrompt extension which model this demo page simulates. -->
+  <!-- Tells the EcoPrompt extension which provider this demo page mimics (so it
+       reads the model switcher below like it does on claude.ai) and which
+       model to assume if the switcher can't be read. -->
+  <meta name="ecoprompt-family" content="anthropic">
   <meta name="ecoprompt-model" content="claude-4.5-sonnet">
   <link rel="stylesheet" href="demo.css">
 </head>
 <body class="skin-claude" data-assistant-initial="C">
   <header class="demo-topbar">
     <span class="demo-brand">Clarion</span>
-    <span class="demo-model-tag">simulates: Claude Sonnet 4.5 · claude.ai</span>
+    <span class="demo-model-tag">mimics claude.ai</span>
+    <!-- Claude-style model selector: the extension reads this label. Click to cycle. -->
+    <button type="button" class="demo-model-switcher" data-testid="model-selector-dropdown"
+            aria-haspopup="menu" title="Click to switch the simulated model — watch the pill re-estimate"
+            data-demo-models="Sonnet 4.5|Haiku 4.5|Claude 3.7 Sonnet">Sonnet 4.5</button>
     <span class="demo-spacer"></span>
     <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
     <a href="index.html">← demo home</a>

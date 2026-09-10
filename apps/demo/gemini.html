@@ -4,14 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lumina — EcoPrompt Coach demo (Gemini-style)</title>
-  <!-- Tells the EcoPrompt extension which model this demo page simulates. -->
+  <!-- Tells the EcoPrompt extension which provider this demo page mimics (so it
+       reads the model switcher below like it does on gemini.google.com) and
+       which model to assume if the switcher can't be read. -->
+  <meta name="ecoprompt-family" content="google">
   <meta name="ecoprompt-model" content="gemini-2.5-flash">
   <link rel="stylesheet" href="demo.css">
 </head>
 <body class="skin-gemini" data-assistant-initial="L">
   <header class="demo-topbar">
     <span class="demo-brand">Lumina</span>
-    <span class="demo-model-tag">simulates: Gemini 2.5 Flash · gemini.google.com</span>
+    <span class="demo-model-tag">mimics gemini.google.com</span>
+    <!-- Gemini-style mode switch: the extension reads this label. Click to cycle. -->
+    <button type="button" class="demo-model-switcher gds-mode-switch" aria-haspopup="listbox"
+            aria-label="Model selector" title="Click to switch the simulated model — watch the pill re-estimate"
+            data-demo-models="2.5 Flash|2.5 Pro|2.0 Flash">2.5 Flash</button>
     <span class="demo-spacer"></span>
     <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
     <a href="index.html">← demo home</a>

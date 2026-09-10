@@ -23,18 +23,13 @@
     E: '#EF4444'
   };
 
-  const DEFAULT_SETTINGS = {
-    defaultModel: 'gpt-4o',
-    regionKey: 'default',
-    reasoningEffort: 'standard',
-    showPill: true,
-    includeEmbodied: true
-  };
+  const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
   let engine = null;
   let conv = null;
   let settings = { ...DEFAULT_SETTINGS };
   let modelId = 'gpt-4o';
+  let modelSource = 'default'; // 'picker' | 'host' | 'meta' | 'settings' | 'default'
 
   let inputEl = null; // the chat prompt input we're attached to
   let pill = null;
@@ -63,13 +58,105 @@
     });
   }
 
+  // --------------------------------------------------------------------------
+  // Which model is this page using?
+  //
+  // Priority: the model the user picked in the page's model switcher (read
+  // from its label — the difference between "GPT-5" and "GPT-5 Thinking" is
+  // ~30× in energy), then the host's default model, then a demo page's
+  // <meta name="ecoprompt-model"> hint, then the user's settings.
+  // --------------------------------------------------------------------------
+
+  // Tried in order: elements that *say* they are the model picker first,
+  // generic dropdowns and toggles only if those yield nothing — so an
+  // unrelated menu button can't mislabel the model.
+  const PICKER_SELECTOR_GROUPS = [
+    [
+      '[data-testid*="model" i]',
+      '[aria-label*="model" i]',
+      '[id*="model-switch" i]',
+      '[class*="model-switch" i]',
+      '[class*="model-select" i]',
+      '[class*="mode-switch" i]'
+    ].join(', '),
+    [
+      'button[aria-haspopup="menu"]',
+      'button[aria-haspopup="listbox"]',
+      '[role="combobox"]',
+      'button[aria-pressed="true"]',
+      '[role="switch"][aria-checked="true"]',
+      'button[aria-selected="true"]'
+    ].join(', ')
+  ];
+
+  function collectModelLabels(selectors) {
+    const labels = [];
+    let nodes;
+    try {
+      nodes = document.querySelectorAll(selectors);
+    } catch (err) {
+      return labels;
+    }
+    for (const el of nodes) {
+      if (labels.length >= 60) break;
+      if (el === pill || el === card || (card && card.contains(el))) continue;
+      const active =
+        el.getAttribute('aria-pressed') === 'true' ||
+        el.getAttribute('aria-checked') === 'true' ||
+        el.getAttribute('aria-selected') === 'true' ||
+        /(?:^|\s)(?:active|selected|checked|is-active|is-selected)(?:\s|$)/.test(String(el.className || ''));
+      const aria = el.getAttribute('aria-label');
+      if (aria) labels.push({ text: aria, active });
+      const text = el.textContent || '';
+      if (text.trim() && text.length <= 80) labels.push({ text, active });
+    }
+    return labels;
+  }
+
+  function pageModelFamily() {
+    // Real chat hosts are recognized by hostname; demo pages declare the
+    // provider they mimic via <meta name="ecoprompt-family" content="openai">.
+    const known = Core.familyForHost(location.hostname);
+    if (known) return known;
+    const meta = document.querySelector('meta[name="ecoprompt-family"]');
+    return meta && meta.content ? meta.content.trim() : null;
+  }
+
+  function pickerModel() {
+    const family = pageModelFamily();
+    if (!family) return null;
+    for (const selectors of PICKER_SELECTOR_GROUPS) {
+      const hit = Core.detectModelFromLabels(location.hostname, collectModelLabels(selectors), { family });
+      if (hit && engine.getModel(hit.modelId)) return hit.modelId;
+    }
+    return null;
+  }
+
+  /** Re-resolve the model; returns true when it changed. */
   function resolveModel() {
-    // On hosts we don't recognize (the demo site, localhost), a page may hint
-    // which model it simulates via <meta name="ecoprompt-model" content="...">.
-    // Known chat hosts always win so real sites can't spoof it.
-    const detected = Core.autoDetectModel(location.hostname) || metaModelHint();
-    const candidate = detected || settings.defaultModel || 'gpt-4o';
-    modelId = engine.getModel(candidate) ? candidate : 'gpt-4o';
+    const picked = pickerModel();
+    let candidate = picked;
+    let source = 'picker';
+    if (!candidate) {
+      candidate = Core.autoDetectModel(location.hostname);
+      source = 'host';
+    }
+    if (!candidate) {
+      candidate = metaModelHint();
+      source = 'meta';
+    }
+    if (!candidate) {
+      candidate = settings.defaultModel;
+      source = 'settings';
+    }
+    if (!candidate || !engine.getModel(candidate)) {
+      candidate = 'gpt-4o';
+      source = 'default';
+    }
+    const changed = candidate !== modelId;
+    modelId = candidate;
+    modelSource = source;
+    return changed;
   }
 
   function metaModelHint() {
@@ -209,7 +296,8 @@
     grade.style.background = GRADE_COLORS[lastImpact.grade.grade];
     const title = document.createElement('span');
     title.className = 'epc-card-title';
-    title.textContent = `${lastImpact.model.name} · ${lastAnalysis.tokens} tokens`;
+    title.textContent =
+      `${lastImpact.model.name}${modelSource === 'picker' ? ' (detected on page)' : ''} · ${lastAnalysis.tokens} tokens`;
     head.append(grade, title);
     card.appendChild(head);
 
@@ -390,6 +478,9 @@
       if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
         attachTo(findPromptInput());
       }
+      // The model switcher lives in the page chrome and re-renders on SPA
+      // navigation; re-read it whenever the DOM settles.
+      if (resolveModel() && inputEl) analyzeDraft();
       positionUi();
     }, 500);
   }

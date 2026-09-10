@@ -330,3 +330,19 @@ textarea.demo-composer::placeholder {
   color: transparent;
 }
 .skin-gemini .demo-composer-row { border-radius: 32px; border-color: transparent; box-shadow: none; }
+
+/* ----------------------------------------------------- model switcher */
+
+.demo-topbar .demo-model-switcher {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.demo-topbar .demo-model-switcher::after { content: ' ▾'; color: var(--muted); }
+.demo-topbar .demo-model-switcher:hover { background: var(--hover); }

@@ -1,0 +1,38 @@
+# Runs on every push and pull request: engine tests (incl. the vendored-copy
+# sync check) plus dependency-free static checks of the browser apps.
+# The Pages deploy (deploy-pages.yml) runs the same `npm test` gate on main.
+
+name: CI
+
+on:
+  push:
+    branches-ignore: [gh-pages]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Engine tests + vendored-copy sync check
+        run: npm run test:core
+
+      - name: Static checks for the apps (syntax, JSON, manifest, HTML ids)
+        run: npm run check

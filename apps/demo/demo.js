@@ -241,4 +241,23 @@
   }
   buildDrawer();
   autoGrow();
+
+  // ---------------------------------------------------------------------
+  // Model switcher — mimics the real sites' model dropdown. Clicking cycles
+  // through the options; the EcoPrompt extension reads the button's label
+  // (via its MutationObserver) and re-estimates for the selected model.
+  // ---------------------------------------------------------------------
+
+  const switcher = document.querySelector('[data-demo-models]');
+  if (switcher) {
+    const options = switcher.dataset.demoModels.split('|').map((s) => s.trim()).filter(Boolean);
+    let index = Math.max(0, options.indexOf(switcher.textContent.trim()));
+    switcher.addEventListener('click', () => {
+      index = (index + 1) % options.length;
+      switcher.textContent = options[index];
+      if (switcher.getAttribute('aria-label')) {
+        switcher.setAttribute('aria-label', `Model selector, current model is ${options[index]}`);
+      }
+    });
+  }
 })();

@@ -7,10 +7,15 @@ Live environmental feedback for AI chat, in everyday units.
   energy line ("3% of a phone charge") for the prompt you're drafting,
   updating as you type. Click it for the full card: energy, water, carbon,
   courtesy-trim savings, and the top coaching tips.
+- **Model detection.** The pill reads the page's model switcher ("ChatGPT 5
+  Thinking", "2.5 Pro", an active DeepThink toggle) and estimates for the
+  model you actually selected — the card says "(detected on page)" when it
+  did. If the switcher can't be read, the site's default model is assumed.
 - **Popup** with three tabs: **Coach** (analyze any prompt, copy a trimmed
   version), **Compare** (up to 4 models side by side with a "switch and
   save" banner), and **Impact** (your personal dashboard: today / week /
-  all-time totals, 7-day chart, grade streak).
+  all-time totals, 7-day chart, grade streak, CSV/JSON export of every
+  recorded query).
 - **Badge** shows today's query count, colored by your day's average grade.
 - **Settings** (options page): default model, electricity region (affects
   carbon), reasoning-effort assumption, pill on/off, embodied-carbon toggle.
@@ -33,6 +38,7 @@ Everything runs locally; prompts never leave your machine.
 | `popup.html/css/js` | Coach / Compare / Impact tabs |
 | `background.js` | badge service worker |
 | `settings.html/css/js` | options page |
+| `shared/defaults.js` | user-setting defaults shared by all three surfaces |
 | `vendor/` | synced copy of `packages/core` (engine + data) — **do not edit here** |
 | `assets/` | icons |
 

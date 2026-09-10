@@ -1,5 +1,11 @@
 # Icon Asset Mapping
 
+> **Status: legacy design reference.** These PNGs (≈5 MB each) were produced
+> for the v1 prototype. No current app (extension, web, demo, mobile) loads
+> them — the shipped UIs use inline SVG and emoji — and the React/Next.js
+> snippets below describe a frontend that was never built. Kept for brand
+> continuity; safe to move out of the repository.
+
 This document maps the icon files in the `assets/` folder to their usage throughout the EcoPrompt Coach application.
 
 ## Available Icons

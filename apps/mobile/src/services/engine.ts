@@ -2,7 +2,6 @@
 // The core is dependency-free CommonJS, so Metro bundles it as-is — the
 // mobile app uses EXACTLY the same math and data as the extension and web app.
 
-// @ts-expect-error — core ships untyped CommonJS; typings TODO in packages/core
 import * as core from '@ecoprompt/core';
 
 export type ReasoningEffort = 'low' | 'standard' | 'high';

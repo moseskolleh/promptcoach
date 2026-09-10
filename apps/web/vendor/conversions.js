@@ -64,17 +64,22 @@ function createConverters(equivalents) {
     emailG: eq.email_g ?? 0.3 // short email, network+device share
   };
 
+  // Every candidate has min >= 1 except the smallest unit of each
+  // dimension, whose label handles sub-unit values ("under a second"), so
+  // the picker never produces "0.5 kettles" or "0.05 minutes".
   function energy(wh) {
     const candidates = [
-      { perUnit: f.ledBulbW / 3600, label: (n) => `${round(n)} ${plural(round(n), 'second')} of an LED bulb`, max: 90 },
+      { perUnit: f.ledBulbW / 3600, label: (n) => (n < 1 ? 'under a second of an LED bulb' : `${round(n)} ${plural(round(n), 'second')} of an LED bulb`), max: 90 },
       { perUnit: f.ledBulbW / 60, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of an LED bulb`, min: 1, max: 120 },
       { perUnit: f.microwaveW / 3600, label: (n) => `${round(n)} ${plural(round(n), 'second')} of a microwave`, min: 1, max: 90 },
       { perUnit: f.phoneChargeWh / 100, label: (n) => `${round(n)}% of a phone charge`, min: 1, max: 99 },
       { perUnit: f.phoneChargeWh, label: (n) => `${round(n)} full phone ${plural(Math.round(n), 'charge')}`, min: 1 },
       { perUnit: f.streamingWhPerMin, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of video streaming`, min: 1, max: 600 },
-      { perUnit: f.kettleBoilWh, label: (n) => `boiling ${round(n)} ${plural(round(n), 'kettle')} of water`, min: 0.5 },
-      { perUnit: f.laptopW, label: (n) => `${round(n)} ${plural(round(n), 'hour')} of laptop use`, min: 0.5, max: 100 },
-      { perUnit: f.ebikeWhPerKm, label: (n) => `riding an e-bike ${round(n)} km`, min: 0.5 }
+      { perUnit: f.kettleBoilWh, label: (n) => `boiling ${round(n)} ${plural(round(n), 'kettle')} of water`, min: 1 },
+      { perUnit: f.laptopW / 60, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of laptop use`, min: 1, max: 120 },
+      { perUnit: f.laptopW, label: (n) => `${round(n)} ${plural(round(n), 'hour')} of laptop use`, min: 1, max: 100 },
+      { perUnit: f.ebikeWhPerKm / 1000, label: (n) => `riding an e-bike ${round(n)} ${plural(round(n), 'meter')}`, min: 50, max: 999 },
+      { perUnit: f.ebikeWhPerKm, label: (n) => `riding an e-bike ${round(n)} km`, min: 1 }
     ];
     const pick = pickEquivalent(wh, candidates);
     const primary = pick ? pick.item.label(pick.n) : `${round(wh)} Wh`;
@@ -84,13 +89,13 @@ function createConverters(equivalents) {
 
   function water(ml) {
     const candidates = [
-      { perUnit: 0.05, label: (n) => `${round(n)} ${plural(round(n), 'drop')} of water`, max: 60 },
-      { perUnit: f.teaspoonMl, label: (n) => `${round(n)} ${plural(round(n), 'teaspoon')} of water`, min: 0.5, max: 30 },
-      { perUnit: f.espressoShotMl, label: (n) => `${round(n)} espresso ${plural(round(n), 'shot')} of water`, min: 0.5, max: 30 },
-      { perUnit: f.glassMl, label: (n) => `${round(n)} ${plural(round(n), 'glass', 'glasses')} of drinking water`, min: 0.5, max: 40 },
-      { perUnit: f.bottleMl, label: (n) => `${round(n)} water ${plural(round(n), 'bottle')}`, min: 0.5, max: 60 },
-      { perUnit: f.toiletFlushL * 1000, label: (n) => `${round(n)} toilet ${plural(round(n), 'flush', 'flushes')}`, min: 0.5, max: 100 },
-      { perUnit: f.showerLPerMin * 1000, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of showering`, min: 0.5 }
+      { perUnit: 0.05, label: (n) => (n < 1 ? 'less than a drop of water' : `${Math.round(n)} ${plural(Math.round(n), 'drop')} of water`), max: 100 },
+      { perUnit: f.teaspoonMl, label: (n) => `${round(n)} ${plural(round(n), 'teaspoon')} of water`, min: 1, max: 30 },
+      { perUnit: f.espressoShotMl, label: (n) => `${round(n)} espresso ${plural(round(n), 'shot')} of water`, min: 1, max: 30 },
+      { perUnit: f.glassMl, label: (n) => `${round(n)} ${plural(round(n), 'glass', 'glasses')} of drinking water`, min: 1, max: 40 },
+      { perUnit: f.bottleMl, label: (n) => `${round(n)} water ${plural(round(n), 'bottle')}`, min: 1, max: 60 },
+      { perUnit: f.toiletFlushL * 1000, label: (n) => `${round(n)} toilet ${plural(round(n), 'flush', 'flushes')}`, min: 1, max: 100 },
+      { perUnit: f.showerLPerMin * 1000, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of showering`, min: 1 }
     ];
     const pick = pickEquivalent(ml, candidates);
     const primary = pick ? pick.item.label(pick.n) : `${round(ml)} mL`;
@@ -101,12 +106,13 @@ function createConverters(equivalents) {
   function carbon(g) {
     const carMPerG = 1000 / f.carGPerKm;
     const candidates = [
-      { perUnit: f.breathGPerMin, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of breathing`, max: 30 },
-      { perUnit: 1 / carMPerG, label: (n) => `driving a car ${round(n)} ${plural(round(n), 'meter')}`, min: 1, max: 900 },
-      { perUnit: f.carGPerKm, label: (n) => `driving a car ${round(n)} km`, min: 0.9 },
+      { perUnit: f.breathGPerMin / 60, label: (n) => (n < 1 ? 'under a second of breathing' : `${round(n)} ${plural(round(n), 'second')} of breathing`), max: 90 },
+      { perUnit: f.breathGPerMin, label: (n) => `${round(n)} ${plural(round(n), 'minute')} of breathing`, min: 1, max: 30 },
+      { perUnit: 1 / carMPerG, label: (n) => `driving a car ${round(n)} ${plural(round(n), 'meter')}`, min: 1, max: 999 },
+      { perUnit: f.carGPerKm, label: (n) => `driving a car ${round(n)} km`, min: 1 },
       { perUnit: f.emailG, label: (n) => `sending ${Math.round(n)} short ${plural(Math.round(n), 'email')}`, min: 2, max: 500 },
-      { perUnit: f.treeGPerHour, label: (n) => `${round(n)} ${plural(round(n), 'hour')} of one tree's CO₂ uptake`, min: 0.5, max: 500 },
-      { perUnit: f.treeGPerHour * 24, label: (n) => `${round(n)} ${plural(round(n), 'day')} of one tree's CO₂ uptake`, min: 0.5 }
+      { perUnit: f.treeGPerHour, label: (n) => `${round(n)} ${plural(round(n), 'hour')} of one tree's CO₂ uptake`, min: 1, max: 48 },
+      { perUnit: f.treeGPerHour * 24, label: (n) => `${round(n)} ${plural(round(n), 'day')} of one tree's CO₂ uptake`, min: 1 }
     ];
     const pick = pickEquivalent(g, candidates);
     const primary = pick ? pick.item.label(pick.n) : `${round(g)} g CO₂e`;

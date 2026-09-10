@@ -171,6 +171,7 @@ async function loadData() {
     fetchJson('vendor/data/equivalents.json')
   ]);
   state.modelsRaw = models;
+  referenceImpactCache.clear();
   state.engine = new EcoPromptCore.ImpactEngine({ models, grids, equivalents });
   state.conv = EcoPromptCore.createConverters(equivalents);
 }
@@ -180,9 +181,22 @@ function providerAnchor(modelId) {
   return m ? m.anchor : null;
 }
 
+// Per-model impacts at the two reference configs are pure functions of the
+// catalog, so they are computed once — not on every explorer filter
+// keystroke or model-select rebuild.
+const referenceImpactCache = new Map();
+
+function referenceImpact(modelId, inputTokens, outputTokens) {
+  const key = `${modelId}|${inputTokens}|${outputTokens}`;
+  if (!referenceImpactCache.has(key)) {
+    referenceImpactCache.set(key, state.engine.estimateImpact({ modelId, inputTokens, outputTokens }));
+  }
+  return referenceImpactCache.get(key);
+}
+
 /** Grade at the standard short query (100 in / 300 out) — used for dots/cards. */
 function shortQueryImpact(modelId) {
-  return state.engine.estimateImpact({ modelId, inputTokens: 100, outputTokens: 300 });
+  return referenceImpact(modelId, 100, 300);
 }
 
 /* ============================ 5. Hero live demo ============================ */
@@ -1052,9 +1066,7 @@ function renderExplorer() {
   $('explorer-no-match').classList.toggle('hidden', models.length > 0);
 
   for (const { meta, short } of models) {
-    const long = state.engine.estimateImpact({
-      modelId: meta.id, inputTokens: 10000, outputTokens: 1500
-    });
+    const long = referenceImpact(meta.id, 10000, 1500);
 
     const card = el('article', 'explorer-card');
 

@@ -7,9 +7,15 @@
     "packages/core"
   ],
   "scripts": {
-    "test": "node --test packages/core/test/core.test.js",
+    "test": "node --test packages/core/test/*.test.js && node scripts/check-apps.js",
+    "test:core": "node --test packages/core/test/*.test.js",
+    "check": "node scripts/check-apps.js",
     "sync": "node scripts/sync-core.js",
-    "web": "npx serve apps/web"
+    "web": "npx serve apps/web",
+    "demo": "npx serve apps/demo"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
 }
