@@ -47,6 +47,7 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 | [`apps/mobile`](apps/mobile) | Mobile app **structure** (Expo/React Native skeleton): share-sheet prompt intake, dashboard, weekly recap — ready to implement. |
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every formula, every factor, every source, every limitation. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the pieces fit, and the product/startup roadmap. |
+| [`ROADMAP.md`](ROADMAP.md) | Everything still to be done, in dependency order — with what is verified working today. |
 
 One engine, every surface: extension, web, and mobile all run the exact same
 `@ecoprompt/core` code and data, so the numbers always agree.
@@ -96,16 +97,41 @@ Same question to a reasoning model (DeepSeek-R1): **the energy of riding an
 e-bike 2.4 km** (23.8 Wh) — grade **E**, ~57× more. That's the coaching
 moment.
 
-## Status & roadmap
+## Status
 
-- ✅ v2 engine with 2025/2026 evidence base, 21-model catalog, regression-tested analyzer and engine, CI on every push
-- ✅ Chrome extension + responsive web app
-- ✅ Live on GitHub Pages — [web app](https://moseskolleh.github.io/promptcoach/)
-  at the root, [demo playground](https://moseskolleh.github.io/promptcoach/demo/)
-  at `/demo/`; every push to `main` redeploys via `.github/workflows/deploy-pages.yml`
-- ✅ Mobile app architecture (skeleton)
-- ⏭️ Org dashboards (team totals, goals, Slack recaps), API for enterprises,
-  per-tenant grid factors, verified provider integrations
+What is verified working, by running it rather than by reading it:
+
+| | |
+|---|---|
+| **Engine** | ✅ v2 with the 2025/2026 evidence base, 21-model catalog, **44/44 tests pass** |
+| **Static checks** | ✅ 700 checks across 22 scripts, 15 JSON files, 7 pages (`npm run check`) |
+| **CI** | ✅ Node 20 + 22 on every push and PR, including the vendored-copy sync gate |
+| **Web app + demo playground** | ✅ live on GitHub Pages, redeployed on every push to `main` |
+| **Chrome extension** | ⚠️ works when loaded unpacked — **not yet published to any store** |
+| **Mobile app** | ⛔ skeleton only; every screen is a TODO |
+| **Model catalog** | ⚠️ `last_updated: 2026-06-10` — refresh cadence needed |
+
+Two things are worth knowing before you rely on a number:
+
+- **The catalog has a vintage.** If you are using a model newer than the
+  catalog, `autoDetectModel` falls back to the provider's default and the
+  figure will be for a different model than the one you are typing into. Check
+  `_metadata.last_updated` in
+  [`models.json`](packages/core/src/data/models.json).
+- **12 of the 21 models are `extrapolated`, 8 are `measured`.** Every model
+  carries its `data_source` and a standard deviation, and
+  [METHODOLOGY §8](docs/METHODOLOGY.md#8-known-limitations-read-before-quoting-numbers)
+  is titled "read before quoting numbers" for good reason.
+
+> Version note: the extension manifest is at **2.2.0** while the engine,
+> the root package and this badge read 2.0.0. There is no `CHANGELOG.md` yet
+> to reconcile them — see ROADMAP task **0.3**.
+
+**Next up** — refresh the model catalog, publish the extension to the Chrome
+Web Store (needs a privacy policy first), then org dashboards, an enterprise
+API, per-tenant grid factors and verified provider integrations. The full
+breakdown, with sequencing and a risk register, is in
+[**ROADMAP.md**](ROADMAP.md).
 
 ## Provenance
 
