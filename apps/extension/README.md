@@ -50,3 +50,21 @@ Edit `packages/core` at the repo root, run its tests, then re-sync:
 npm test                      # from repo root
 node scripts/sync-core.js     # refreshes vendor/ in extension and web app
 ```
+
+## Release vs dev manifest
+
+`manifest.json` is the **release** manifest and deliberately contains no
+`localhost`, `127.0.0.1` or `github.io` host matches. Dev-only host permissions
+in a published build are a standard "permission not necessary for the stated
+purpose" rejection trigger on the Chrome Web Store, and they widen the
+extension's reach past what its description claims.
+
+`manifest.dev.json` is the same manifest plus those three hosts, so the
+[demo playground](../demo/) and a local `npx serve` still work while developing.
+To use it, copy it over `manifest.json` in a scratch copy of this directory
+before Load unpacked — never commit that swap.
+
+`manifest.json` also declares `browser_specific_settings.gecko`
+`data_collection_permissions: {required: ["none"]}`. That is required for new
+addons.mozilla.org submissions, and for this extension it is simply true: every
+calculation runs locally and no prompt text leaves the device.

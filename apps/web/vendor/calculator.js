@@ -10,9 +10,19 @@
 // arXiv:2505.09598), so the data file stays citable benchmark numbers while
 // the engine derives a smooth, physically sensible curve. Decode (output)
 // dominates because generation is sequential, while prefill (input) is
-// massively parallel — the fit consistently recovers e_in ≈ 0 and
-// e_out ≈ 0.2–20 mWh/token (small models ~0.2–0.5, frontier chat ~1–3,
-// reasoning ~7–18), matching the literature.
+// massively parallel — so e_out (≈0.2–20 mWh/token: small models ~0.2–0.5,
+// frontier chat ~1–3, reasoning ~7–18) dominates at chat-sized prompts,
+// matching the literature.
+//
+// e_in is SMALL BUT NOT ZERO. Measured across the current catalog it spans
+// 0.0009–0.516 mWh/token, non-zero for every model. Because the largest
+// fitted benchmark point is 10,000 input tokens, extrapolating that term
+// linearly into today's 200k–1M context windows inverts the finding this
+// catalog cites for output-dominance (Adamska et al., arXiv:2503.10666,
+// r≈0.9): unclamped, a 200k-token prompt attributes ~96% of its energy to
+// input. estimateImpact() therefore holds the input term flat beyond
+// INPUT_FIT_EXTRAPOLATION_LIMIT × benchMaxInput and reports energy.clamped.
+// Do not remove that clamp without new benchmark points at long context.
 //
 // Water:  W (L)      = E_IT · WUE_site + E_query · WUE_source,  E_IT = E_query / PUE
 // Carbon: C (kgCO2e) = E_query · CIF · embodiedFactor
@@ -168,6 +178,12 @@ const REASONING_EFFORT = {
   high: 2.5 // extended thinking / hard problems
 };
 
+// How far past the largest fitted input benchmark the linear input term may
+// be extrapolated before it is held flat. The benchmarks top out at 10,000
+// input tokens, so 5x reaches 50,000 — beyond that the term would dominate a
+// number it was never fitted to support. See the header note on e_in.
+const INPUT_FIT_EXTRAPOLATION_LIMIT = 5;
+
 const QUERY_CATEGORIES = [
   { id: 'short', maxTokens: 400, label: 'Short query' },
   { id: 'medium', maxTokens: 2000, label: 'Medium query' },
@@ -306,12 +322,21 @@ class ImpactEngine {
 
     const { eIn, eOut, eFixed, relStd } = model.coefficients;
 
+    // The input coefficient is fitted over 100–10,000 tokens. Past a few
+    // multiples of that, a linear term stops being an estimate and becomes an
+    // invention — at 200k it would claim ~96% of the query's energy. Hold it
+    // flat beyond the limit and say so, rather than emitting a confident
+    // number built almost entirely out of extrapolation.
+    const inputFitCap = model.benchMaxInput * INPUT_FIT_EXTRAPOLATION_LIMIT;
+    const tInBilled = Math.min(tIn, inputFitCap);
+    const inputClamped = tIn > inputFitCap;
+
     // Reasoning effort scales everything except prefill: hidden
     // chain-of-thought tokens show up in the fitted fixed term (they barely
     // vary with visible output length) as well as in the decode term.
     const decodeWh = eOut * tOut * effort;
     const fixedWh = eFixed * effort;
-    const energyWh = (fixedWh + eIn * tIn + decodeWh) * taskMult;
+    const energyWh = (fixedWh + eIn * tInBilled + decodeWh) * taskMult;
     const energyKwh = energyWh / 1000;
 
     // Water — on-site cooling applies to IT energy, source water to total.
@@ -360,11 +385,23 @@ class ImpactEngine {
         kwh: energyKwh,
         breakdown: {
           fixedWh: fixedWh * taskMult,
-          inputWh: eIn * tIn * taskMult,
+          inputWh: eIn * tInBilled * taskMult,
           outputWh: decodeWh * taskMult
         },
         perTokenOutMwh: eOut * effort * 1000,
         extrapolated,
+        // Present only when the prompt ran past the fitted input range. A
+        // consumer that shows a number without checking this is showing a
+        // floor, not an estimate.
+        clamped: inputClamped
+          ? {
+              term: 'input',
+              atTokens: inputFitCap,
+              requestedTokens: tIn,
+              fittedMaxTokens: model.benchMaxInput,
+              reason: 'beyond fitted range — input term held flat; treat as a lower bound'
+            }
+          : null,
         confidence: {
           minWh: Math.max(0, energyWh * (1 - band)),
           maxWh: energyWh * (1 + band)
@@ -381,7 +418,11 @@ class ImpactEngine {
         operationalG: energyKwh * cif * 1000,
         embodiedG: energyKwh * cif * (embodied - 1) * 1000
       },
-      grade: this.gradeFor(energyWh),
+      // A clamped estimate is a lower bound, so its grade is a floor too —
+      // mark it provisional rather than presenting a confident letter.
+      grade: inputClamped
+        ? { ...this.gradeFor(energyWh), provisional: true }
+        : this.gradeFor(energyWh),
       factors: {
         taskMultiplier: taskMult,
         reasoningEffort: model.isReasoning ? effortKey : null,
@@ -473,16 +514,28 @@ class ImpactEngine {
 const HOST_DEFAULTS = {
   'chatgpt.com': 'gpt-5',
   'chat.openai.com': 'gpt-5',
-  'claude.ai': 'claude-4.5-sonnet',
+  'claude.ai': 'claude-sonnet-5',
   'gemini.google.com': 'gemini-2.5-flash',
   'copilot.microsoft.com': 'gpt-5',
   'chat.mistral.ai': 'mistral-large',
   'chat.deepseek.com': 'deepseek-v3',
+  // Perplexity and Poe are multi-model routers: the served model is chosen
+  // per query and is not observable from the page, so these defaults are a
+  // guess, not a detection. They are kept so the UI has something to show,
+  // and flagged below so a caller can label them honestly.
   'perplexity.ai': 'gpt-4o-mini',
   'poe.com': 'claude-4.5-sonnet',
-  'you.com': 'gpt-4o-mini',
   'grok.com': 'grok-3'
 };
+
+// Hosts whose served model cannot be read off the page at all. A number shown
+// for these is a per-site assumption, not a measurement of the user's choice.
+const ROUTED_HOSTS = ['perplexity.ai', 'poe.com', 'copilot.microsoft.com'];
+
+function isRoutedHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return ROUTED_HOSTS.some((d) => hostMatches(host, d));
+}
 
 function hostMatches(hostname, domain) {
   return hostname === domain || hostname.endsWith('.' + domain);
@@ -508,25 +561,59 @@ function autoDetectModel(hostname) {
 // collects such labels and this pure function maps them to catalog ids.
 // Patterns are ordered most-specific first, per provider family. A label
 // that names no catalog model returns null so the caller keeps its default.
+// A label naming a generation the catalog does not carry must NOT fall
+// through to the nearest older sibling. Every such fallback resolved to a
+// cheaper, non-reasoning model, so detection error was one-directional: the
+// product only ever understated. These run before the family patterns and
+// force a null (the caller then shows a documented host default, which is
+// explainable, instead of asserting a specific wrong model's coefficients).
+const UNKNOWN_GENERATION = [
+  // GPT-6+ and any GPT-5 minor version the catalog has no entry for.
+  /\bgpt[\s-]?[6-9]\b/i,
+  /\b(?:gpt[\s-]?|chatgpt\s+)5\.[1-9]\b/i,
+  // Claude generations with no catalog entry. Sonnet 5 is deliberately NOT
+  // listed here — it has an entry, so it is matched below.
+  /\b(?:opus|fable|mythos)[\s-]*\d/i,
+  /\b(?:sonnet|haiku)[\s-]*[6-9]\b/i,
+  /\bclaude[\s-]*[6-9]\b/i,
+  // Opus has no catalog entry at any version — never guess a sibling tier.
+  /\bopus\b/i,
+  // Gemini 3+.
+  /\bgemini[\s-]*[3-9]\b/i,
+  // The lookbehind keeps "2.5 Pro" out: without it \b matches after the
+  // decimal point and the trailing "5 Pro" reads as a bare generation.
+  /(?<![\d.])[3-9][\s-]*(?:pro|flash|deep\s+think)\b/i,
+  // Grok 4+, DeepSeek V4+, Mistral generations past the catalog.
+  /\bgrok[\s-]?[4-9]\b/i,
+  /\bv[4-9]\b/i,
+  // Router / auto modes pick a model we cannot observe.
+  /\bauto\b/i
+];
+
 const MODEL_LABEL_PATTERNS = {
   openai: [
     { re: /\bo4[\s-]?mini\b/i, id: 'o4-mini' },
     { re: /\bo3\b(?![\s-]?mini)/i, id: 'o3' },
-    { re: /\b(?:gpt[\s-]?)?5(?:\.\d)?[\s-]*(?:thinking|pro|reasoning)\b|\bthinking\b|\bthink\s+longer\b|\bdeep\s+research\b/i, id: 'gpt-5-thinking' },
+    { re: /\b(?:gpt[\s-]?)?5[\s-]*(?:thinking|pro|reasoning)\b|\bthinking\b|\bthink\s+longer\b|\bdeep\s+research\b/i, id: 'gpt-5-thinking' },
     { re: /\b4\.1[\s-]?nano\b/i, id: 'gpt-4.1-nano' },
     { re: /\b4o[\s-]?mini\b/i, id: 'gpt-4o-mini' },
     { re: /\b(?:gpt[\s-]?)?4o\b/i, id: 'gpt-4o' },
-    { re: /\b(?:gpt[\s-]?|chatgpt\s+)?5(?:\.\d)?\b(?:[\s-]*(?:instant|chat|auto|fast|mini|nano))?/i, id: 'gpt-5' }
+    // Anchored to bare 5 — "5.6" is handled by UNKNOWN_GENERATION above.
+    { re: /\b(?:gpt[\s-]?|chatgpt\s+)?5\b(?:[\s-]*(?:instant|chat|fast|mini|nano))?/i, id: 'gpt-5' }
   ],
   anthropic: [
+    // Version-first, most-specific-first. There is deliberately no bare
+    // /\bsonnet\b/ catch-all: it silently absorbed every future Sonnet.
+    { re: /\bhaiku[\s-]*4\.5\b|\b4\.5[\s-]*haiku\b/i, id: 'claude-4.5-haiku' },
     { re: /\bhaiku\b/i, id: 'claude-4.5-haiku' },
-    { re: /\b3\.7\b|\bsonnet\s+3\.7\b/i, id: 'claude-3.7-sonnet' },
-    { re: /\bsonnet\b/i, id: 'claude-4.5-sonnet' }
+    { re: /\b(?:sonnet[\s-]*)?3\.7\b/i, id: 'claude-3.7-sonnet' },
+    { re: /\bsonnet[\s-]*4\.5\b|\b4\.5[\s-]*sonnet\b/i, id: 'claude-4.5-sonnet' },
+    { re: /\bsonnet[\s-]*5\b|\b5[\s-]*sonnet\b/i, id: 'claude-sonnet-5' }
   ],
   google: [
     { re: /\b2\.0[\s-]?flash\b/i, id: 'gemini-2.0-flash' },
-    { re: /\bflash(?:[\s-]?lite)?\b/i, id: 'gemini-2.5-flash' },
-    { re: /\bpro\b|\bdeep\s+think\b|\bthinking\b/i, id: 'gemini-2.5-pro' }
+    { re: /\b2\.5[\s-]?flash(?:[\s-]?lite)?\b|\bflash(?:[\s-]?lite)?\b/i, id: 'gemini-2.5-flash' },
+    { re: /\b2\.5[\s-]?pro\b|\bpro\b|\bdeep\s+think\b|\bthinking\b/i, id: 'gemini-2.5-pro' }
   ],
   mistral: [
     { re: /\bsmall\b|\bministral\b/i, id: 'mistral-small' },
@@ -545,7 +632,13 @@ const MODEL_LABEL_PATTERNS = {
 const HOST_FAMILY = [
   ['chatgpt.com', 'openai'],
   ['chat.openai.com', 'openai'],
-  ['copilot.microsoft.com', 'openai'],
+  // Copilot gets its own family. Mapping it to 'openai' leaked ChatGPT's
+  // "Deep Research" rule onto Copilot's own Deep Research mode, reporting a
+  // reasoning model's energy for a non-reasoning default — an 11.6x
+  // overstatement. Copilot does not expose which model served a turn, so
+  // there is nothing here to match: detection returns null and the caller
+  // uses the documented host default.
+  ['copilot.microsoft.com', 'microsoft'],
   ['claude.ai', 'anthropic'],
   ['gemini.google.com', 'google'],
   ['chat.mistral.ai', 'mistral'],
@@ -582,10 +675,29 @@ function detectModelFromLabels(hostname, labels, opts = {}) {
     .filter((l) => l && typeof l.text === 'string')
     .map((l) => ({ text: l.text.replace(/\s+/g, ' ').trim(), active: !!l.active }))
     .filter((l) => l.text.length > 0 && l.text.length <= 80);
+  // Fail closed first. If any visible label names a generation the catalog
+  // does not carry, refuse rather than matching a looser pattern further
+  // down — that path always resolved to an older, cheaper, non-reasoning
+  // sibling and made the product understate.
+  for (const item of items) {
+    for (const re of UNKNOWN_GENERATION) {
+      if (re.test(item.text)) {
+        return {
+          modelId: null,
+          matchedText: item.text,
+          source: 'unknown-generation',
+          unknownGeneration: true
+        };
+      }
+    }
+  }
+
   for (const { re, id, requiresActive } of patterns) {
     for (const item of items) {
       if (requiresActive && !item.active) continue;
-      if (re.test(item.text)) return { modelId: id, matchedText: item.text };
+      if (re.test(item.text)) {
+        return { modelId: id, matchedText: item.text, source: 'label' };
+      }
     }
   }
   return null;
@@ -602,8 +714,10 @@ const CalculatorModule = {
   autoDetectModel,
   detectModelFromLabels,
   familyForHost,
+  isRoutedHost,
   REASONING_EFFORT,
-  GRADE_BANDS
+  GRADE_BANDS,
+  INPUT_FIT_EXTRAPOLATION_LIMIT
 };
 
 if (typeof globalThis !== 'undefined') {
