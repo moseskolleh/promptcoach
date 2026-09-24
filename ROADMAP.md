@@ -23,7 +23,7 @@ Verified by execution on 2026-09-15, not by reading the code.
 | GitHub Pages deploy | ✅ web app and demo playground live |
 | Chrome extension | ⚠️ loads unpacked; **not published to any store** |
 | Mobile app | ⛔ skeleton only — every screen is a TODO |
-| Model catalog | ⚠️ 21 models, `last_updated: 2026-06-10` — **three months stale** |
+| Model catalog | ⚠️ 22 models, current 2026-09-24. Note the earlier "three months stale" reading was imprecise: the file was edited 2026-09-10 but added no models and never bumped `last_updated`, so the *roster* was un-refreshed while the *date field* was simply wrong. |
 | Repo weight | ⚠️ **58 MB `.git`**, ~58 MB of unreferenced binaries |
 | Governance files | ❌ no CONTRIBUTING, SECURITY, PRIVACY, CHANGELOG, CITATION |
 

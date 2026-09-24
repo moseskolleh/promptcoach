@@ -6,7 +6,7 @@ boundary, and the known limitations — in that order, because the most common
 failure mode of "AI footprint" tools is mixing numbers from incompatible
 boundaries.
 
-Last updated: 2026-09-10.
+Last updated: 2026-09-24. Evidence audit: [RESEARCH-2026.md](RESEARCH-2026.md).
 
 ---
 
@@ -255,19 +255,36 @@ in D–E):
    difference between a standard and a reasoning selection is 10–30× and
    is the largest single source of error in per-query estimates.
 
+8. **The input coefficient is only fitted to 10,000 tokens.** `e_in` is small
+   but non-zero for every model (0.0009–0.516 mWh/token). Extrapolated
+   linearly, it would attribute ~96% of a 200k-token query's energy to input —
+   inverting Adamska et al., which this document cites for output-dominance.
+   The engine therefore holds the input term flat past 5× the largest fitted
+   point and returns `energy.clamped` with a provisional grade. **A clamped
+   figure is a lower bound, not an estimate.**
+9. **A model id is a weaker predictor than this document implies.** Independent
+   measurement shows batch size moving per-request energy 12–17× for a single
+   model on a single GPU — more than the spread between models. No benchmark
+   point here states an assumed batch size, and the published uncertainty bands
+   almost certainly do not span it.
+10. **`measured` now means a third-party hardware measurement.** Five closed
+   hosted models previously carried that label on the strength of an
+   infrastructure-aware estimation framework; they are now `benchmarked`. No
+   number changed — only the claim about where it came from.
+
 ---
 
 ## 9. Full reference list
 
 1. Jegham, N., Abdelatti, M., Elmoubarki, L., Hendawi, A. (2025). *How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference.* arXiv:2505.09598 (v6, Nov 2025). https://arxiv.org/abs/2505.09598
 2. Elsworth, C., et al. (Google, 2025). *Measuring the environmental impact of delivering AI at Google Scale.* arXiv:2508.15734. https://arxiv.org/abs/2508.15734
-3. Oviedo, F., Kazhamiaka, F., Choukse, E., et al. (Microsoft, 2025). *Energy Use of AI Inference: Efficiency Pathways and Test-Time Compute.* arXiv:2509.20241; published in *Joule* (2026). https://arxiv.org/abs/2509.20241
+3. Oviedo, F., Kazhamiaka, F., Choukse, E., et al. (Microsoft, 2025). *Energy Use of AI Inference: Efficiency Pathways and Test-Time Compute.* arXiv:2509.20241. https://arxiv.org/abs/2509.20241 — **preprint figures only.** The published *Joule* (2026) version reports different values and has NOT been read; secondary sources put its median at 0.31 Wh (IQR 0.16–0.60) rather than the preprint’s 0.34 Wh, with an unknown boundary. Verify against the journal article before quoting any figure from it.
 4. Mistral AI (2025). *Our contribution to a global environmental standard for AI.* https://mistral.ai/news/our-contribution-to-a-global-environmental-standard-for-ai/
 5. Altman, S. (2025). *The Gentle Singularity.* https://blog.samaltman.com/the-gentle-singularity
 6. You, J. (Epoch AI, 2025). *How much energy does ChatGPT use?* https://epoch.ai/gradient-updates/how-much-energy-does-chatgpt-use
 7. Adamska, M., et al. (2025). *Green Prompting: Characterizing Prompt-driven Energy Costs of LLM Inference.* arXiv:2503.10666. https://arxiv.org/abs/2503.10666
-8. *Green Prompt Engineering* (2025). arXiv:2509.22320. https://arxiv.org/html/2509.22320
-9. *Small Talk, Big Impact: The Energy Cost of Thanking AI* (2026). arXiv:2601.22357.
+8. *Green Prompt Engineering* (2025). arXiv:2509.22320. https://arxiv.org/html/2509.22320 — ⚠️ **unverified**: no author list; identifier not resolved to a document (see RESEARCH-2026.md §3.1).
+9. *Small Talk, Big Impact: The Energy Cost of Thanking AI* (2026). arXiv:2601.22357 — ⚠️ **UNVERIFIED**: no URL, no author list, identifier never resolved to a document. Resolve or remove before any external publication (see RESEARCH-2026.md §3.1).
 10. Li, P., Yang, J., Islam, M. A., Ren, S. (2025). *Making AI Less "Thirsty".* Communications of the ACM. https://cacm.acm.org/sustainability-and-computing/making-ai-less-thirsty/
 11. Mytton, D. (2021). *Data centre water consumption.* npj Clean Water 4, 11. https://www.nature.com/articles/s41545-021-00101-w
 12. IEA (2025). *Electricity 2025 — Emissions.* https://www.iea.org/reports/electricity-2025/emissions

@@ -196,7 +196,7 @@ test('analyzer: zero-AI alternatives detected', () => {
 
 test('autoDetectModel maps chat hosts', () => {
   assert.strictEqual(core.autoDetectModel('chatgpt.com'), 'gpt-5');
-  assert.strictEqual(core.autoDetectModel('claude.ai'), 'claude-4.5-sonnet');
+  assert.strictEqual(core.autoDetectModel('claude.ai'), 'claude-sonnet-5');
   assert.strictEqual(core.autoDetectModel('gemini.google.com'), 'gemini-2.5-flash');
   assert.strictEqual(core.autoDetectModel('example.com'), null);
 });
@@ -333,6 +333,31 @@ test('detectModelFromLabels maps model-picker text to catalog ids per provider',
   assert.strictEqual(d('claude.ai', ['Haiku 4.5']), 'claude-4.5-haiku');
   assert.strictEqual(d('claude.ai', ['Claude 3.7 Sonnet']), 'claude-3.7-sonnet');
   assert.strictEqual(d('claude.ai', ['Opus 4.1']), null, 'models outside the catalog are not guessed');
+  // Fail closed on newer generations. Each of these previously resolved to an
+  // older, cheaper or non-reasoning sibling, so detection error only ever ran
+  // in the direction of understating the footprint.
+  assert.strictEqual(d('claude.ai', ['Sonnet 5']), 'claude-sonnet-5', 'Sonnet 5 resolves to its own entry, not Sonnet 4.5');
+  assert.strictEqual(d('claude.ai', ['Opus 5.5']), null, 'Opus has no catalog entry at any version');
+  assert.strictEqual(d('claude.ai', ['Sonnet']), null, 'an unversioned label names no specific model');
+  assert.strictEqual(d('chatgpt.com', ['GPT-5.1']), null, 'an unknown GPT-5 minor version is not GPT-5');
+  assert.strictEqual(d('chatgpt.com', ['Auto']), null, 'a router mode picks a model we cannot observe');
+  assert.strictEqual(d('gemini.google.com', ['Gemini 3 Pro']), null, 'Gemini 3 is not Gemini 2.5');
+  assert.strictEqual(
+    d('gemini.google.com', ['Gemini 3 Deep Think']), null,
+    'a heavy-reasoning selection must not resolve to a non-reasoning entry'
+  );
+  assert.strictEqual(d('grok.com', ['Grok 4 Heavy']), null, 'Grok 4 is not Grok 3');
+  assert.strictEqual(d('chat.deepseek.com', ['V4']), null, 'DeepSeek V4 is not V3');
+  // Copilot has its own family: ChatGPT's "Deep Research" rule must not leak
+  // onto it and report a reasoning model for Copilot's non-reasoning default.
+  assert.strictEqual(core.familyForHost('copilot.microsoft.com'), 'microsoft');
+  assert.strictEqual(d('copilot.microsoft.com', ['Deep Research']), null);
+  // Hosts that route per query cannot have their served model read off-page.
+  assert.ok(core.isRoutedHost('perplexity.ai') && core.isRoutedHost('poe.com'));
+  assert.ok(!core.isRoutedHost('chatgpt.com'));
+  // Versioned labels the catalog does carry still resolve.
+  assert.strictEqual(d('gemini.google.com', ['2.5 Pro']), 'gemini-2.5-pro', 'a decimal is not a bare generation');
+  assert.strictEqual(d('gemini.google.com', ['2.5 Flash']), 'gemini-2.5-flash');
   // Google
   assert.strictEqual(d('gemini.google.com', ['2.5 Flash']), 'gemini-2.5-flash');
   assert.strictEqual(d('gemini.google.com', ['2.5 Pro']), 'gemini-2.5-pro');
@@ -350,7 +375,9 @@ test('detectModelFromLabels maps model-picker text to catalog ids per provider',
   const ids = new Set(engine.listModels().map((m) => m.id));
   for (const [host, labels] of [
     ['chatgpt.com', ['o4-mini', 'o3', 'Thinking', '4.1 nano', '4o mini', '4o', 'GPT-5']],
-    ['claude.ai', ['Haiku', '3.7', 'Sonnet']],
+    // 'Sonnet' alone is deliberately absent: an unversioned label no longer
+    // resolves, so the caller falls back to a documented host default.
+    ['claude.ai', ['Haiku', '3.7', 'Sonnet 4.5']],
     ['gemini.google.com', ['2.0 Flash', 'Flash', 'Pro']],
     ['chat.mistral.ai', ['Small', 'Large']],
     ['chat.deepseek.com', [{ text: 'DeepThink', active: true }, 'V3']],
@@ -360,5 +387,43 @@ test('detectModelFromLabels maps model-picker text to catalog ids per provider',
       const id = d(host, [label]);
       assert.ok(id && ids.has(id), `${host} "${typeof label === 'string' ? label : label.text}" -> ${id}`);
     }
+  }
+});
+
+test('the input term is clamped beyond its fitted range, and says so', () => {
+  const model = engine.getModel('claude-4.5-sonnet');
+  const cap = model.benchMaxInput * core.INPUT_FIT_EXTRAPOLATION_LIMIT;
+
+  // Inside the fitted range nothing is clamped and the grade is definite.
+  const near = engine.estimateImpact({ modelId: 'claude-4.5-sonnet', inputTokens: 10000, outputTokens: 500 });
+  assert.strictEqual(near.energy.clamped, null);
+  assert.strictEqual(near.grade.provisional, undefined);
+
+  // Past the cap the input term stops growing, so two very different context
+  // lengths agree — the estimate becomes a floor rather than a fiction.
+  const at200k = engine.estimateImpact({ modelId: 'claude-4.5-sonnet', inputTokens: 200000, outputTokens: 500 });
+  const at1m = engine.estimateImpact({ modelId: 'claude-4.5-sonnet', inputTokens: 1000000, outputTokens: 500 });
+  assert.ok(at200k.energy.clamped, 'a 200k-token prompt is beyond the fitted range');
+  assert.strictEqual(at200k.energy.clamped.term, 'input');
+  assert.strictEqual(at200k.energy.clamped.atTokens, cap);
+  assert.strictEqual(at200k.energy.wh, at1m.energy.wh, 'input term is held flat past the cap');
+  assert.strictEqual(at200k.grade.provisional, true, 'a floor gets a provisional grade');
+
+  // Unclamped, the fit put ~96% of a 200k prompt's energy in the input term
+  // while this catalog cites Adamska et al. for output-dominance. The clamp
+  // keeps the reported figure anchored to what was actually measured.
+  const { eIn, eOut, eFixed } = model.coefficients;
+  const unclamped = eFixed + eIn * 200000 + eOut * 500;
+  assert.ok(unclamped > 25, 'unclamped extrapolation really is this large');
+  assert.ok(at200k.energy.wh < unclamped / 3, 'the clamp materially reduces the invented portion');
+
+  // Tokens are still reported honestly even though they are not all billed.
+  assert.strictEqual(at200k.tokens.input, 200000);
+  assert.strictEqual(at200k.energy.clamped.requestedTokens, 200000);
+
+  // Every model has a non-zero input coefficient — the header comment used to
+  // claim the fit recovers e_in ~ 0, which is false for all of them.
+  for (const m of engine.listModels()) {
+    assert.ok(engine.getModel(m.id).coefficients.eIn > 0, `${m.id} has a non-zero e_in`);
   }
 });

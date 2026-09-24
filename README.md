@@ -48,6 +48,7 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every formula, every factor, every source, every limitation. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the pieces fit, and the product/startup roadmap. |
 | [`ROADMAP.md`](ROADMAP.md) | Everything still to be done, in dependency order — with what is verified working today. |
+| [`docs/RESEARCH-2026.md`](docs/RESEARCH-2026.md) | The 2026 evidence audit: what was verified, what collapsed under fact-checking, and the citations that must not be shipped. |
 
 One engine, every surface: extension, web, and mobile all run the exact same
 `@ecoprompt/core` code and data, so the numbers always agree.
@@ -103,25 +104,30 @@ What is verified working, by running it rather than by reading it:
 
 | | |
 |---|---|
-| **Engine** | ✅ v2 with the 2025/2026 evidence base, 21-model catalog, **44/44 tests pass** |
-| **Static checks** | ✅ 700 checks across 22 scripts, 15 JSON files, 7 pages (`npm run check`) |
+| **Engine** | ✅ v2 with the 2025/2026 evidence base, 22-model catalog, **45/45 tests pass** |
+| **Static checks** | ✅ 721 checks across 22 scripts, 16 JSON files, 7 pages (`npm run check`) |
 | **CI** | ✅ Node 20 + 22 on every push and PR, including the vendored-copy sync gate |
 | **Web app + demo playground** | ✅ live on GitHub Pages, redeployed on every push to `main` |
 | **Chrome extension** | ⚠️ works when loaded unpacked — **not yet published to any store** |
 | **Mobile app** | ⛔ skeleton only; every screen is a TODO |
-| **Model catalog** | ⚠️ `last_updated: 2026-06-10` — refresh cadence needed |
+| **Model catalog** | ⚠️ current as of 2026-09-24; **no 2026-generation model has a published energy figure**, so those entries are extrapolated |
 
 Two things are worth knowing before you rely on a number:
 
-- **The catalog has a vintage.** If you are using a model newer than the
-  catalog, `autoDetectModel` falls back to the provider's default and the
-  figure will be for a different model than the one you are typing into. Check
-  `_metadata.last_updated` in
-  [`models.json`](packages/core/src/data/models.json).
-- **12 of the 21 models are `extrapolated`, 8 are `measured`.** Every model
-  carries its `data_source` and a standard deviation, and
+- **A model the catalog does not carry now reports no match, rather than the
+  nearest older sibling.** That fallback was one-directional — it always
+  resolved to a cheaper or non-reasoning model, so the tool only ever
+  understated. Detection now fails closed and the UI shows a documented host
+  default instead of asserting a specific wrong model.
+- **Long prompts return a lower bound, not an estimate.** The per-token fit is
+  supported only to 10,000 input tokens; past 5× that the input term is held
+  flat and the result carries `energy.clamped` with a provisional grade.
+- **Only open-weight models are `measured`.** Closed hosted models are
+  `benchmarked` — an infrastructure-aware estimate, not instrumentation, since
+  no third party can meter them.
   [METHODOLOGY §8](docs/METHODOLOGY.md#8-known-limitations-read-before-quoting-numbers)
-  is titled "read before quoting numbers" for good reason.
+  is titled "read before quoting numbers" for good reason, and
+  [RESEARCH-2026.md](docs/RESEARCH-2026.md) is the evidence audit behind it.
 
 > Version note: the extension manifest is at **2.2.0** while the engine,
 > the root package and this badge read 2.0.0. There is no `CHANGELOG.md` yet

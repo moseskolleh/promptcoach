@@ -1,14 +1,14 @@
 {
   "_metadata": {
     "version": "2.0.0",
-    "last_updated": "2026-06-10",
+    "last_updated": "2026-09-24",
     "primary_source": "Jegham et al. (2025), How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference, arXiv:2505.09598 (v6, Nov 2025 — 30 models, DEA eco-efficiency ranking)",
     "anchor_sources": [
       "Google (Aug 2025), Measuring the environmental impact of delivering AI at Google, arXiv:2508.15734 — median Gemini Apps text prompt: 0.24 Wh, 0.26 mL water, 0.03 gCO2e (market-based, incl. embodied)",
       "OpenAI / Altman (Jun 2025), The Gentle Singularity — average ChatGPT query: ~0.34 Wh, ~0.32 mL water",
       "Mistral AI (Jul 2025), lifecycle analysis of Mistral Large 2 (ISO 14040/44, peer-reviewed) — 1.14 gCO2e and 45 mL water per 400-output-token response (full lifecycle)",
       "Epoch AI (Feb 2025), How much energy does ChatGPT use? — ~0.3 Wh per typical GPT-4o query; ~2.5 Wh at 10k-token input",
-      "Oviedo et al. (Microsoft, 2025/Joule 2026), Energy Use of AI Inference, arXiv:2509.20241 — median 0.34 Wh/query (IQR 0.18-0.67) for >200B-param models in production; non-production extrapolations overstate 4-20x",
+      "Oviedo et al. (Microsoft), Energy Use of AI Inference, arXiv:2509.20241 (PREPRINT v1 figures: median 0.34 Wh/query, IQR 0.18-0.67, >200B-param models in production; non-production extrapolations overstate 4-20x). VERSION UNPINNED: the published Joule (2026) version reports different values and was NOT read in this pipeline - verify against the journal article before quoting any figure from it.",
       "URI AI lab / Jegham dashboard (Aug 2025) — GPT-5 medium reasoning response: ~18.35 Wh average, up to ~40 Wh (contested estimate)",
       "Adamska et al. (2025), Green Prompting, arXiv:2503.10666 — response length is the dominant energy driver (r~0.9); input length matters far less"
     ],
@@ -16,8 +16,18 @@
       "data_source_field": "measured = benchmarked in Jegham et al.; extrapolated = estimated from size class, hardware, and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
       "benchmark_configurations": "short = 100 in / 300 out, medium = 1000 in / 1000 out, long = 10000 in / 1500 out tokens",
       "reasoning_models": "Benchmark energy for reasoning models includes hidden chain-of-thought tokens at a typical thinking budget; the engine scales the fixed and decode terms (everything except prefill) for low/standard/high effort.",
-      "provider_reported_anchor": "A provider's own published per-prompt figure, kept for reference. Each anchor states its boundary; anchors with a wider boundary than the engine (full lifecycle incl. training, or a median prompt of unknown length) are not expected to be reproduced by the engine and are labelled as such."
-    }
+      "provider_reported_anchor": "A provider's own published per-prompt figure, kept for reference. Each anchor states its boundary; anchors with a wider boundary than the engine (full lifecycle incl. training, or a median prompt of unknown length) are not expected to be reproduced by the engine and are labelled as such.",
+      "evidence_gaps_2026_09_24": [
+        "No lab has published a per-query energy figure for ANY 2026-generation model. Every 2026 entry is necessarily extrapolated, with no provider anchor.",
+        "Jegham et al. (arXiv:2505.09598) is unrevised at v6 (24 Nov 2025) - there is no v7.",
+        "Google has published no successor to its Aug 2025 figure of 0.24 Wh / 0.26 mL / 0.03 gCO2e per median Gemini Apps prompt.",
+        "Only the Llama and DeepSeek entries are open-weight enough for a genuine third-party measurement; closed hosted models are 'benchmarked', not measured."
+      ],
+      "linearity_validity": "The fitted coefficients are supported only across 100-10,000 input tokens - the range of the benchmark points. e_in is small but non-zero for every model (0.0009-0.516 mWh/token), so extrapolating it into 200k-1M context windows would attribute ~96% of a long query's energy to input, inverting Adamska et al. (arXiv:2503.10666), which this catalog cites for output-dominance. The engine therefore holds the input term flat past 5x the largest fitted point and flags the result as clamped.",
+      "anthropic_lineup_2026_09_24": "Anthropic's current lineup is Fable 5.1, Opus 5.5, Opus 5, Sonnet 5 and Haiku 4.5 (verified against Anthropic's own platform docs). Only Sonnet 5 is added here. Opus and Fable are DELIBERATELY ABSENT: no defensible energy figure exists for them, and seeding them from Sonnet's points would report a smaller, non-thinking model's number under a larger always-on-thinking model's name - repeating the exact understatement this release fixes. Until a measurement exists they resolve to no catalog entry, which the UI reports as such."
+    },
+    "data_source_field": "measured = an independent third-party hardware measurement (open-weight models only); benchmarked = estimated by the Jegham et al. infrastructure-aware framework, not instrumented - no third party can meter a closed hosted model; extrapolated = estimated from size class, hardware and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
+    "last_checked": "2026-09-24"
   },
   "models": [
     {
@@ -31,8 +41,8 @@
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
-        "boundary": "Undisclosed; average query of unknown length, on-site water only",
-        "label": "OpenAI-reported average ChatGPT query (Jun 2025); Microsoft/Joule 2026 production median is also 0.34 Wh"
+        "boundary": "BOUNDARY NOT DISCLOSED - no model named, no definition of \"average query\", no statement on PUE, idle, embodied or training; not peer reviewed. Kept for reference, never used to calibrate.",
+        "label": "OpenAI-reported average ChatGPT query (Jun 2025)"
       },
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.54, "energy_wh_std": 0.16 },
@@ -67,11 +77,11 @@
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
-      "data_source": "measured",
+      "data_source": "benchmarked",
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
-        "boundary": "Undisclosed; average query of unknown length, on-site water only",
+        "boundary": "BOUNDARY NOT DISCLOSED - no model named, no definition of \"average query\", no statement on PUE, idle, embodied or training; not peer reviewed. Kept for reference, never used to calibrate.",
         "label": "OpenAI-reported average ChatGPT query (Jun 2025)"
       },
       "performance": {
@@ -101,7 +111,7 @@
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Nano",
-      "data_source": "measured",
+      "data_source": "benchmarked",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.103, "energy_wh_std": 0.037 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.271, "energy_wh_std": 0.087 },
@@ -130,7 +140,7 @@
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
-      "data_source": "measured",
+      "data_source": "benchmarked",
       "is_reasoning": true,
       "provider_reported_anchor": {
         "energy_wh": 33.0,
@@ -141,6 +151,21 @@
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 14.0, "energy_wh_std": 4.2 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 24.0, "energy_wh_std": 7.0 },
         "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 33.5, "energy_wh_std": 9.0 }
+      }
+    },
+    {
+      "model_id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5",
+      "provider": "Anthropic",
+      "host": "AWS",
+      "host_key": "aws",
+      "size_class": "Large",
+      "data_source": "extrapolated",
+      "notes": "Benchmark points CARRIED FORWARD verbatim from Claude Sonnet 4.5 (same tier, same host). No lab has published a per-query energy figure for any 2026-generation model, so this is a transparent carry-forward, not a measurement of Sonnet 5. Named correctly so the reported number stops being attributed to a superseded model; the underlying figure is unchanged and equally extrapolated. Replace as soon as a measurement exists.",
+      "performance": {
+        "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
+        "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.14, "energy_wh_std": 0.54 },
+        "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 4.35, "energy_wh_std": 1.09 }
       }
     },
     {
@@ -155,7 +180,8 @@
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.14, "energy_wh_std": 0.54 },
         "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 4.35, "energy_wh_std": 1.09 }
-      }
+      },
+      "notes": "Legacy. Superseded by claude-sonnet-5; kept so stored history stays resolvable."
     },
     {
       "model_id": "claude-4.5-haiku",
@@ -178,12 +204,14 @@
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Large",
-      "data_source": "measured",
+      "data_source": "benchmarked",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.836, "energy_wh_std": 0.102 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.781, "energy_wh_std": 0.277 },
         "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 5.518, "energy_wh_std": 0.751 }
-      }
+      },
+      "retired": true,
+      "notes": "Retired: absent from Anthropic's current model lineup. Kept for historical history entries; excluded from detection."
     },
     {
       "model_id": "gemini-2.5-pro",
@@ -227,7 +255,7 @@
       "host": "Google Cloud",
       "host_key": "google_cloud",
       "size_class": "Small",
-      "data_source": "measured",
+      "data_source": "benchmarked",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.095, "energy_wh_std": 0.018 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.285, "energy_wh_std": 0.048 },
