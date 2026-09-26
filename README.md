@@ -48,6 +48,7 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every formula, every factor, every source, every limitation. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the pieces fit, and the product/startup roadmap. |
 | [`ROADMAP.md`](ROADMAP.md) | Everything still to be done, in dependency order — with what is verified working today. |
+| [`PLAN.md`](PLAN.md) | Build plan v3: 38 steps from pre-send estimator to closed-loop coach — observed answers, one-click actions, provable numbers, new surfaces. |
 | [`docs/RESEARCH-2026.md`](docs/RESEARCH-2026.md) | The 2026 evidence audit: what was verified, what collapsed under fact-checking, and the citations that must not be shipped. |
 
 One engine, every surface: extension, web, and mobile all run the exact same
@@ -137,7 +138,8 @@ Two things are worth knowing before you rely on a number:
 Web Store (needs a privacy policy first), then org dashboards, an enterprise
 API, per-tenant grid factors and verified provider integrations. The full
 breakdown, with sequencing and a risk register, is in
-[**ROADMAP.md**](ROADMAP.md).
+[**ROADMAP.md**](ROADMAP.md). What to build after that — step by step — is in
+[**PLAN.md**](PLAN.md).
 
 ## Provenance
 
