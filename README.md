@@ -48,7 +48,7 @@ Full math + citations: **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**.
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every formula, every factor, every source, every limitation. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the pieces fit, and the product/startup roadmap. |
 | [`ROADMAP.md`](ROADMAP.md) | Everything still to be done, in dependency order — with what is verified working today. |
-| [`PLAN.md`](PLAN.md) | Build plan v3: 38 steps from pre-send estimator to closed-loop coach — observed answers, one-click actions, provable numbers, new surfaces. |
+| [`PLAN.md`](PLAN.md) | Build plan v4: 46 steps. First a 2026 model catalog (current models only, honest ranges, correct detection), then the closed-loop coach: observed answers, one-click actions, provable numbers, new surfaces. v3 is in `docs/legacy/`. |
 | [`docs/RESEARCH-2026.md`](docs/RESEARCH-2026.md) | The 2026 evidence audit: what was verified, what collapsed under fact-checking, and the citations that must not be shipped. |
 
 One engine, every surface: extension, web, and mobile all run the exact same
