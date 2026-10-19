@@ -371,6 +371,43 @@ How effort is applied:
   a model whose thinking is baked into its benchmark points can neither
   stop nor be scaled past what was measured.
 
+#### 2.5.8 How the apps show an estimate
+
+Every app labels a result through one function, `describeImpact()`, so the
+web app, the extension pill and card, the popup and (once built) the mobile
+screens say the same thing. A measured or benchmarked model keeps its single
+figure and grade. A model nobody has measured shows:
+
+| What | Model that thinks | Model that doesn't think | Several agents (floor) |
+|---|---|---|---|
+| Energy figure | the range, "0.252–12.6 Wh" | "about" the point, with the range beside it | "≥ 8.93 Wh" |
+| Everyday units | "1.5–75.5 minutes of an LED bulb" | "about 2.7 seconds of a microwave" | "at least 6.9 minutes of video streaming" |
+| Grade | "A–E", coloured from A to E | one letter, or "A–B" when the range crosses a band | "≥ D" |
+| Method chip | *estimated · tier* or *estimated · from parameters* | same | same |
+| Note | *likely high* | *likely high* | *likely high* |
+
+- **"Likely high"** is on every estimate. It is the direction of error
+  chosen in §2.5.4: the estimates are built from 2025 models on 2025
+  hardware.
+- **One unit where one fits.** A range is written in a single everyday
+  unit when both ends count at least one of it and stay within its
+  natural span. Otherwise each end gets its own unit: "between 12 drops of
+  water and 5.8 teaspoons of water". A range never reads "0.4–12 minutes".
+- **Savings between estimates.** A percentage is claimed only when the
+  cheaper model's high end is below the dearer model's low end. It is then
+  "at least" the gap between those two ends. Overlapping ranges get
+  "probably less", never a number (PLAN.md Step 27, pulled forward for
+  Compare and the coach's switch button).
+- **Totals.** A day's or week's total that includes an estimate is a
+  range: lows summed with lows, highs with highs. One floor makes the total
+  a floor. The extension stores each estimate's `lowWh` and `highWh` in its
+  history for this.
+- **Where the energy goes.** For an estimate the breakdown gives shares,
+  not watt-hours. For a model that thinks it covers the visible answer
+  only, and says how many hidden tokens thinking adds.
+- **Sorting.** The centre of each range orders lists. Compare calls its top
+  row "Likely greenest" when an estimate is in the set.
+
 ---
 
 ## 3. Water model
@@ -457,6 +494,9 @@ in D–E):
 | **C** | ≤ 3.5 Wh |
 | **D** | ≤ 10 Wh |
 | **E** | > 10 Wh |
+
+An estimated model's grade is the grade of each end of its energy range:
+"B–E" when the range crosses bands, "≥ C" for a floor (§2.5.8).
 
 ---
 

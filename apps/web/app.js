@@ -42,12 +42,8 @@ function debounce(fn, ms) {
   };
 }
 
-function formatWh(wh) {
-  if (wh >= 1000) return `${(wh / 1000).toFixed(2)} kWh`;
-  if (wh >= 10) return `${wh.toFixed(1)} Wh`;
-  if (wh >= 1) return `${wh.toFixed(2)} Wh`;
-  return `${wh.toFixed(3)} Wh`;
-}
+// formatWh, describeImpact and savingClaim are top-level functions in
+// vendor/conversions.js, which shares this page's global scope.
 
 function formatMl(ml) {
   return ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : `${ml.toFixed(1)} mL`;
@@ -70,6 +66,50 @@ function paintSlider(input) {
 }
 
 const GRADE_DOTS = { A: '🟢', B: '🟢', C: '🟡', D: '🟠', E: '🔴' };
+
+/**
+ * Paint a grade element for an impact: one letter for a measured model, a
+ * range ("B–E") or a floor ("≥ C") for an estimate (PLAN.md Step 8). A range
+ * is coloured from its low grade to its high one. The text goes into
+ * `textNode` when the element has a separate one (the coach badge).
+ */
+function paintGrade(node, desc, textNode = node) {
+  textNode.textContent = desc.gradeText;
+  node.dataset.grade = desc.gradeLow;
+  node.classList.toggle('is-span', desc.gradeText.length > 1);
+  if (desc.gradeHigh && desc.gradeHigh !== desc.gradeLow) {
+    node.style.setProperty('--grade-from', `var(--grade-${desc.gradeLow.toLowerCase()})`);
+    node.style.setProperty('--grade-to', `var(--grade-${desc.gradeHigh.toLowerCase()})`);
+    node.dataset.span = 'true';
+  } else {
+    node.style.removeProperty('--grade-from');
+    node.style.removeProperty('--grade-to');
+    delete node.dataset.span;
+  }
+  node.setAttribute('aria-label', desc.gradeLabel);
+}
+
+/** The method chip and "likely high" note of an estimate, as info chips. */
+function estimateChips(desc) {
+  const chips = [];
+  if (!desc.estimated) return chips;
+  const method = el('span', 'info-chip', desc.methodChip);
+  method.dataset.kind = 'estimated';
+  chips.push(method);
+  const note = el('span', 'info-chip', desc.note);
+  note.dataset.kind = 'likely-high';
+  note.title = desc.noteReason;
+  chips.push(note);
+  return chips;
+}
+
+/**
+ * A percentage saving that never claims more than the ranges allow:
+ * "57% less energy" or "at least 54% less energy" (PLAN.md Step 27).
+ */
+function savingPhrase(claim) {
+  return `${claim.atLeast ? 'at least ' : ''}${claim.percentage}% less energy`;
+}
 
 /* ============================ 2. Theme ============================ */
 
@@ -124,7 +164,7 @@ const state = {
   impact: null,
 
   // Compare
-  compareIds: ['gemini-2.5-flash', 'gpt-4o', 'gpt-5-thinking'],
+  compareIds: [], // set from the catalog at boot: defaultCompareIds()
   compareTouched: false, // user moved compare sliders manually
   compareInput: 100,
   compareOutput: 300,
@@ -206,42 +246,73 @@ function shortQueryImpact(modelId) {
 
 /* ============================ 5. Hero live demo ============================ */
 
+/** Models the catalog lists, cheapest at a short query first. */
+function modelsByShortQuery(filter) {
+  return state.engine.listModels(MODEL_LIST)
+    .filter(filter)
+    .sort((a, b) => shortQueryImpact(a.id).energy.wh - shortQueryImpact(b.id).energy.wh);
+}
+
+/** A model that always thinks, else any reasoning model, from the catalog. */
+function firstThinker(models) {
+  return models.find((m) => m.thinking === 'always') || models.find((m) => m.isReasoning) || null;
+}
+
+/**
+ * Compare's opening trio, from whatever the catalog lists: the greenest
+ * small plain model, the first large plain model and the first model that
+ * thinks, topped up in catalog order.
+ */
+function defaultCompareIds() {
+  const models = state.engine.listModels(MODEL_LIST);
+  const small = modelsByShortQuery((m) => m.sizeClass === 'Small' && !m.isReasoning)[0];
+  const large = models.find((m) => m.sizeClass === 'Large' && !m.isReasoning);
+  const ids = [...new Set([small, large, firstThinker(models)].filter(Boolean).map((m) => m.id))];
+  for (const m of models) {
+    if (ids.length >= 3) break;
+    if (!ids.includes(m.id)) ids.push(m.id);
+  }
+  return ids;
+}
+
 function buildDemoFacts() {
   const engine = state.engine;
   const conv = state.conv;
   const facts = [];
+  const short = { inputTokens: 100, outputTokens: 300 };
+  const tag = (impact) => (impact.estimate ? ', estimated' : '');
 
-  // Fact 1: a reasoning-mode answer, in everyday units (computed live).
-  const thinking = engine.estimateImpact({
-    modelId: 'gpt-5-thinking', inputTokens: 100, outputTokens: 300
-  });
+  // Fact 1: a thinking model's answer, in everyday units (computed live).
+  const thinker = firstThinker(engine.listModels(MODEL_LIST));
+  const thinking = thinker && engine.estimateImpact({ modelId: thinker.id, ...short });
   if (thinking) {
-    const e = conv.energy(thinking.energy.wh);
+    const e = conv.forImpact(thinking).energy;
     facts.push({
       emoji: '🧠',
-      text: `One ${thinking.model.name} answer ≈ ${e.primary} (${e.secondary}).`
+      text: `One ${thinking.model.name} answer uses ${e.primary} (${e.secondary}${tag(thinking)}).`
     });
   }
 
-  // Fact 2: best vs worst on a typical short question.
-  const cmp = engine.compareModels({ ...MODEL_LIST, inputTokens: 100, outputTokens: 300 });
-  if (cmp.best && cmp.worst && cmp.potentialSavings) {
+  // Fact 2: best vs worst on a typical short question, claiming only what
+  // the ranges support.
+  const cmp = engine.compareModels({ ...MODEL_LIST, ...short });
+  const claim = cmp.best && cmp.worst && cmp.best !== cmp.worst ? savingClaim(cmp.best, cmp.worst) : null;
+  if (claim) {
     facts.push({
       emoji: '⚖️',
-      text: `Same question, different model: ${cmp.best.model.name} uses ${cmp.potentialSavings.percentage}% less energy than ${cmp.worst.model.name}.`
+      text: `Same question, different model: ${cmp.best.model.name} ` +
+        `${claim.claim === 'probably' ? 'probably uses less energy' : `uses ${savingPhrase(claim)}`} than ${cmp.worst.model.name}.`
     });
   }
 
-  // Fact 3: a day of efficient prompting, summed up.
-  const daily = engine.estimateImpact({
-    modelId: 'gemini-2.5-flash', inputTokens: 100, outputTokens: 300
-  });
+  // Fact 3: a day of efficient prompting with the greenest everyday model.
+  const everyday = modelsByShortQuery((m) => m.sizeClass !== 'Nano' && !m.isReasoning)[0];
+  const daily = everyday && engine.estimateImpact({ modelId: everyday.id, ...short });
   if (daily) {
-    const e = conv.energy(daily.energy.wh * 25);
-    const w = conv.water(daily.water.ml * 25);
+    const rel = conv.forImpact(daily, 25);
     facts.push({
       emoji: '💧',
-      text: `25 ${daily.model.name} queries a day ≈ ${e.primary} and ${w.primary}.`
+      text: `25 ${daily.model.name} queries a day use ${rel.energy.primary} and ${rel.water.primary}.`
     });
   }
 
@@ -294,10 +365,11 @@ function populateModelSelect() {
     og.label = provider;
     for (const m of list) {
       const impact = shortQueryImpact(m.id);
-      const grade = impact ? impact.grade.grade : '?';
+      const desc = impact ? describeImpact(impact) : null;
       const opt = document.createElement('option');
       opt.value = m.id;
-      opt.textContent = `${GRADE_DOTS[grade] || '⚪'} ${m.name} — grade ${grade}${m.isReasoning ? ' · reasoning' : ''}`;
+      opt.textContent = `${(desc && GRADE_DOTS[impact.grade.grade]) || '⚪'} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
+        `${m.isReasoning ? ' · reasoning' : ''}${desc && desc.estimated ? ' · estimated' : ''}`;
       og.appendChild(opt);
     }
     select.appendChild(og);
@@ -338,15 +410,25 @@ function setSegmentWidths(impact) {
   const { fixedWh, inputWh, outputWh } = impact.energy.breakdown;
   const total = Math.max(1e-9, fixedWh + inputWh + outputWh);
   const pct = (x) => `${Math.max(0, (x / total) * 100)}%`;
+  // An estimate has no single figure to split, so its legend gives shares;
+  // a model that thinks splits only its visible answer, and says so.
+  const label = impact.estimate
+    ? (x) => `${Math.round(Math.max(0, (x / total) * 100))}%`
+    : formatWh;
   $('bar-fixed').style.width = pct(fixedWh);
   $('bar-input').style.width = pct(inputWh);
   $('bar-output').style.width = pct(outputWh);
-  $('legend-fixed').textContent = formatWh(fixedWh);
-  $('legend-input').textContent = formatWh(inputWh);
-  $('legend-output').textContent = formatWh(outputWh);
+  $('legend-fixed').textContent = label(fixedWh);
+  $('legend-input').textContent = label(inputWh);
+  $('legend-output').textContent = label(outputWh);
+  const thinking = impact.estimate && impact.estimate.rangeOnly ? impact.estimate.thinkingTokens : null;
+  const n = (x) => Math.round(x).toLocaleString('en-US');
+  $('breakdown-note').textContent = thinking
+    ? `visible answer only · thinking adds ${thinking.lowTokens > 0 ? `${n(thinking.lowTokens)}–` : 'up to '}${n(thinking.highTokens)} hidden tokens`
+    : 'output tokens dominate';
   $('energy-breakdown-bar').setAttribute(
     'aria-label',
-    `Energy breakdown: fixed ${formatWh(fixedWh)}, input ${formatWh(inputWh)}, output ${formatWh(outputWh)}`
+    `Energy breakdown${thinking ? ' of the visible answer' : ''}: fixed ${label(fixedWh)}, input ${label(inputWh)}, output ${label(outputWh)}`
   );
 }
 
@@ -357,7 +439,7 @@ function setSegmentWidths(impact) {
 function applyPromptChange(newText, toastPrefix) {
   const prevText = $('prompt-input').value;
   const beforeWh = state.impact ? state.impact.energy.wh : null;
-  const beforeGrade = state.impact ? state.impact.grade.grade : null;
+  const beforeGrade = state.impact ? describeImpact(state.impact).gradeText : null;
 
   $('prompt-input').value = newText;
   state.outputTouched = false; // let the analyzer re-estimate the output
@@ -367,8 +449,9 @@ function applyPromptChange(newText, toastPrefix) {
   if (beforeWh && state.impact && state.impact.energy.wh < beforeWh) {
     const pct = Math.round((1 - state.impact.energy.wh / beforeWh) * 100);
     if (pct > 0) msg += ` — ${pct}% less energy`;
-    if (beforeGrade && state.impact.grade.grade !== beforeGrade) {
-      msg += ` (${beforeGrade} → ${state.impact.grade.grade})`;
+    const afterGrade = describeImpact(state.impact).gradeText;
+    if (beforeGrade && afterGrade !== beforeGrade) {
+      msg += ` (${beforeGrade} → ${afterGrade})`;
     }
   }
   showToast(msg, {
@@ -382,12 +465,12 @@ function applyPromptChange(newText, toastPrefix) {
   });
 }
 
-function switchModelAction(bestModel, savingsPct) {
+function switchModelAction(bestModel, claim) {
   state.modelId = bestModel.id;
   $('model-select').value = bestModel.id;
   syncReasoningControl();
   updateCoach();
-  showToast(`🔁 Switched to ${bestModel.name} — ~${savingsPct}% less energy on this prompt`);
+  showToast(`🔁 Switched to ${bestModel.name} — ${savingPhrase(claim)} on this prompt`);
 }
 
 /**
@@ -436,11 +519,13 @@ function tipAction(tip, analysis) {
     const best = cmp.best;
     const current = cmp.results.find((r) => r.model.id === state.modelId);
     if (!best || !current || best.model.id === state.modelId) return null;
-    const pct = Math.round((1 - best.energy.wh / current.energy.wh) * 100);
-    if (pct < 15) return null;
+    // Only a saving the ranges support: never a percentage between
+    // overlapping estimates, and never a switch for "probably less".
+    const claim = savingClaim(best, current);
+    if (!claim || claim.claim !== 'percent' || claim.percentage < 15) return null;
     return {
-      label: `🔁 Switch to ${best.model.name} (−${pct}%)`,
-      onClick: () => switchModelAction(best.model, pct)
+      label: `🔁 Switch to ${best.model.name} (${claim.atLeast ? `at least ${claim.percentage}% less` : `−${claim.percentage}%`})`,
+      onClick: () => switchModelAction(best.model, claim)
     };
   }
   return null;
@@ -523,21 +608,28 @@ function updateCoach() {
   bodyEl.classList.remove('hidden');
 
   // Grade
-  const badge = $('grade-badge');
-  badge.dataset.grade = impact.grade.grade;
-  $('grade-letter').textContent = impact.grade.grade;
+  const desc = describeImpact(impact);
+  paintGrade($('grade-badge'), desc, $('grade-letter'));
   $('grade-summary').textContent =
     `${impact.model.name} · ${analysis.taskType} · ${impact.category} query`;
-  $('grade-detail').textContent =
-    `${formatWh(impact.energy.wh)} per query · eco-score ${impact.grade.score}/100` +
-    (impact.energy.extrapolated ? ' · extrapolated beyond benchmark range' : '');
+  // A model nobody has measured has no single figure to score: its range
+  // and method stand in for the eco-score.
+  $('grade-detail').textContent = desc.estimated
+    ? (desc.rangeOnly ? `${desc.whText} per query` : `about ${desc.whText} per query (${desc.rangeText})`)
+    : `${formatWh(impact.energy.wh)} per query · eco-score ${impact.grade.score}/100` +
+      (impact.energy.extrapolated ? ' · extrapolated beyond benchmark range' : '');
+  const chipRow = $('grade-chips');
+  clearChildren(chipRow);
+  for (const chip of estimateChips(desc)) chipRow.appendChild(chip);
+  chipRow.classList.toggle('hidden', !desc.estimated);
 
   // Metric cards
   const rel = state.conv.forImpact(impact);
   $('energy-primary').textContent = rel.energy.primary;
   $('energy-secondary').textContent = rel.energy.secondary;
-  $('energy-range').textContent =
-    `range ${formatWh(impact.energy.confidence.minWh)} – ${formatWh(impact.energy.confidence.maxWh)}`;
+  $('energy-range').textContent = desc.estimated
+    ? `${desc.methodChip} · ${desc.note}`
+    : `range ${formatWh(impact.energy.confidence.minWh)} – ${formatWh(impact.energy.confidence.maxWh)}`;
 
   $('water-primary').textContent = rel.water.primary;
   $('water-secondary').textContent = rel.water.secondary;
@@ -586,10 +678,12 @@ function updateStickyPill() {
     pill.classList.add('hidden');
     return;
   }
-  const grade = $('sticky-grade');
-  grade.textContent = state.impact.grade.grade;
-  grade.dataset.grade = state.impact.grade.grade;
-  $('sticky-text').textContent = state.conv.energy(state.impact.energy.wh).primary;
+  paintGrade($('sticky-grade'), describeImpact(state.impact));
+  // An estimate shows its range here too, in everyday units.
+  const range = state.impact.energy.range;
+  $('sticky-text').textContent = range
+    ? state.conv.energyRange(range.lowWh, range.highWh).primary
+    : state.conv.energy(state.impact.energy.wh).primary;
   pill.classList.toggle('hidden', state.coachInView);
 }
 
@@ -832,13 +926,21 @@ function renderCompare() {
     }
   });
 
-  // Savings banner
+  // Savings banner: only what the ranges support (PLAN.md Step 27).
   const banner = $('savings-banner');
-  if (cmp.potentialSavings && cmp.potentialSavings.percentage > 0) {
-    const per100 = state.conv.energy(cmp.potentialSavings.energyWh * 100);
+  const claim = cmp.best && cmp.worst && cmp.best !== cmp.worst ? savingClaim(cmp.best, cmp.worst) : null;
+  if (claim && claim.claim === 'percent') {
+    const per100 = state.conv.energy(claim.energyWh * 100);
     $('savings-text').textContent =
       `Switching from ${cmp.worst.model.name} to ${cmp.best.model.name} saves ` +
-      `${cmp.potentialSavings.percentage}% — that's ${per100.primary} per 100 queries.`;
+      (claim.atLeast
+        ? `at least ${claim.percentage}% — at least ${per100.primary} per 100 queries.`
+        : `${claim.percentage}% — that's ${per100.primary} per 100 queries.`);
+    banner.classList.remove('hidden');
+  } else if (claim) {
+    $('savings-text').textContent =
+      `${cmp.best.model.name} probably uses less energy than ${cmp.worst.model.name}, ` +
+      'but their estimated ranges overlap, so no saving is claimed.';
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
@@ -846,6 +948,9 @@ function renderCompare() {
 
   const wrap = $('compare-results');
   clearChildren(wrap);
+  // With an estimate in the set, the order is by centre of range: likely,
+  // not certain.
+  const greenest = cmp.results.some((r) => r.energy.range) ? 'Likely greenest' : 'Greenest';
 
   // --- Mobile cards ---
   const cards = el('div', 'compare-cards');
@@ -857,15 +962,20 @@ function renderCompare() {
     nameWrap.appendChild(el('div', 'compare-card-name', r.model.name));
     nameWrap.appendChild(el('div', 'compare-card-provider', r.model.provider));
     head.appendChild(nameWrap);
+    const desc = describeImpact(r);
     const headRight = el('div');
-    if (idx === 0) headRight.appendChild(el('span', 'best-tag', 'Greenest'));
-    const pill = el('span', 'grade-pill', r.grade.grade);
-    pill.dataset.grade = r.grade.grade;
+    if (idx === 0) headRight.appendChild(el('span', 'best-tag', greenest));
+    const pill = el('span', 'grade-pill');
+    paintGrade(pill, desc);
     pill.style.marginLeft = '0.5em';
-    pill.setAttribute('aria-label', `Eco-grade ${r.grade.grade}`);
     headRight.appendChild(pill);
     head.appendChild(headRight);
     card.appendChild(head);
+    if (desc.estimated) {
+      const chips = el('div', 'grade-chips');
+      for (const chip of estimateChips(desc)) chips.appendChild(chip);
+      card.appendChild(chips);
+    }
     card.appendChild(compareMetricRow('⚡ Energy', rel.energy.primary, rel.energy.secondary));
     card.appendChild(compareMetricRow('💧 Water', rel.water.primary, rel.water.secondary));
     card.appendChild(compareMetricRow('🌍 Carbon', rel.carbon.primary, rel.carbon.secondary));
@@ -895,18 +1005,23 @@ function renderCompare() {
     const tdModel = el('td');
     const nm = el('span', 'cell-model', r.model.name);
     tdModel.appendChild(nm);
+    const desc = describeImpact(r);
     if (idx === 0) {
-      const tag = el('span', 'best-tag', 'Greenest');
+      const tag = el('span', 'best-tag', greenest);
       tag.style.marginLeft = '0.5em';
       tdModel.appendChild(tag);
     }
     tdModel.appendChild(el('span', 'cell-provider', r.model.provider));
+    if (desc.estimated) {
+      const chips = el('div', 'grade-chips');
+      for (const chip of estimateChips(desc)) chips.appendChild(chip);
+      tdModel.appendChild(chips);
+    }
     tr.appendChild(tdModel);
 
     const tdGrade = el('td');
-    const pill = el('span', 'grade-pill', r.grade.grade);
-    pill.dataset.grade = r.grade.grade;
-    pill.setAttribute('aria-label', `Eco-grade ${r.grade.grade}`);
+    const pill = el('span', 'grade-pill');
+    paintGrade(pill, desc);
     tdGrade.appendChild(pill);
     tr.appendChild(tdGrade);
 
@@ -942,14 +1057,21 @@ function renderCompareChart(results) {
   const barH = 16;
   const width = 600;
   const height = results.length * rowH + 4;
-  const maxWh = Math.max(...results.map((r) => r.energy.wh), 1e-9);
+  // An estimate is a solid bar to its low end and a faint span to its high
+  // end; a floor's span runs to the edge. Its label is the range.
+  const descs = results.map(describeImpact);
+  const reserve = descs.some((d) => d.estimated) ? 120 : 90;
+  const span = width - reserve;
+  const topWh = (r, d) => (d.estimated ? (d.highWh === null ? d.lowWh : d.highWh) : r.energy.wh);
+  const maxWh = Math.max(...results.map((r, i) => topWh(r, descs[i])), 1e-9);
+  const valueText = (r, d) => (d.estimated ? d.rangeText : formatWh(r.energy.wh));
 
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label',
     'Bar chart of energy per query: ' +
-    results.map((r) => `${r.model.name} ${formatWh(r.energy.wh)}`).join(', '));
+    results.map((r, i) => `${r.model.name} ${valueText(r, descs[i])}`).join(', '));
 
   const bars = [];
   results.forEach((r, i) => {
@@ -970,7 +1092,22 @@ function renderCompareChart(results) {
     track.setAttribute('class', 'chart-track');
     svg.appendChild(track);
 
-    const targetW = Math.max(8, (r.energy.wh / maxWh) * (width - 90));
+    const d = descs[i];
+    const solidWh = d.estimated ? d.lowWh : r.energy.wh;
+    const targetW = Math.max(8, (solidWh / maxWh) * span);
+    let endW = targetW;
+    if (d.estimated) {
+      endW = d.highWh === null ? span : Math.max(targetW, (d.highWh / maxWh) * span);
+      const rangeBar = document.createElementNS(NS, 'rect');
+      rangeBar.setAttribute('x', '0');
+      rangeBar.setAttribute('y', String(y + labelH));
+      rangeBar.setAttribute('width', String(endW));
+      rangeBar.setAttribute('height', String(barH));
+      rangeBar.setAttribute('rx', '8');
+      rangeBar.setAttribute('class', 'chart-span');
+      rangeBar.setAttribute('fill', GRADE_COLORS[d.gradeHigh || d.gradeLow] || '#10B981');
+      svg.appendChild(rangeBar);
+    }
     const bar = document.createElementNS(NS, 'rect');
     bar.setAttribute('x', '0');
     bar.setAttribute('y', String(y + labelH));
@@ -978,15 +1115,15 @@ function renderCompareChart(results) {
     bar.setAttribute('height', String(barH));
     bar.setAttribute('rx', '8');
     bar.setAttribute('class', 'chart-bar');
-    bar.setAttribute('fill', GRADE_COLORS[r.grade.grade] || '#10B981');
+    bar.setAttribute('fill', GRADE_COLORS[d.gradeLow] || '#10B981');
     svg.appendChild(bar);
-    bars.push({ bar, targetW, value: r.energy.wh, y: y + labelH });
+    bars.push({ bar, targetW, value: solidWh, y: y + labelH });
 
     const value = document.createElementNS(NS, 'text');
-    value.setAttribute('x', String(targetW + 8));
+    value.setAttribute('x', String(endW + 8));
     value.setAttribute('y', String(y + labelH + barH - 3));
     value.setAttribute('class', 'chart-value');
-    value.textContent = formatWh(r.energy.wh);
+    value.textContent = valueText(r, d);
     svg.appendChild(value);
   });
 
@@ -1080,9 +1217,10 @@ function renderExplorer() {
     names.appendChild(el('div', 'explorer-name', meta.name));
     names.appendChild(el('div', 'explorer-provider', `${meta.provider} · ${meta.host} · ${meta.sizeClass}`));
     head.appendChild(names);
-    const pill = el('span', 'grade-pill', short.grade.grade);
-    pill.dataset.grade = short.grade.grade;
-    pill.setAttribute('aria-label', `Eco-grade ${short.grade.grade} at a short query`);
+    const desc = describeImpact(short);
+    const pill = el('span', 'grade-pill');
+    paintGrade(pill, desc);
+    pill.setAttribute('aria-label', `${desc.gradeLabel} at a short query`);
     head.appendChild(pill);
     card.appendChild(head);
 
@@ -1093,14 +1231,20 @@ function renderExplorer() {
       s.appendChild(el('span', 'stat-value', value));
       return s;
     };
-    stats.appendChild(mkStat('Short query', formatWh(short.energy.wh)));
-    if (long) stats.appendChild(mkStat('Long query', formatWh(long.energy.wh)));
+    // An estimate's figures are its ranges.
+    const whOf = (impact) => (impact.energy.range ? describeImpact(impact).rangeText : formatWh(impact.energy.wh));
+    stats.appendChild(mkStat('Short query', whOf(short)));
+    if (long) stats.appendChild(mkStat('Long query', whOf(long)));
     card.appendChild(stats);
 
     const chips = el('div', 'explorer-chips');
-    const src = el('span', 'info-chip', meta.dataSource);
-    src.dataset.kind = meta.dataSource;
-    chips.appendChild(src);
+    if (desc.estimated) {
+      for (const chip of estimateChips(desc)) chips.appendChild(chip);
+    } else {
+      const src = el('span', 'info-chip', meta.dataSource);
+      src.dataset.kind = meta.dataSource;
+      chips.appendChild(src);
+    }
     if (meta.isReasoning) {
       const rc = el('span', 'info-chip', 'reasoning model');
       rc.dataset.kind = 'reasoning';
@@ -1159,6 +1303,38 @@ function writeLibrary(items) {
   }
 }
 
+function savedRange(impact) {
+  const r = impact.energy.range;
+  return { lowWh: r.lowWh, highWh: r.highWh, rangeOnly: r.rangeOnly, method: impact.estimate.method };
+}
+
+/** A saved entry's range, sanitised; null for one saved without a range. */
+function cleanRange(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const lowWh = Number(raw.lowWh);
+  if (!Number.isFinite(lowWh) || lowWh < 0) return null;
+  const highWh = raw.highWh === null ? null : Number(raw.highWh);
+  if (highWh !== null && !(Number.isFinite(highWh) && highWh >= lowWh)) return null;
+  return {
+    lowWh,
+    highWh,
+    rangeOnly: raw.rangeOnly === true || highWh === null,
+    method: Object.prototype.hasOwnProperty.call(EcoPromptCore.METHOD_CHIPS, raw.method) ? raw.method : null
+  };
+}
+
+/** describeImpact for a saved entry; null for one saved without a range. */
+function describeSaved(it) {
+  const r = cleanRange(it.range);
+  if (!r) return null;
+  const gradeOf = (wh) => state.engine.gradeFor(wh).grade;
+  return describeImpact({
+    grade: { grade: it.grade, range: { low: gradeOf(r.lowWh), high: r.highWh === null ? null : gradeOf(r.highWh) } },
+    energy: { wh: Number(it.energyWh) || r.lowWh, range: { lowWh: r.lowWh, highWh: r.highWh, rangeOnly: r.rangeOnly, floor: r.highWh === null } },
+    estimate: { method: r.method, thinkingTokens: null }
+  });
+}
+
 function saveLibraryEntry(title) {
   const items = readLibrary();
   items.push({
@@ -1172,6 +1348,9 @@ function saveLibraryEntry(title) {
     },
     energyWh: state.impact ? state.impact.energy.wh : 0,
     grade: state.impact ? state.impact.grade.grade : '?',
+    // An estimate keeps its range, so the library never shows its centre
+    // as if it were a measurement.
+    range: state.impact && state.impact.energy.range ? savedRange(state.impact) : undefined,
     ts: Date.now()
   });
   writeLibrary(items);
@@ -1214,9 +1393,13 @@ function renderLibrary() {
 
     const head = el('div', 'library-item-head');
     head.appendChild(el('span', 'library-item-title', it.title || 'Untitled prompt'));
+    const saved = describeSaved(it);
     const pill = el('span', 'grade-pill', it.grade || '?');
-    if (it.grade) pill.dataset.grade = it.grade;
-    pill.setAttribute('aria-label', `Eco-grade ${it.grade || 'unknown'}`);
+    if (saved) paintGrade(pill, saved);
+    else {
+      if (it.grade) pill.dataset.grade = it.grade;
+      pill.setAttribute('aria-label', `Eco-grade ${it.grade || 'unknown'}`);
+    }
     head.appendChild(pill);
     card.appendChild(head);
 
@@ -1225,7 +1408,9 @@ function renderLibrary() {
     const model = state.engine.getModel(it.modelId);
     const meta = el('div', 'library-item-meta');
     meta.appendChild(el('span', null, model ? model.name : (it.modelId || 'unknown model')));
-    if (typeof it.energyWh === 'number') {
+    if (saved) {
+      meta.appendChild(el('span', null, `⚡ ${saved.rangeText} · ${saved.methodChip}`));
+    } else if (typeof it.energyWh === 'number') {
       meta.appendChild(el('span', null, `⚡ ${formatWh(it.energyWh)}`));
     }
     if (it.tokens) {
@@ -1302,6 +1487,7 @@ function importLibrary(file) {
             : { input: 0, output: 0 },
           energyWh: Number(it.energyWh) || 0,
           grade: typeof it.grade === 'string' ? it.grade.slice(0, 1) : '?',
+          range: cleanRange(it.range) || undefined,
           ts: Number(it.ts) || Date.now()
         };
         seen.add(entry.id);
@@ -1430,6 +1616,9 @@ async function boot() {
   $('app-loading').classList.add('hidden');
   $('app-main').classList.remove('hidden');
 
+  if (!state.compareIds.length || state.compareIds.some((id) => !state.engine.getModel(id))) {
+    state.compareIds = defaultCompareIds();
+  }
   initDemoStrip();
   initCoach();
   initCompare();

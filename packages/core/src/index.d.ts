@@ -270,6 +270,15 @@ export interface Totals {
   energyWh: number;
   waterMl: number;
   carbonG: number;
+  /**
+   * Present only when some entry was an estimate: lows summed with lows,
+   * highs with highs. One floor makes every high null.
+   */
+  range?: {
+    lowWh: number; highWh: number | null;
+    lowMl: number; highMl: number | null;
+    lowG: number; highG: number | null;
+  };
 }
 
 /** Flat history record as stored by the extension and mobile app. */
@@ -277,6 +286,9 @@ export interface HistoryLike {
   energyWh?: number;
   waterMl?: number;
   carbonG?: number;
+  /** An estimate's range, when the record is one; a null highWh is a floor. */
+  lowWh?: number;
+  highWh?: number | null;
   [key: string]: unknown;
 }
 
@@ -467,12 +479,63 @@ export interface Converters {
   energy(wh: number): Relatable;
   water(ml: number): Relatable;
   carbon(g: number): Relatable;
-  forImpact(impact: Impact): { energy: Relatable; water: Relatable; carbon: Relatable };
+  /** "between … and …"; a null high end is a floor, "at least …". */
+  energyRange(lowWh: number, highWh: number | null): Relatable;
+  waterRange(lowMl: number, highMl: number | null): Relatable;
+  carbonRange(lowG: number, highG: number | null): Relatable;
+  /**
+   * An estimated model always shows its range: "between … and …" when it
+   * thinks, "at least …" for a floor, "about …" with the range as the
+   * secondary otherwise. `times` repeats the same query.
+   */
+  forImpact(impact: Impact, times?: number): { energy: Relatable; water: Relatable; carbon: Relatable };
   forTotals(totals: Totals, periodLabel?: string): { energy: Relatable; water: Relatable; carbon: Relatable; sentence: string };
   factors: Record<string, number>;
 }
 
 export function createConverters(equivalents?: EquivalentsData | null): Converters;
+
+/** How to label an impact on screen (PLAN.md Step 8). */
+export interface ImpactDescription {
+  estimated: boolean;
+  method: EstimateMethod | null;
+  /** "estimated · tier" or "estimated · from parameters"; null when measured or benchmarked. */
+  methodChip: string | null;
+  rangeOnly: boolean;
+  floor: boolean;
+  lowWh: number;
+  /** Null for a floor. */
+  highWh: number | null;
+  /** The figure to show: the range when the model thinks, "≥ …" for a floor, else the point. */
+  whText: string;
+  /** The Wh range of an estimate; null when measured or benchmarked. */
+  rangeText: string | null;
+  /** "B", "B–E" when the range crosses a band, or "≥ C" for a floor. */
+  gradeText: string;
+  gradeLow: Grade;
+  /** Null for a floor. */
+  gradeHigh: Grade | null;
+  /** For screen readers: "Eco-grade B to E". */
+  gradeLabel: string;
+  /** "likely high" on every estimate; null otherwise. */
+  note: string | null;
+  noteReason: string | null;
+}
+
+export interface SavingClaim {
+  /** "percent" only when the ranges do not overlap; "probably" otherwise. */
+  claim: 'percent' | 'probably';
+  percentage: number | null;
+  /** True when the percentage is better's dearest end against worse's cheapest. */
+  atLeast: boolean;
+  energyWh: number | null;
+}
+
+export function describeImpact(impact: Impact): ImpactDescription;
+export function savingClaim(better: Impact, worse: Impact): SavingClaim | null;
+export function formatWh(wh: number): string;
+export function formatWhRange(lowWh: number, highWh: number | null): string;
+export const METHOD_CHIPS: Record<EstimateMethod, string>;
 
 // --------------------------------------------------------------------- entry
 

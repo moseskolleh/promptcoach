@@ -12,6 +12,9 @@ export interface HistoryEntry {
   waterMl: number;
   carbonG: number;
   grade: 'A' | 'B' | 'C' | 'D' | 'E';
+  /** An estimate's range (PLAN.md Step 8); a null highWh is a floor. */
+  lowWh?: number;
+  highWh?: number | null;
 }
 
 export interface LibraryEntry {
@@ -22,6 +25,8 @@ export interface LibraryEntry {
   tokens: number;
   energyWh: number;
   grade: string;
+  /** An estimate's range, as the web library saves it. */
+  range?: { lowWh: number; highWh: number | null; rangeOnly: boolean; method: string | null };
   ts: number;
 }
 
