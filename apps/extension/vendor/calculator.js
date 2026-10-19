@@ -208,6 +208,228 @@ const GRADE_BANDS = [
   { grade: 'E', maxWh: Infinity }
 ];
 
+// ----------------------------------------------------------------------------
+// Estimating models nobody has measured (PLAN.md Step 2, METHODOLOGY §2.5)
+//
+// No lab has published a per-query energy figure for any 2026 model, so a
+// current entry carries an `estimate` block instead of benchmark points. Both
+// methods below derive every number from the reference (pre-2026) entries,
+// and both return a range, never just a point:
+//
+//   active-params  open-weight models: EcoLogits' energy-per-token relation
+//                  on the published active/total parameter counts, bridged to
+//                  this catalog's scale by the measured reference entries.
+//   tier           closed models: the median of a tier's reference entries,
+//                  with their spread as the range.
+//
+// Thinking is a separate multiplier on top of either, taken from the
+// reference pairs that differ only in thinking. A model that thinks is shown
+// as a range only (decision recorded in PLAN.md, 2026-10-19).
+// ----------------------------------------------------------------------------
+
+// Ported from genai-impact/ecologits at d0b76e3 (v0.11.3, 2026-10-14),
+// ecologits/impacts/llm.py, MPL-2.0. EcoLogits fitted these on ML.ENERGY
+// leaderboard data: vLLM on NVIDIA H100 80GB, models up to 200B parameters.
+// We use its fallback latency regression (no measured throughput) and its
+// batch size of 64. Constants are copied from the source, not a paper.
+const ECOLOGITS = Object.freeze({
+  commit: 'd0b76e382442e63df688e9c37016f596223c8aff',
+  gpuEnergyAlpha: 1.1665273170451914e-06,
+  gpuEnergyBeta: -0.011205921025579175,
+  gpuEnergyGamma: 4.052928146734005e-05,
+  latencyAlpha: 0.0006785088094353663,
+  latencyBeta: 0.0003119310311688259,
+  latencyGamma: 0.019473717579473387,
+  gpuMemoryGb: 80,
+  serverGpus: 8,
+  serverPowerKw: 1.2,
+  batchSize: 64,
+  defaultBits: 16
+});
+
+// Weight precision decides how many GPUs hold the model. EcoLogits assumes
+// 16 bits for everything; 2026 models ship FP8 or FP4 weights and are served
+// that way, so the precision a model card states is used instead.
+const PRECISION_BITS = {
+  fp32: 32, bf16: 16, fp16: 16, fp8: 8, mxfp8: 8, int8: 8, fp4: 4, mxfp4: 4, nvfp4: 4, int4: 4
+};
+
+const ESTIMATE_METHODS = ['active-params', 'tier'];
+
+/** GPUs needed to hold the weights: EcoLogits' 1.2× memory overhead, rounded up to a power of two. */
+function ecologitsGpuCount(totalB, bits) {
+  const memoryGb = (1.2 * totalB * bits) / 8;
+  const gpus = Math.max(1, Math.ceil(memoryGb / ECOLOGITS.gpuMemoryGb));
+  return 2 ** Math.ceil(Math.log2(gpus));
+}
+
+/**
+ * IT energy per output token (Wh, before PUE), per EcoLogits: every required
+ * GPU's decode energy plus those GPUs' share of the server, at batch 64.
+ */
+function ecologitsItWhPerToken(activeB, totalB, bits = ECOLOGITS.defaultBits) {
+  const E = ECOLOGITS;
+  const gpus = ecologitsGpuCount(totalB, bits);
+  const gpuWh = E.gpuEnergyAlpha * Math.exp(E.gpuEnergyBeta * E.batchSize) * activeB + E.gpuEnergyGamma;
+  const latencyS = E.latencyAlpha * activeB + E.latencyBeta * E.batchSize + E.latencyGamma;
+  const serverWh = (latencyS / 3600) * E.serverPowerKw * 1000 * (gpus / E.serverGpus) / E.batchSize;
+  return { gpus, wh: gpus * gpuWh + serverWh };
+}
+
+function geometricMean(values) {
+  return Math.exp(values.reduce((s, v) => s + Math.log(v), 0) / values.length);
+}
+
+function median(values) {
+  const a = [...values].sort((x, y) => x - y);
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
+/** Energy of one plain answer from fitted coefficients: no effort, no task multiplier. */
+function plainEnergyWh(c, benchMaxInput, tIn, tOut) {
+  return c.eFixed + c.eIn * Math.min(tIn, benchMaxInput * INPUT_FIT_EXTRAPOLATION_LIMIT) + c.eOut * tOut;
+}
+
+/**
+ * Everything the estimators take from the reference entries, derived once.
+ *   calibration  measured, non-thinking open-weight entries: their fitted
+ *                decode coefficient over EcoLogits' prediction (PUE applied)
+ *   tiers        per tier, the members' fitted coefficients
+ *   pairs        thinking entries with their non-thinking sibling
+ */
+function buildEvidence(fitted, grids) {
+  const calibration = [];
+  const tiers = {};
+  const pairs = [];
+  for (const m of fitted) {
+    if (m.dataSource === 'measured' && m.thinking === 'none' && m.params) {
+      const pue = grids.providers[m.hostKey].pue;
+      const eco = ecologitsItWhPerToken(m.params.active_b, m.params.total_b, PRECISION_BITS[m.params.precision] || ECOLOGITS.defaultBits);
+      const c = m.coefficients;
+      calibration.push({
+        id: m.id,
+        ratio: c.eOut / (eco.wh * pue),
+        inPerOut: c.eIn / c.eOut,
+        fixedTokens: c.eFixed / c.eOut,
+        benchMaxInput: m.benchMaxInput,
+        benchMaxOutput: m.benchMaxOutput
+      });
+    }
+    if (m.tier) (tiers[m.tier] = tiers[m.tier] || []).push(m);
+  }
+  for (const m of fitted) {
+    if (!m.thinkingPairOf) continue;
+    const base = fitted.find((b) => b.id === m.thinkingPairOf);
+    if (!base) throw new Error(`models.json: ${m.id} pairs with "${m.thinkingPairOf}", which has no benchmark points`);
+    pairs.push({ thinking: m, base: { id: base.id, coefficients: base.coefficients, benchMaxInput: base.benchMaxInput } });
+  }
+  const ratios = calibration.map((c) => c.ratio);
+  const cal = calibration.length
+    ? {
+        entries: calibration.map((c) => c.id),
+        k: geometricMean(ratios),
+        kLow: Math.min(...ratios),
+        kHigh: Math.max(...ratios),
+        inPerOut: geometricMean(calibration.map((c) => c.inPerOut)),
+        fixedTokens: calibration.reduce((s, c) => s + c.fixedTokens, 0) / calibration.length,
+        benchMaxInput: Math.max(...calibration.map((c) => c.benchMaxInput)),
+        benchMaxOutput: Math.max(...calibration.map((c) => c.benchMaxOutput))
+      }
+    : null;
+  // A measured open-weight model that always thinks is direct evidence too:
+  // its plain answer is priced by the active-parameter estimator, and what
+  // it measured beyond that is its thinking. (Its catalog sibling is only an
+  // extrapolation, so the pair alone can disagree with the measurement.)
+  if (cal) {
+    for (const m of fitted) {
+      if (m.dataSource !== 'measured' || m.thinking !== 'always' || !m.params) continue;
+      const plain = activeParamsCoefficients(m.params, grids.providers[m.hostKey].pue, cal);
+      pairs.push({ thinking: m, base: { id: `${m.id} (plain, estimated)`, coefficients: plain.coefficients, benchMaxInput: cal.benchMaxInput } });
+    }
+  }
+  return { calibration: cal, tiers, pairs };
+}
+
+/** Plain-answer coefficients for an open-weight model, from its parameter counts. */
+function activeParamsCoefficients(params, pue, cal) {
+  const bits = PRECISION_BITS[params.precision] || ECOLOGITS.defaultBits;
+  const eco = ecologitsItWhPerToken(params.active_b, params.total_b, bits);
+  const eOut = eco.wh * pue * cal.k;
+  return {
+    coefficients: { eIn: eOut * cal.inPerOut, eOut, eFixed: eOut * cal.fixedTokens, relStd: 0 },
+    bits,
+    gpus: eco.gpus
+  };
+}
+
+/** Coefficients and band factors for one `estimate` block. */
+function estimateCoefficients(m, evidence, grids, hostKey) {
+  const est = m.estimate || {};
+  if (!ESTIMATE_METHODS.includes(est.method)) {
+    throw new Error(`models.json: ${m.model_id} has unknown estimate method "${est.method}"`);
+  }
+  if (m.thinking !== undefined && m.thinking !== 'none' && !evidence.pairs.length) {
+    throw new Error(`models.json: ${m.model_id} thinks, but no reference thinking pair exists to estimate that from`);
+  }
+  if (est.method === 'active-params') {
+    const p = m.params;
+    if (!p || !(p.active_b > 0) || !(p.total_b >= p.active_b)) {
+      throw new Error(`models.json: ${m.model_id} needs params.total_b >= params.active_b > 0 for active-params`);
+    }
+    if (p.precision !== undefined && !PRECISION_BITS[p.precision]) {
+      throw new Error(`models.json: ${m.model_id} has unknown params.precision "${p.precision}"`);
+    }
+    const cal = evidence.calibration;
+    if (!cal) throw new Error(`models.json: ${m.model_id} uses active-params, but no measured open-weight reference entry calibrates it`);
+    const plain = activeParamsCoefficients(p, grids.providers[hostKey].pue, cal);
+    return {
+      coefficients: plain.coefficients,
+      // The calibration entries disagree with each other by kHigh/kLow
+      // (about 2x today), and a model none of them is can sit anywhere in
+      // that spread, on either side. Leave-one-out confirms errors that size
+      // (scripts/estimator-validation.js).
+      band: { low: cal.kLow / cal.kHigh, high: cal.kHigh / cal.kLow },
+      benchMaxInput: cal.benchMaxInput,
+      benchMaxOutput: cal.benchMaxOutput,
+      inputs: { activeB: p.active_b, totalB: p.total_b, bits: plain.bits, gpus: plain.gpus, calibratedOn: cal.entries, ecologitsCommit: ECOLOGITS.commit }
+    };
+  }
+  const members = evidence.tiers[est.tier];
+  if (!members || !members.length) {
+    throw new Error(`models.json: ${m.model_id} uses tier "${est.tier}", which no reference entry belongs to`);
+  }
+  return {
+    coefficients: {
+      eIn: median(members.map((t) => t.coefficients.eIn)),
+      eOut: median(members.map((t) => t.coefficients.eOut)),
+      eFixed: median(members.map((t) => t.coefficients.eFixed)),
+      relStd: 0
+    },
+    tierMembers: members,
+    benchMaxInput: Math.max(...members.map((t) => t.benchMaxInput)),
+    benchMaxOutput: Math.max(...members.map((t) => t.benchMaxOutput)),
+    inputs: { tier: est.tier, members: members.map((t) => t.id) }
+  };
+}
+
+/**
+ * Hidden thinking tokens one answer adds at these token counts, low and high
+ * across the reference pairs: the energy a pair's thinking entry spends
+ * beyond its plain sibling, in the sibling's own decode tokens. They are
+ * priced at the estimated model's own per-token cost, not as a ratio:
+ * a ratio would double-count for a model that already costs more per token.
+ * Effort scales the hidden tokens.
+ */
+function thinkingTokens(pairs, tIn, tOut, effort) {
+  const tokens = pairs.map(({ thinking, base }) => {
+    const extraWh = plainEnergyWh(thinking.coefficients, thinking.benchMaxInput, tIn, tOut) -
+      plainEnergyWh(base.coefficients, base.benchMaxInput, tIn, tOut);
+    return base.coefficients.eOut > 0 ? Math.max(0, extraWh / base.coefficients.eOut) * effort : 0;
+  });
+  return { low: Math.min(...tokens), high: Math.max(...tokens) };
+}
+
 class ImpactEngine {
   /**
    * @param {Object} bundle
@@ -226,6 +448,7 @@ class ImpactEngine {
       (bundle.grids.lifecycle && bundle.grids.lifecycle.embodied_factor) || 1.15;
 
     this.models = {};
+    const pending = [];
     for (const m of bundle.models.models || []) {
       if (!m || !m.model_id) throw new Error('models.json: every model needs a model_id');
       if (Object.prototype.hasOwnProperty.call(this.models, m.model_id)) {
@@ -240,25 +463,16 @@ class ImpactEngine {
       if (!THINKING_MODES.includes(thinking)) {
         throw new Error(`models.json: ${m.model_id} has unknown thinking mode "${m.thinking}"`);
       }
-      // An unmeasured model carries an `estimate` block instead of benchmark
-      // points. The estimators that read it are not part of this engine yet;
-      // refuse it rather than inventing points to fit.
-      if (!m.performance && m.estimate) {
-        throw new Error(`models.json: ${m.model_id} uses estimate method "${m.estimate.method}", which this engine does not support yet`);
+      // A model nobody has measured carries an `estimate` block instead of
+      // benchmark points (never invented points in fields that mean measured).
+      if (m.performance && m.estimate) {
+        throw new Error(`models.json: ${m.model_id} has both performance points and an estimate block; keep one`);
       }
-      const perf = m.performance || {};
-      const bench = ['short', 'medium', 'long'].map((k) => {
-        const p = perf[k];
-        if (!p || typeof p.energy_wh_mean !== 'number') {
-          throw new Error(`models.json: ${m.model_id} is missing performance.${k}`);
-        }
-        return p;
-      });
       const hostKey = m.host_key || String(m.host || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
       if (!this.grids.providers || !this.grids.providers[hostKey]) {
         throw new Error(`models.json: ${m.model_id} host_key "${hostKey}" has no entry in grids.providers`);
       }
-      this.models[m.model_id] = {
+      const record = {
         id: m.model_id,
         name: m.name,
         provider: m.provider,
@@ -271,11 +485,51 @@ class ImpactEngine {
         thinking,
         isReasoning: thinking !== 'none',
         anchor: m.provider_reported_anchor || null,
+        params: m.params || null,
+        tier: m.tier || null,
+        thinkingPairOf: m.thinking_pair_of || null,
+        estimate: null
+      };
+      // Estimated entries are filled in below, once the benchmarked ones
+      // they are derived from are fitted; inserting the record now keeps
+      // listModels() in data-file order.
+      this.models[m.model_id] = record;
+      if (m.estimate) {
+        pending.push({ m: { ...m, thinking }, record });
+        continue;
+      }
+      const perf = m.performance || {};
+      const bench = ['short', 'medium', 'long'].map((k) => {
+        const p = perf[k];
+        if (!p || typeof p.energy_wh_mean !== 'number') {
+          throw new Error(`models.json: ${m.model_id} is missing performance.${k}`);
+        }
+        return p;
+      });
+      Object.assign(record, {
         bench,
         benchMaxInput: Math.max(...bench.map((b) => b.input_tokens)),
         benchMaxOutput: Math.max(...bench.map((b) => b.output_tokens)),
         coefficients: fitCoefficients(bench)
-      };
+      });
+    }
+
+    const fitted = Object.values(this.models).filter((r) => r.bench);
+    this.evidence = buildEvidence(fitted, this.grids);
+    for (const { m, record } of pending) {
+      const est = estimateCoefficients(m, this.evidence, this.grids, record.hostKey);
+      Object.assign(record, {
+        bench: [],
+        benchMaxInput: est.benchMaxInput,
+        benchMaxOutput: est.benchMaxOutput,
+        coefficients: est.coefficients,
+        estimate: {
+          method: m.estimate.method,
+          band: est.band || null,
+          tierMembers: est.tierMembers || null,
+          inputs: est.inputs
+        }
+      });
     }
   }
 
@@ -358,7 +612,9 @@ class ImpactEngine {
     const taskMult = Number.isFinite(tm) && tm > 0 ? tm : 1;
     // Unknown effort keys fall back to the benchmark condition — and say so.
     const effortKey = REASONING_EFFORT[options.reasoningEffort] ? options.reasoningEffort : 'standard';
-    const effort = model.isReasoning ? REASONING_EFFORT[effortKey] : 1;
+    // An estimated model's coefficients describe a plain answer; its thinking
+    // is applied below as a multiplier range instead.
+    const effort = model.isReasoning && !model.estimate ? REASONING_EFFORT[effortKey] : 1;
     const includeEmbodied = options.includeEmbodied !== false;
 
     const { eIn, eOut, eFixed, relStd } = model.coefficients;
@@ -377,8 +633,54 @@ class ImpactEngine {
     // vary with visible output length) as well as in the decode term.
     const decodeWh = eOut * tOut * effort;
     const fixedWh = eFixed * effort;
-    const energyWh = (fixedWh + eIn * tInBilled + decodeWh) * taskMult;
+    let energyWh = (fixedWh + eIn * tInBilled + decodeWh) * taskMult;
+
+    // A model nobody has measured: the evidence gives a range around that
+    // plain answer, and thinking adds hidden tokens on top. A model that
+    // thinks is a range only; its point is the range's geometric centre,
+    // kept for sorting and totals, never for display (PLAN.md Step 2).
+    let range = null;
+    let thinkingRange = null;
+    if (model.estimate) {
+      // Hidden tokens. Only a model that always thinks is sure to pay the
+      // low end; adaptive and optional thinking may not think at all.
+      let lowTokens = 0;
+      let highTokens = 0;
+      if (model.thinking !== 'none') {
+        const t = thinkingTokens(this.evidence.pairs, tIn, tOut, REASONING_EFFORT[effortKey]);
+        lowTokens = model.thinking === 'always' ? t.low : 0;
+        highTokens = t.high;
+        thinkingRange = { lowTokens, highTokens };
+      }
+      let lowWh;
+      let highWh;
+      if (model.estimate.method === 'tier') {
+        // Every member answers plainly at its own cost, then thinks at its
+        // own per-token cost; the range is the cheapest to the dearest.
+        const members = model.estimate.tierMembers.map((t) => ({
+          plain: plainEnergyWh(t.coefficients, t.benchMaxInput, tIn, tOut),
+          eOut: t.coefficients.eOut
+        }));
+        lowWh = Math.min(...members.map((x) => x.plain + lowTokens * x.eOut));
+        highWh = Math.max(...members.map((x) => x.plain + highTokens * x.eOut));
+        // A model that always thinks is never estimated below its tier's
+        // median plain answer plus the least thinking: the understatement
+        // RESEARCH-2026 §4.1 rejected (PLAN.md Step 2).
+        if (model.thinking === 'always') {
+          const floor = median(members.map((x) => x.plain)) + lowTokens * median(members.map((x) => x.eOut));
+          lowWh = Math.max(lowWh, floor);
+        }
+      } else {
+        const plain = plainEnergyWh(model.coefficients, model.benchMaxInput, tIn, tOut);
+        lowWh = (plain + lowTokens * eOut) * model.estimate.band.low;
+        highWh = (plain + highTokens * eOut) * model.estimate.band.high;
+      }
+      const rangeOnly = model.thinking !== 'none';
+      range = { lowWh: lowWh * taskMult, highWh: highWh * taskMult, rangeOnly };
+      if (rangeOnly) energyWh = Math.sqrt(range.lowWh * range.highWh);
+    }
     const energyKwh = energyWh / 1000;
+    const scale = (value, wh) => (energyWh > 0 ? (value * wh) / energyWh : 0);
 
     // Water — on-site cooling applies to IT energy, source water to total.
     const itKwh = energyKwh / infra.pue;
@@ -406,8 +708,15 @@ class ImpactEngine {
     // beyond the measured range on either axis (the benchmarks top out at
     // 10k input / 1.5k output tokens) or away from 'standard' effort.
     const extrapolated =
-      tIn > model.benchMaxInput || tOut > model.benchMaxOutput || effort !== 1;
+      !!model.estimate || tIn > model.benchMaxInput || tOut > model.benchMaxOutput || effort !== 1;
     const band = relStd * (extrapolated ? 2 : 1);
+    const grade = inputClamped
+      ? { ...this.gradeFor(energyWh), provisional: true }
+      : this.gradeFor(energyWh);
+    if (range) {
+      grade.range = { low: this.gradeFor(range.lowWh).grade, high: this.gradeFor(range.highWh).grade };
+      grade.rangeOnly = range.rangeOnly;
+    }
 
     return {
       model: {
@@ -446,27 +755,45 @@ class ImpactEngine {
               reason: 'beyond fitted range — input term held flat; treat as a lower bound'
             }
           : null,
-        confidence: {
-          minWh: Math.max(0, energyWh * (1 - band)),
-          maxWh: energyWh * (1 + band)
-        }
+        confidence: range
+          ? { minWh: range.lowWh, maxWh: range.highWh }
+          : {
+              minWh: Math.max(0, energyWh * (1 - band)),
+              maxWh: energyWh * (1 + band)
+            },
+        // Present only for a model nobody has measured. With rangeOnly set,
+        // `wh` is not a figure to show: display lowWh–highWh.
+        range
       },
       water: {
         ml: waterL * 1000,
         l: waterL,
-        breakdown: { onsiteMl: waterOnsiteL * 1000, offsiteMl: waterOffsiteL * 1000 }
+        breakdown: { onsiteMl: waterOnsiteL * 1000, offsiteMl: waterOffsiteL * 1000 },
+        range: range
+          ? { lowMl: scale(waterL * 1000, range.lowWh), highMl: scale(waterL * 1000, range.highWh) }
+          : null
       },
       carbon: {
         gCO2e: carbonKg * 1000,
         kgCO2e: carbonKg,
         operationalG: energyKwh * cif * 1000,
-        embodiedG: energyKwh * cif * (embodied - 1) * 1000
+        embodiedG: energyKwh * cif * (embodied - 1) * 1000,
+        range: range
+          ? { lowG: scale(carbonKg * 1000, range.lowWh), highG: scale(carbonKg * 1000, range.highWh) }
+          : null
       },
       // A clamped estimate is a lower bound, so its grade is a floor too —
-      // mark it provisional rather than presenting a confident letter.
-      grade: inputClamped
-        ? { ...this.gradeFor(energyWh), provisional: true }
-        : this.gradeFor(energyWh),
+      // marked provisional rather than presented as a confident letter. An
+      // estimated model's grade also carries the range's grades.
+      grade,
+      estimate: model.estimate
+        ? {
+            method: model.estimate.method,
+            rangeOnly: range.rangeOnly,
+            thinkingTokens: thinkingRange,
+            inputs: model.estimate.inputs
+          }
+        : null,
       factors: {
         taskMultiplier: taskMult,
         reasoningEffort: model.isReasoning ? effortKey : null,
@@ -766,7 +1093,12 @@ const CalculatorModule = {
   GRADE_BANDS,
   INPUT_FIT_EXTRAPOLATION_LIMIT,
   MODEL_STATUSES,
-  THINKING_MODES
+  THINKING_MODES,
+  ECOLOGITS,
+  PRECISION_BITS,
+  ESTIMATE_METHODS,
+  ecologitsGpuCount,
+  ecologitsItWhPerToken
 };
 
 if (typeof globalThis !== 'undefined') {

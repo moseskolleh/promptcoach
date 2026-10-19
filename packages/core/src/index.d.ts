@@ -58,8 +58,12 @@ export interface ModelEntry {
   open_weight?: boolean;
   /** Parameter counts in billions; active_b is per token at decode. */
   params?: { total_b: number; active_b: number; precision?: string };
-  /** How an unmeasured model is estimated. Not yet supported by the engine (PLAN.md Step 2). */
-  estimate?: { method: string; [input: string]: unknown };
+  /** How an unmeasured model is estimated (METHODOLOGY §2.5). Replaces performance. */
+  estimate?: { method: EstimateMethod; tier?: 'small' | 'frontier' };
+  /** Reference entries only: the tier this entry is evidence for. */
+  tier?: 'small' | 'frontier';
+  /** Reference thinking entries only: the non-thinking sibling it pairs with. */
+  thinking_pair_of?: string;
   sources?: SourceRef[];
   provider_reported_anchor?: ProviderAnchor;
   /** Benchmark points. A current entry must cite them in performance_source. */
@@ -124,6 +128,11 @@ export interface ModelSummary {
 export interface ModelRecord extends ModelSummary {
   hostKey: string;
   anchor: ProviderAnchor | null;
+  params: { total_b: number; active_b: number; precision?: string } | null;
+  tier: string | null;
+  thinkingPairOf: string | null;
+  /** Set for an estimated model; bench is then empty. */
+  estimate: { method: EstimateMethod; band: { low: number; high: number } | null; tierMembers: ModelRecord[] | null; inputs: EstimateInfo['inputs'] } | null;
   bench: BenchPoint[];
   benchMaxInput: number;
   benchMaxOutput: number;
@@ -156,6 +165,27 @@ export interface GradeResult {
   score: number;
 }
 
+export interface ImpactGrade extends GradeResult {
+  /** The figure is a lower bound (input clamped), so the grade is a floor. */
+  provisional?: boolean;
+  /** Grades of the range's ends, for an estimated model. */
+  range?: { low: Grade; high: Grade };
+  /** Show range.low–range.high, not grade. */
+  rangeOnly?: boolean;
+}
+
+export type EstimateMethod = 'active-params' | 'tier';
+
+export interface EstimateInfo {
+  method: EstimateMethod;
+  rangeOnly: boolean;
+  /** Hidden thinking tokens assumed, low and high; null for a model that does not think. */
+  thinkingTokens: { lowTokens: number; highTokens: number } | null;
+  inputs:
+    | { activeB: number; totalB: number; bits: number; gpus: number; calibratedOn: string[]; ecologitsCommit: string }
+    | { tier: string; members: string[] };
+}
+
 export interface Impact {
   model: ModelSummary;
   tokens: { input: number; output: number; total: number };
@@ -165,22 +195,31 @@ export interface Impact {
     kwh: number;
     breakdown: { fixedWh: number; inputWh: number; outputWh: number };
     perTokenOutMwh: number;
-    /** True when the request lies beyond the measured token range or off the benchmark effort. */
+    /** True when the request lies beyond the measured token range or off the benchmark effort, and always for an estimated model. */
     extrapolated: boolean;
+    /** Set when the input ran past the fitted range: the figure is a lower bound. */
+    clamped: { term: 'input'; atTokens: number; requestedTokens: number; fittedMaxTokens: number; reason: string } | null;
+    /** For an estimated model, the estimate's range. */
     confidence: { minWh: number; maxWh: number };
+    /** Only for a model nobody has measured. With rangeOnly set, show lowWh–highWh, never wh. */
+    range: { lowWh: number; highWh: number; rangeOnly: boolean } | null;
   };
   water: {
     ml: number;
     l: number;
     breakdown: { onsiteMl: number; offsiteMl: number };
+    range: { lowMl: number; highMl: number } | null;
   };
   carbon: {
     gCO2e: number;
     kgCO2e: number;
     operationalG: number;
     embodiedG: number;
+    range: { lowG: number; highG: number } | null;
   };
-  grade: GradeResult;
+  grade: ImpactGrade;
+  /** How an unmeasured model was estimated (METHODOLOGY §2.5); null for benchmarked models. */
+  estimate: EstimateInfo | null;
   factors: {
     taskMultiplier: number;
     reasoningEffort: ReasoningEffort | null;
@@ -239,6 +278,12 @@ export class ImpactEngine {
   equivalents: EquivalentsData | null;
   embodiedFactor: number;
   models: Record<string, ModelRecord>;
+  /** What the estimators derive from the reference entries (METHODOLOGY §2.5). */
+  evidence: {
+    calibration: { entries: string[]; k: number; kLow: number; kHigh: number; inPerOut: number; fixedTokens: number; benchMaxInput: number; benchMaxOutput: number } | null;
+    tiers: Record<string, ModelRecord[]>;
+    pairs: Array<{ thinking: ModelRecord; base: { id: string; coefficients: Coefficients; benchMaxInput: number } }>;
+  };
   /** Current models only, unless includeReference is set. */
   listModels(options?: { includeReference?: boolean }): ModelSummary[];
   getModel(modelId: string): ModelRecord | null;
@@ -258,6 +303,17 @@ export const REASONING_EFFORT: Record<ReasoningEffort, number>;
 export const GRADE_BANDS: Array<{ grade: Grade; maxWh: number }>;
 export const MODEL_STATUSES: ModelStatus[];
 export const THINKING_MODES: ThinkingMode[];
+export const ESTIMATE_METHODS: EstimateMethod[];
+/** EcoLogits constants, ported from genai-impact/ecologits at `commit`. */
+export const ECOLOGITS: {
+  commit: string;
+  gpuEnergyAlpha: number; gpuEnergyBeta: number; gpuEnergyGamma: number;
+  latencyAlpha: number; latencyBeta: number; latencyGamma: number;
+  gpuMemoryGb: number; serverGpus: number; serverPowerKw: number; batchSize: number; defaultBits: number;
+};
+export const PRECISION_BITS: Record<string, number>;
+export function ecologitsGpuCount(totalB: number, bits: number): number;
+export function ecologitsItWhPerToken(activeB: number, totalB: number, bits?: number): { gpus: number; wh: number };
 
 // ------------------------------------------------------------------ analyzer
 

@@ -5,6 +5,33 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Estimators for models nobody has measured (PLAN.md Step 2)
+
+- A `current` entry can now carry an `estimate` block instead of benchmark
+  points. The engine derives its numbers from the reference entries. Two
+  methods are built; see METHODOLOGY §2.5.
+- **`active-params`, for open-weight models.** It ports EcoLogits'
+  energy-per-token relation (genai-impact/ecologits `d0b76e3`, MPL-2.0).
+  It uses the model card's weight precision, and is bridged to this
+  catalog's scale by the measured Llama 3.3 70B and Llama 3.2 1B entries.
+  Its band is ×0.48–×2.08.
+- **`tier`, for closed models.** It takes the median of a tier's
+  reference members, with the cheapest-to-dearest member as the range.
+  Tiers are named on the reference entries.
+- **Thinking adds hidden tokens,** priced at the model's own per-token
+  cost. The evidence is the GPT-5 pair and DeepSeek-R1's measurement.
+  - `always` thinking pays at least the low end, with a floor at the
+    tier's median plain answer.
+  - `adaptive` and `optional` thinking range from no thinking at all.
+- **A model that thinks is a range only.** `energy.wh` is then the range's
+  geometric centre, for sorting and totals, never for display.
+- Results gain `energy.range`, `water.range`, `carbon.range`, `grade.range`
+  and `estimate`. The engine gains `evidence`.
+- `scripts/estimator-validation.js` prints the leave-one-out tables.
+- **No catalog model is estimated yet,** so nothing a user sees changes.
+  The 2026 entries arrive in Step 5. The reference snapshot test still
+  passes unchanged.
+
 ### Catalog schema v3 (PLAN.md Step 1)
 
 - Every `models.json` entry now has a `status`.
