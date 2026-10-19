@@ -1,5 +1,6 @@
 # Runs on every push and pull request: engine tests (incl. the vendored-copy
-# sync check) plus dependency-free static checks of the browser apps.
+# sync check), the catalog gates, and dependency-free static checks of the
+# browser apps.
 # The Pages deploy (deploy-pages.yml) runs the same `npm test` gate on main.
 
 name: CI
@@ -34,5 +35,8 @@ jobs:
       - name: Engine tests + vendored-copy sync check
         run: npm run test:core
 
-      - name: Static checks for the apps (syntax, JSON, manifest, HTML ids)
+      - name: Catalog gates (release dates, sources, deny-list, superseded_by)
+        run: npm run check:catalog
+
+      - name: Static checks for the apps (syntax, JSON, manifest, HTML ids, model ids)
         run: npm run check

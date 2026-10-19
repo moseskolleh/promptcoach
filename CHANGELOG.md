@@ -5,41 +5,25 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
-### Honest labels for estimates (PLAN.md Step 8)
+### Catalog gates and a monthly refresh (PLAN.md Step 9)
 
-- **One labelling function.** `describeImpact()` gives every app the same
-  label for a result. See METHODOLOGY §2.5.8. A model nobody has measured
-  shows:
-  - its range, "0.252–12.6 Wh", or "≥ 8.93 Wh" for a floor;
-  - an *estimated · tier* or *estimated · from parameters* chip;
-  - a grade range when the range crosses a band ("A–E", coloured from A to
-    E), or "≥ D" for a floor;
-  - *likely high*, the chosen direction of error.
-- **Measured and benchmarked models look exactly as before.**
-- **Where it shows:**
-  - web: coach, sticky pill, Compare cards, table and chart, explorer and
-    library;
-  - extension: pill, card and popup;
-  - mobile: the badge accepts a grade range.
-- **Everyday units for ranges.** `forImpact()` writes a range in one unit
-  when one fits ("1.5–75.5 minutes of an LED bulb"). Otherwise each end
-  gets its own unit. New: `energyRange()`, `waterRange()`,
-  `carbonRange()`, and a repeat count, `forImpact(impact, 25)`.
-- **No percentage between overlapping ranges.** `savingClaim()` returns
-  "at least N%" only when the ranges are apart, and "probably less"
-  otherwise. Compare's banner and the coach's switch button use it. This is
-  pulled forward from Step 27.
-- **Totals are ranges** when any entry is an estimate. `aggregate()` adds
-  `range`, and `forTotals()` uses it. The extension's history stores each
-  estimate's `lowWh` and `highWh`, and the web library keeps an entry's
-  range.
-- **Old model names leave the copy.** The web hero facts and Compare's
-  opening trio are picked from the catalog. The README example waits for
-  Step 5.
-- **Fix:** the popup's quick grades were computed at *low* effort, because
-  the effort control was read before it was restored. They now use the
-  saved effort. This changes the popup's grades for o3, o4-mini,
-  GPT-5 (Thinking) and DeepSeek-R1.
+- **`scripts/check-catalog.js`** checks `models.json` in CI, as its own
+  step, and in `npm test`. On top of the schema v3 rules it adds:
+  - **No estimate on search-only facts.** Sources name what they vouch
+    for (`fact`). A current model's estimate needs a fetched source for
+    each fact it rests on: `params`, `precision` and `thinking` for
+    `active-params`; `tier` and `thinking` for `tier`.
+  - **No deny-listed citations.** A current entry may not mention an arXiv
+    id from RESEARCH-2026 §3.1. The list is read from that document.
+  - **`superseded_by` chains** end at a current model or an explicit
+    `null`, with no loops and no unknown ids. Once any model is current,
+    every reference entry needs one.
+- **`check-apps` checks hard-coded model ids.** Every model id written
+  into the apps, demo pages or core must exist in the catalog.
+- **`docs/CATALOG-REFRESH.md`** is the monthly runbook: network access
+  first, then what to check per provider, how to record sources, what each
+  CI message means, and what the refresh PR lists.
+- Nothing a user sees changes.
 
 ### Effort as each provider names it (PLAN.md Step 3)
 

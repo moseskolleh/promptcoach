@@ -789,6 +789,27 @@ and method label, and no old model name appears in any app's UI copy.
 **Done when:** CI fails each violation with a clear message, and the
 runbook has been used once for real (the Mistral Large 4 weights).
 
+> **Status (2026-10-19): built, except the first real use of the runbook.**
+> - **The catalog gates** live in `scripts/check-catalog.js`. CI runs them
+>   as their own step, and `npm test` runs them too. `catalog.test.js`
+>   proves each rule fails on a synthetic catalog that breaks it.
+> - **Sources name their facts.** `fact` takes values from a fixed list.
+>   An `active-params` estimate needs fetched `params`, `precision` and
+>   `thinking`; a `tier` estimate needs fetched `tier` and `thinking`.
+>   `precision` is added to the plan's list because the GPU count depends
+>   on it.
+> - **The deny-list is read from RESEARCH-2026 §3.1 itself,** so it has
+>   one home. The check fails loudly if that section moves.
+> - **`superseded_by`.** Once the catalog holds a current model, every
+>   reference entry must name its successor or `null`. Today nothing is
+>   current, so Step 5 meets that rule when it sets the mapping above.
+> - **Hard-coded ids.** `check-apps` scans the apps (vendored copies
+>   excluded), the demo pages and the core for strings shaped like model
+>   ids. Each must exist in `models.json`. It found 44, all present.
+> - **The runbook** is `docs/CATALOG-REFRESH.md`. It hasn't been used for
+>   real yet: Mistral Large 4's weights are expected Oct 27–31, and
+>   mistral.ai and huggingface.co are still blocked from this environment.
+
 ---
 
 ## Stage 1 — Make the base trustworthy and fast *(≈ 3 weeks)*

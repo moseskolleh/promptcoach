@@ -41,6 +41,10 @@
    HTML page reference files that exist, and cross-checks every element id a
    page's script looks up against the ids the page defines — the class of
    bug plain scripts wired to HTML actually ship.
+   It also checks that every model id hard-coded in an app or in the core
+   exists in the catalog. `scripts/check-catalog.js` gates the catalog itself:
+   release dates, per-fact sources, the citation deny-list and
+   `superseded_by` chains (PLAN.md Step 9, docs/CATALOG-REFRESH.md).
 
 3. **Data as citable benchmark points, math in code.** `models.json` stores
    the three published benchmark measurements per model — numbers you can
