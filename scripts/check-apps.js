@@ -223,6 +223,30 @@ for (const cs of (manifest && manifest.content_scripts) || []) {
 }
 
 // ---------------------------------------------------------------------------
+// 7. Hard-coded model ids (PLAN.md Step 9). Every model id written into an
+// app or the core's own code must exist in models.json, so a catalog
+// refresh can't leave a default, a detection map or a demo page pointing at
+// nothing. Vendored copies are the core's code, checked once at the source.
+// ---------------------------------------------------------------------------
+const { modelIdsIn } = require('./check-catalog');
+const catalogIds = new Set(
+  JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'models.json'), 'utf8'))
+    .models.map((m) => m.model_id)
+);
+const idSources = [
+  ...walk(path.join(root, 'apps'), (f) => /\.(js|ts|tsx|html)$/.test(f) && !f.split(path.sep).includes('vendor')),
+  ...walk(path.join(root, 'packages', 'core', 'src'), (f) => f.endsWith('.js'))
+];
+for (const file of idSources) {
+  for (const { id, line } of modelIdsIn(fs.readFileSync(file, 'utf8'))) {
+    checks++;
+    if (!catalogIds.has(id)) {
+      fail(`${rel(file)}:${line}: model id "${id}" is not in models.json — use a catalog id, or add the entry`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
 if (problems.length) {

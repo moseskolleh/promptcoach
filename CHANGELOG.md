@@ -5,6 +5,26 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Catalog gates and a monthly refresh (PLAN.md Step 9)
+
+- **`scripts/check-catalog.js`** checks `models.json` in CI, as its own
+  step, and in `npm test`. On top of the schema v3 rules it adds:
+  - **No estimate on search-only facts.** Sources name what they vouch
+    for (`fact`). A current model's estimate needs a fetched source for
+    each fact it rests on: `params`, `precision` and `thinking` for
+    `active-params`; `tier` and `thinking` for `tier`.
+  - **No deny-listed citations.** A current entry may not mention an arXiv
+    id from RESEARCH-2026 §3.1. The list is read from that document.
+  - **`superseded_by` chains** end at a current model or an explicit
+    `null`, with no loops and no unknown ids. Once any model is current,
+    every reference entry needs one.
+- **`check-apps` checks hard-coded model ids.** Every model id written
+  into the apps, demo pages or core must exist in the catalog.
+- **`docs/CATALOG-REFRESH.md`** is the monthly runbook: network access
+  first, then what to check per provider, how to record sources, what each
+  CI message means, and what the refresh PR lists.
+- Nothing a user sees changes.
+
 ### Effort as each provider names it (PLAN.md Step 3)
 
 - **One effort scale:** `none`, `low`, `standard` (alias `medium`),
