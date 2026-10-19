@@ -140,11 +140,11 @@ test('the engine refuses malformed entries instead of guessing', () => {
   assert.throws(() => engineWith([entry('x'), entry('x')]), /listed twice/);
   // An id that shadows an Object.prototype name is still just an id.
   assert.strictEqual(engineWith([entry('constructor')]).listModels()[0].id, 'constructor');
-  // An unmeasured model's estimate block needs an estimator (PLAN.md Step 2);
-  // until there is one, the engine must not invent points to fit.
+  // Benchmark points and an estimate block on one entry would leave it
+  // unclear which numbers the model shows.
   assert.throws(
-    () => engineWith([entry('x', { performance: undefined, estimate: { method: 'tier', tier: 'frontier' } })]),
-    /estimate method "tier", which this engine does not support yet/
+    () => engineWith([entry('x', { estimate: { method: 'tier', tier: 'frontier' } })]),
+    /both performance points and an estimate block/
   );
 });
 

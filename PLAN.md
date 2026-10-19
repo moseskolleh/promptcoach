@@ -51,6 +51,14 @@ new catalog changes carry a **Changed in v4** note.
    estimates are derived from and it lets old history re-score.
 3. **This document:** PLAN v4, with the model refresh first.
 
+**Recorded on 2026-10-19:**
+
+4. **A model that thinks is shown as a range only.** It gets no single
+   number until real thinking-token counts exist. This replaces Step 2's
+   "point estimate at the top quartile". The only thinking evidence would
+   put Opus 5.5 at grade E even for a one-line question, a precision the
+   evidence doesn't support.
+
 ---
 
 ## The idea
@@ -419,6 +427,25 @@ return `{wh, range: {lowWh, highWh}, method, inputs}`.
 **Done when:** both estimators have unit tests and the leave-one-out table
 is in METHODOLOGY. Ranges are monotonic in tokens and effort. No
 `thinking: always` model's range starts below the frontier-chat median.
+
+> **Status (2026-10-19): built.** METHODOLOGY §2.5 and
+> `scripts/estimator-validation.js` hold the method and the leave-one-out
+> tables. Where the build departs from the wording above:
+> - **R1's evidence.** DeepSeek-R1 is not paired with the catalog's V3
+>   entry. V3's extrapolated decode coefficient is ~3.4× below EcoLogits'
+>   figure for the same architecture, and pairing them inflates R1's
+>   implied thinking to ~20,600 tokens. Instead, R1's measurement is
+>   priced against its own estimated plain answer. The hidden-token
+>   evidence at 150/400 is therefore ~5,300–5,800, not 5,300–20,600.
+> - **Thinking models are a range only** (decision 4). There is no
+>   top-quartile point.
+> - **The active-parameter band** is ×0.48–×2.08: the full disagreement
+>   between the two calibration entries, applied either side. Leave-one-out
+>   showed the narrower in-sample spread was too optimistic.
+> - **GPU counts** use the weight precision the model card states, not
+>   EcoLogits' blanket 16 bits.
+> - **The price-order cross-check** moves to Step 5, since it needs
+>   per-model prices.
 
 ### Step 3 — Effort as each provider names it · S
 *(was v3 Step 23, pulled forward: the catalog can't model GPT-6 without it)*

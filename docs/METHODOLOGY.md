@@ -99,6 +99,229 @@ Non-chat tasks scale energy: image generation ×3, agentic/multi-step ×2,
 data analysis ×1.4, summarization ×0.7, translation ×0.6 (v1 factors,
 retained as order-of-magnitude estimates pending dedicated benchmarks).
 
+### 2.4 Multi-turn context
+
+*Not yet written. It lands with the conversation meter (PLAN.md Step 20).*
+
+### 2.5 Estimating models nobody has measured
+
+No lab has published a per-query energy figure for any 2026 model
+(RESEARCH-2026 §2.2, re-checked 2026-10-18). So a `current` catalog entry
+does not carry benchmark points. It carries an `estimate` block naming one
+of two methods, and the engine derives the number from the `reference`
+(pre-2026) entries. Invented numbers never go into `energy_wh_mean`, which
+keeps meaning "a benchmark said this".
+
+Every estimate is a **range**, carried as `energy.range` with matching
+`water.range` and `carbon.range`, and its grade carries `grade.range`. A
+model that thinks is shown **as a range only**: its `energy.wh` is the
+range's geometric centre, kept for sorting and totals, never for display
+(`estimate.rangeOnly`, decision of 2026-10-19). Every estimate is labelled
+*extrapolated*.
+
+To reproduce every table in this section, run:
+`node scripts/estimator-validation.js`
+
+#### 2.5.1 Open-weight models: the active-parameter estimator
+
+The per-output-token relation comes from **EcoLogits** (genai-impact,
+MPL-2.0). It is ported from `ecologits/impacts/llm.py` at commit
+`d0b76e3` (v0.11.3, 2026-10-14), with the constants copied from source:
+
+```
+GPUs     = 2^ceil(log2(ceil(1.2 · P_total · bits/8 / 80 GB)))
+gpu_Wh   = α · e^(β·B) · P_active + γ          (per GPU, per token)
+server_Wh = (latency/3600) · 1.2 kW · (GPUs/8) / B
+latency  = α_L · P_active + β_L · B + γ_L      (seconds per token)
+e_out,IT = GPUs · gpu_Wh + server_Wh
+```
+
+Here B = 64 (EcoLogits' batch size) and P is in billions. EcoLogits fitted
+these constants on ML.ENERGY leaderboard data: vLLM on NVIDIA H100 80 GB,
+models up to 200B parameters. We use its fallback latency regression,
+because no measured throughput is available.
+
+**One deliberate deviation.** EcoLogits assumes 16-bit weights for every
+model. 2026 models ship FP8 or FP4 weights and are served that way, so the
+GPU count uses the precision the model card states, falling back to 16
+bits. This matters: an 816B model needs 32 GPUs at BF16 but 8 at NVFP4.
+
+**The bridge to this catalog's scale.** EcoLogits' boundary is not Jegham
+et al.'s. For the same models, our measured reference entries run
+1.3–2.7× above EcoLogits after PUE. So:
+
+```
+e_out = e_out,IT · PUE_host · k
+k     = geometric mean over the calibration entries of
+        (fitted e_out / EcoLogits e_out · PUE)
+```
+
+- **Calibration entries.** These are the measured, non-thinking open-weight
+  reference entries: today, Llama 3.3 70B (ratio 1.29) and Llama 3.2 1B
+  (2.69), so k = 1.86. Their parameter counts are fetched from Meta's model
+  cards.
+- **e_in and E_fixed.** These take the calibration entries' own
+  proportions: e_in = 0.023 · e_out (geometric mean), and E_fixed is about
+  17 output tokens' worth.
+- **The band.** It is **×0.48–×2.08**, the full factor by which the two
+  calibration entries disagree, applied on either side. The leave-one-out
+  check below shows errors that size are real.
+
+Without the bridge, open-weight models would look up to 2.7× cleaner than
+closed ones purely because of method.
+
+#### 2.5.2 Closed models: the tier estimator
+
+Closed models publish no parameter counts. Each is assigned a tier
+(`small` or `frontier`, in its `estimate` block), and the tier's reference
+members are the evidence. Members are named explicitly by a `tier` field on
+the reference entries:
+
+| Tier | Members |
+|---|---|
+| small | GPT-4o mini, GPT-4.1 nano, Claude Haiku 4.5, Gemini 2.5 Flash, Gemini 2.0 Flash, Mistral Small, Llama 4 Scout |
+| frontier | GPT-5, GPT-4o, Claude Sonnet 4.5, Claude 3.7 Sonnet, Gemini 2.5 Pro, Mistral Large 2, DeepSeek V3, Grok 3 |
+
+- **The point.** It uses the coefficient-wise median of the members.
+- **The range.** It runs from the cheapest member to the dearest, each
+  evaluated at the request's own token counts.
+
+`claude-sonnet-5` is left out, because it duplicates Sonnet 4.5's points.
+
+#### 2.5.3 Thinking: hidden tokens
+
+2026 models don't split into a "thinking" entry and a "chat" entry. GPT-6
+Sol serves Instant through Extra High, and Claude's thinking is adaptive.
+So thinking is an extra cost on top of the plain answer, counted in
+**hidden tokens** and priced at the model's own per-token cost. A ratio
+would double-count for a model that already costs more per token.
+
+```
+hidden tokens = (E_thinking − E_plain) / e_out,plain    at the request's token counts
+effort        scales hidden tokens: low 0.4 · standard 1 · high 2.5
+```
+
+The evidence:
+
+| Evidence | Thinking side | Plain side | Hidden tokens at 150 in / 400 out |
+|---|---|---|---|
+| GPT-5 pair | GPT-5 Thinking (extrapolated) | GPT-5 (extrapolated) | ≈ 5,300 |
+| DeepSeek-R1 | R1 (measured) | R1's own plain answer, priced by §2.5.1 | ≈ 5,800 |
+
+R1 is deliberately **not** paired with the catalog's DeepSeek V3 entry.
+V3's decode coefficient is an extrapolation about 3.4× below EcoLogits'
+figure for the identical architecture. Pairing them would inflate R1's
+implied thinking to about 20,600 tokens. Pricing R1's plain answer with
+the same estimator that prices every open-weight model keeps one
+consistent per-token cost. The measurement itself stays in the evidence.
+
+How a model's thinking mode shapes its range:
+
+| Thinking mode | Low end | High end |
+|---|---|---|
+| `always` (Opus 5.5, Fable 5.1) | the least hidden tokens | the most |
+| `adaptive`, `optional` | no thinking at all | the most hidden tokens |
+| `none` | the plain range | the plain range |
+
+For a tier model that always thinks, the low end also has a **floor**: the
+tier's median plain answer, plus the least thinking. Such a model can
+never be estimated below a non-thinking frontier model, which is the
+understatement RESEARCH-2026 §4.1 rejected.
+
+What the engine shows today, for model shapes like the 2026 roster
+(standard effort, 150 in / 400 out, unless noted):
+
+| Shape | Range | Grades |
+|---|---|---|
+| Frontier tier, always thinks | 8.9–16.7 Wh | D–E |
+| Same, a one-line question at low effort (30 in / 150 out) | 1.8–6.5 Wh | C–D |
+| Frontier tier, adaptive thinking | 0.52–16.7 Wh | B–E |
+| Small tier, adaptive thinking | 0.12–3.0 Wh | A–C |
+| Frontier tier, no thinking | 0.52–1.17 Wh (point 0.74) | B |
+
+#### 2.5.4 Direction of error
+
+The reference set measured 2025 hardware: H100s at EcoLogits' batch size.
+2026 serving runs on newer accelerators and, for many models, at FP8 or
+FP4. **Estimates for 2026 models therefore probably err high.** That is
+the chosen direction of error, and the UI says "likely high" (PLAN.md
+Step 8).
+
+Three known ways an estimate can still run *low*:
+- **Multi-agent modes.** Grok Heavy and Muse Spark Contemplating run
+  several agents per answer.
+- **Unusually long thinking.** A prompt can make a model think far longer
+  than the benchmark prompts did.
+- **Unpublished architecture.** A closed model whose real size is above
+  its tier.
+
+What replaces each estimate:
+- **Measured points** from the validation study (PLAN.md Step 33) replace
+  the active-parameter estimate. That measurement is the independent check
+  now, because §2.5.1 ports EcoLogits, so an EcoLogits cross-check would
+  be circular.
+- **Real reasoning-token counts** from the SDK wrapper (Step 36) replace
+  the hidden-token evidence.
+- **Observed answer lengths** from receipts (Step 19) replace output
+  guesses.
+
+#### 2.5.5 Limitations specific to the estimators
+
+- The EcoLogits relation was fitted on models up to 200B parameters. The
+  GPU count for 800B–2.8T MoE models is an extrapolation of its memory
+  rule, not of its fit.
+- Only two measured entries calibrate the active-parameter estimator, and
+  only two pieces of evidence describe thinking. Each band is the spread
+  of that evidence, not a statistical interval.
+- Tier assignment for a closed model is a judgement, recorded per model
+  in the catalog. Step 5 records each assignment with a price-order
+  cross-check, since it needs per-model prices.
+
+#### 2.5.6 Leave-one-out checks
+
+**Active-parameter estimator: leave one calibration entry out.**
+
+Shipped band: x0.48–x2.08 around the estimate.
+
+| Predicted | Calibrated on | Shape | Fitted | Predicted | Error | Within the shipped band |
+|---|---|---|---|---|---|---|
+| llama-3.2-1b | llama-3.3-70b | 100/300 | 0.07 Wh | 0.03 Wh | -56% | **no** |
+| llama-3.2-1b | llama-3.3-70b | 1000/1000 | 0.22 Wh | 0.11 Wh | -52% | yes |
+| llama-3.2-1b | llama-3.3-70b | 10000/1500 | 0.34 Wh | 0.20 Wh | -41% | yes |
+| llama-3.3-70b | llama-3.2-1b | 100/300 | 0.25 Wh | 0.57 Wh | +129% | **no** |
+| llama-3.3-70b | llama-3.2-1b | 1000/1000 | 0.86 Wh | 1.77 Wh | +107% | yes |
+| llama-3.3-70b | llama-3.2-1b | 10000/1500 | 1.65 Wh | 2.78 Wh | +69% | yes |
+
+**Tier estimator: leave each member out.**
+
+| Tier | Members inside the others' range at 100/300 | at 1000/1000 | at 10000/1500 | Worst error at centre |
+|---|---|---|---|---|
+| small | 5/7 | 5/7 | 5/7 | ±76% |
+| frontier | 6/8 | 6/8 | 6/8 | ±127% |
+
+**Thinking: predict each piece of evidence from the other.**
+
+| Predicted | From | Shape | Benchmark | Predicted range | Inside range |
+|---|---|---|---|---|---|
+| DeepSeek-R1 (measured) | GPT-5 pair | 100/300 | 23.8 Wh | 8.26–35.8 | yes |
+| DeepSeek-R1 (measured) | GPT-5 pair | 1000/1000 | 29.0 Wh | 25.5–110.4 | yes |
+| DeepSeek-R1 (measured) | GPT-5 pair | 10000/1500 | 33.6 Wh | 38.0–164.8 | **no** |
+| GPT-5 Thinking (extrapolated) | DeepSeek-R1 | 100/300 | 6.00 Wh | 9.51–16.2 | **no** |
+| GPT-5 Thinking (extrapolated) | DeepSeek-R1 | 1000/1000 | 18.4 Wh | 11.7–19.8 | yes |
+| GPT-5 Thinking (extrapolated) | DeepSeek-R1 | 10000/1500 | 28.0 Wh | 14.2–23.7 | **no** |
+
+How to read these:
+- **Active-parameter estimator.** Calibrated on a single entry, it misses
+  the other by up to −56% / +129%. Four of six predictions fall inside the
+  shipped ×0.48–×2.08 band. Both misses are at the short prompt.
+- **Tier estimator.** The members left outside the others' range are the
+  tier's extremes, as expected.
+- **Thinking.** Each piece of evidence predicts the other at only some
+  prompt sizes. GPT-5 Thinking's extrapolated points grow with prompt
+  size, while R1's measured energy is nearly flat, so they disagree most
+  at long prompts. The shipped range spans both. That disagreement is why
+  a thinking model is shown as a range only.
+
 ---
 
 ## 3. Water model

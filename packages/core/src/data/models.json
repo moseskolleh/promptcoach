@@ -14,6 +14,8 @@
       "Adamska et al. (2025), Green Prompting, arXiv:2503.10666 — response length is the dominant energy driver (r~0.9); input length matters far less"
     ],
     "notes": {
+      "tier_field": "On reference entries only: which tier of unmeasured closed models this entry is evidence for (small or frontier). The tier estimator takes the median of its members' fitted coefficients as the point and their spread as the range (PLAN.md Step 2, METHODOLOGY §2.5).",
+      "thinking_pair_field": "On a reference thinking entry: the non-thinking sibling it pairs with. The energy one adds beyond the other, in the sibling's decode tokens, is evidence for how many hidden tokens thinking adds (METHODOLOGY §2.5). A measured open-weight thinking entry needs no pair: its plain answer is priced by the active-parameter estimator instead. deepseek-r1 is deliberately not paired with deepseek-v3, whose extrapolated decode coefficient is ~3.4x below EcoLogits' figure for the same architecture and would inflate R1's implied thinking ~3.5x.",
       "status_field": "current = a model a user can pick today: released on or after 2026-01-01 and still its provider's current offering (PLAN.md Step 5). reference = an older entry kept as evidence for the estimators and so stored history can re-score; resolvable by id, never listed in a picker (engine listModels() returns current entries unless asked for reference ones).",
       "thinking_field": "always = every answer reasons (hidden chain-of-thought is part of the benchmark energy); adaptive = the model decides how much to think; optional = the user can switch it on; none = no hidden reasoning.",
       "sources_field": "Per-fact provenance. status fetched = a primary page was opened on checked_on; search-only = only seen in search results or secondary sources. A current entry's estimate may not rest on search-only facts alone (PLAN.md Step 9).",
@@ -44,6 +46,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
@@ -66,6 +69,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "always",
+      "thinking_pair_of": "gpt-5",
       "provider_reported_anchor": {
         "energy_wh": 18.35,
         "boundary": "Third-party estimate of a medium-length response with full reasoning budget",
@@ -87,6 +91,7 @@
       "size_class": "Large",
       "data_source": "benchmarked",
       "thinking": "none",
+      "tier": "frontier",
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
@@ -109,6 +114,7 @@
       "size_class": "Small",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "small",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.185, "energy_wh_std": 0.042 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.52, "energy_wh_std": 0.095 },
@@ -125,6 +131,7 @@
       "size_class": "Nano",
       "data_source": "benchmarked",
       "thinking": "none",
+      "tier": "small",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.103, "energy_wh_std": 0.037 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.271, "energy_wh_std": 0.087 },
@@ -195,6 +202,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.14, "energy_wh_std": 0.54 },
@@ -212,6 +220,7 @@
       "size_class": "Small",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "small",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.14, "energy_wh_std": 0.04 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.42, "energy_wh_std": 0.08 },
@@ -228,6 +237,7 @@
       "size_class": "Large",
       "data_source": "benchmarked",
       "thinking": "none",
+      "tier": "frontier",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.836, "energy_wh_std": 0.102 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.781, "energy_wh_std": 0.277 },
@@ -245,6 +255,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.42, "energy_wh_std": 0.11 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.18, "energy_wh_std": 0.3 },
@@ -261,6 +272,7 @@
       "size_class": "Small",
       "data_source": "anchored",
       "thinking": "none",
+      "tier": "small",
       "provider_reported_anchor": {
         "energy_wh": 0.24,
         "water_ml": 0.26,
@@ -284,6 +296,7 @@
       "size_class": "Small",
       "data_source": "benchmarked",
       "thinking": "none",
+      "tier": "small",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.095, "energy_wh_std": 0.018 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.285, "energy_wh_std": 0.048 },
@@ -300,6 +313,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "provider_reported_anchor": {
         "carbon_g": 1.14,
         "water_ml": 45,
@@ -322,6 +336,7 @@
       "size_class": "Small",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "small",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.145, "energy_wh_std": 0.032 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.425, "energy_wh_std": 0.075 },
@@ -338,11 +353,12 @@
       "size_class": "Medium",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "small",
       "open_weight": true,
-      "params": { "total_b": 109, "active_b": 17 },
+      "params": { "total_b": 109, "active_b": 17, "precision": "bf16" },
       "released": "2025-04-05",
       "sources": [
-        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama4/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+        { "fact": "params, precision, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama4/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
       ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.19, "energy_wh_std": 0.048 },
@@ -361,10 +377,10 @@
       "data_source": "measured",
       "thinking": "none",
       "open_weight": true,
-      "params": { "total_b": 70, "active_b": 70 },
+      "params": { "total_b": 70, "active_b": 70, "precision": "bf16" },
       "released": "2024-12-06",
       "sources": [
-        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_3/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+        { "fact": "params, precision, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_3/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
       ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.247, "energy_wh_std": 0.032 },
@@ -383,10 +399,10 @@
       "data_source": "measured",
       "thinking": "none",
       "open_weight": true,
-      "params": { "total_b": 1.23, "active_b": 1.23 },
+      "params": { "total_b": 1.23, "active_b": 1.23, "precision": "bf16" },
       "released": "2024-10-24",
       "sources": [
-        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+        { "fact": "params, precision, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
       ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.07, "energy_wh_std": 0.011 },
@@ -404,10 +420,11 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "open_weight": true,
-      "params": { "total_b": 671, "active_b": 37 },
+      "params": { "total_b": 671, "active_b": 37, "precision": "fp8" },
       "sources": [
-        { "fact": "params", "url": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
+        { "fact": "params, precision", "url": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
       ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.49, "energy_wh_std": 0.15 },
@@ -426,9 +443,9 @@
       "data_source": "measured",
       "thinking": "always",
       "open_weight": true,
-      "params": { "total_b": 671, "active_b": 37 },
+      "params": { "total_b": 671, "active_b": 37, "precision": "fp8" },
       "sources": [
-        { "fact": "params", "url": "https://github.com/deepseek-ai/DeepSeek-R1/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
+        { "fact": "params, precision", "url": "https://github.com/deepseek-ai/DeepSeek-R1/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
       ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 23.815, "energy_wh_std": 2.16 },
@@ -446,6 +463,7 @@
       "size_class": "Large",
       "data_source": "extrapolated",
       "thinking": "none",
+      "tier": "frontier",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.9, "energy_wh_std": 0.27 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.9, "energy_wh_std": 0.87 },
