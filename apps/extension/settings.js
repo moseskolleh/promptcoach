@@ -56,7 +56,9 @@ async function init() {
   // Model select, grouped by provider.
   const modelSelect = $('default-model');
   const byProvider = new Map();
-  for (const m of engine.listModels()) {
+  // Until the 2026 models land (PLAN.md Step 5) every entry is a reference
+  // model, so ask for those too. Step 5 removes this.
+  for (const m of engine.listModels({ includeReference: true })) {
     if (!byProvider.has(m.provider)) byProvider.set(m.provider, []);
     byProvider.get(m.provider).push(m);
   }

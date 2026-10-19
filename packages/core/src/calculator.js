@@ -184,6 +184,13 @@ const REASONING_EFFORT = {
 // number it was never fitted to support. See the header note on e_in.
 const INPUT_FIT_EXTRAPOLATION_LIMIT = 5;
 
+// A catalog entry is either a model a user can pick today ('current') or an
+// older one kept as evidence for the estimators and so stored history can
+// re-score ('reference'). Reference ids always resolve; they are only listed
+// on request. See _metadata.notes.status_field in models.json.
+const MODEL_STATUSES = ['current', 'reference'];
+const THINKING_MODES = ['always', 'adaptive', 'optional', 'none'];
+
 const QUERY_CATEGORIES = [
   { id: 'short', maxTokens: 400, label: 'Short query' },
   { id: 'medium', maxTokens: 2000, label: 'Medium query' },
@@ -221,6 +228,24 @@ class ImpactEngine {
     this.models = {};
     for (const m of bundle.models.models || []) {
       if (!m || !m.model_id) throw new Error('models.json: every model needs a model_id');
+      if (Object.prototype.hasOwnProperty.call(this.models, m.model_id)) {
+        throw new Error(`models.json: ${m.model_id} is listed twice`);
+      }
+      // Bundles that predate the status field are all user-pickable models.
+      const status = m.status === undefined ? 'current' : m.status;
+      if (!MODEL_STATUSES.includes(status)) {
+        throw new Error(`models.json: ${m.model_id} has unknown status "${m.status}"`);
+      }
+      const thinking = m.thinking === undefined ? (m.is_reasoning ? 'always' : 'none') : m.thinking;
+      if (!THINKING_MODES.includes(thinking)) {
+        throw new Error(`models.json: ${m.model_id} has unknown thinking mode "${m.thinking}"`);
+      }
+      // An unmeasured model carries an `estimate` block instead of benchmark
+      // points. The estimators that read it are not part of this engine yet;
+      // refuse it rather than inventing points to fit.
+      if (!m.performance && m.estimate) {
+        throw new Error(`models.json: ${m.model_id} uses estimate method "${m.estimate.method}", which this engine does not support yet`);
+      }
       const perf = m.performance || {};
       const bench = ['short', 'medium', 'long'].map((k) => {
         const p = perf[k];
@@ -241,7 +266,10 @@ class ImpactEngine {
         hostKey,
         sizeClass: m.size_class,
         dataSource: m.data_source || 'measured',
-        isReasoning: !!m.is_reasoning,
+        status,
+        released: m.released || null,
+        thinking,
+        isReasoning: thinking !== 'none',
         anchor: m.provider_reported_anchor || null,
         bench,
         benchMaxInput: Math.max(...bench.map((b) => b.input_tokens)),
@@ -251,16 +279,29 @@ class ImpactEngine {
     }
   }
 
-  listModels() {
-    return Object.values(this.models).map((m) => ({
-      id: m.id,
-      name: m.name,
-      provider: m.provider,
-      host: m.host,
-      sizeClass: m.sizeClass,
-      dataSource: m.dataSource,
-      isReasoning: m.isReasoning
-    }));
+  /**
+   * Models a user can pick, in data-file order. Reference entries (older
+   * models kept as evidence) are left out unless asked for.
+   *
+   * @param {Object} [opts]
+   * @param {boolean} [opts.includeReference=false]
+   */
+  listModels(opts = {}) {
+    const includeReference = !!(opts && opts.includeReference);
+    return Object.values(this.models)
+      .filter((m) => includeReference || m.status === 'current')
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        provider: m.provider,
+        host: m.host,
+        sizeClass: m.sizeClass,
+        dataSource: m.dataSource,
+        status: m.status,
+        released: m.released,
+        thinking: m.thinking,
+        isReasoning: m.isReasoning
+      }));
   }
 
   getModel(modelId) {
@@ -376,6 +417,9 @@ class ImpactEngine {
         host: model.host,
         sizeClass: model.sizeClass,
         dataSource: model.dataSource,
+        status: model.status,
+        released: model.released,
+        thinking: model.thinking,
         isReasoning: model.isReasoning
       },
       tokens: { input: tIn, output: tOut, total: tIn + tOut },
@@ -457,9 +501,12 @@ class ImpactEngine {
    * Compare models on the same query. Returns results sorted most-efficient
    * first, with potential savings vs the worst option.
    */
-  compareModels({ modelIds, inputTokens, outputTokens, options = {} }) {
-    // Omitting modelIds means "all models"; an explicit empty list means none.
-    const ids = [...new Set(Array.isArray(modelIds) ? modelIds : Object.keys(this.models))];
+  compareModels({ modelIds, includeReference = false, inputTokens, outputTokens, options = {} }) {
+    // Omitting modelIds means "every model listModels() would list"; an
+    // explicit empty list means none.
+    const ids = [...new Set(Array.isArray(modelIds)
+      ? modelIds
+      : this.listModels({ includeReference }).map((m) => m.id))];
     const results = [];
     for (const id of ids) {
       const impact = this.estimateImpact({ modelId: id, inputTokens, outputTokens, options });
@@ -717,7 +764,9 @@ const CalculatorModule = {
   isRoutedHost,
   REASONING_EFFORT,
   GRADE_BANDS,
-  INPUT_FIT_EXTRAPOLATION_LIMIT
+  INPUT_FIT_EXTRAPOLATION_LIMIT,
+  MODEL_STATUSES,
+  THINKING_MODES
 };
 
 if (typeof globalThis !== 'undefined') {

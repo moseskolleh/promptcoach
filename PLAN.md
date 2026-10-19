@@ -336,6 +336,21 @@ before 2026-01-01. Every reference id still estimates to exactly the value it do
 test proves no `current` entry carries `performance` points unless they
 cite a benchmark.
 
+> **Status (2026-10-19): built.**
+> - All 22 entries are `reference`. `thinking` replaces `is_reasoning`,
+>   and the no-op `retired` flag is gone.
+> - The open-weight entries carry parameter counts fetched from the labs'
+>   own model cards: Llama 3.2 1B, Llama 3.3 70B, Llama 4 Scout,
+>   DeepSeek V3 and R1. These are inputs for Step 2's leave-one-out check.
+> - A snapshot test pins every reference estimate: 22 models × 6 shapes ×
+>   3 efforts.
+> - Two values wait for later steps. `superseded_by` arrives in Step 5,
+>   with the models it points to, so no id ever points at nothing.
+>   `effort_vocab` arrives in Step 3.
+> - Until Step 5 adds current models, the apps ask for reference entries
+>   explicitly (`includeReference: true`), so no picker goes empty. Step 5
+>   removes that opt-in, and with it every pre-2026 model from the UI.
+
 ### Step 2 — Two estimators, both with ranges · L
 Decision 1, made concrete. Both estimators are pure functions in core and
 return `{wh, range: {lowWh, highWh}, method, inputs}`.
