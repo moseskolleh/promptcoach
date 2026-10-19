@@ -4,6 +4,9 @@
 
 export type Grade = 'A' | 'B' | 'C' | 'D' | 'E';
 export type ReasoningEffort = 'low' | 'standard' | 'high';
+/** Every effort level a provider can name, cheapest first (METHODOLOGY §2.5.7). */
+export type EffortLevel = 'none' | 'low' | 'standard' | 'high' | 'xhigh' | 'max';
+export type EffortVocabulary = 'anthropic' | 'openai' | 'google' | 'xai' | 'deepseek' | 'meta';
 export type QueryCategory = 'short' | 'medium' | 'long';
 export type DataSource = 'measured' | 'benchmarked' | 'extrapolated' | 'anchored';
 /** current = pickable today (released 2026+); reference = older entry kept as evidence and for stored history. */
@@ -54,7 +57,10 @@ export interface ModelEntry {
   thinking?: ThinkingMode;
   /** @deprecated schema v2; use thinking. */
   is_reasoning?: boolean;
-  effort_vocab?: string;
+  /** Which provider's effort labels apply (EFFORT_VOCABULARIES). */
+  effort_vocab?: EffortVocabulary;
+  /** The provider's documented default effort; used when none is given. */
+  default_effort?: EffortLevel | 'medium';
   open_weight?: boolean;
   /** Parameter counts in billions; active_b is per token at decode. */
   params?: { total_b: number; active_b: number; precision?: string };
@@ -128,6 +134,8 @@ export interface ModelSummary {
 export interface ModelRecord extends ModelSummary {
   hostKey: string;
   anchor: ProviderAnchor | null;
+  defaultEffort: EffortLevel | null;
+  effortVocab: EffortVocabulary | null;
   params: { total_b: number; active_b: number; precision?: string } | null;
   tier: string | null;
   thinkingPairOf: string | null;
@@ -142,8 +150,10 @@ export interface ModelRecord extends ModelSummary {
 export interface ImpactOptions {
   /** Task-type energy multiplier (image ×3, agentic ×2, …); non-positive values are treated as 1. */
   taskMultiplier?: number;
-  /** Reasoning models only; unknown keys fall back to 'standard'. */
-  reasoningEffort?: ReasoningEffort | string;
+  /** An EffortLevel or alias ('medium'); unknown or missing means the model's default_effort, else 'standard'. */
+  reasoningEffort?: EffortLevel | 'medium' | string;
+  /** Several agents answer at once (Grok Heavy): an estimated model's figure becomes a floor. */
+  multiAgent?: boolean;
   /** Override the carbon grid (regions in grids.json); energy and water are unaffected. */
   regionKey?: string;
   /** Direct carbon-intensity override in kgCO2e/kWh. */
@@ -168,10 +178,12 @@ export interface GradeResult {
 export interface ImpactGrade extends GradeResult {
   /** The figure is a lower bound (input clamped), so the grade is a floor. */
   provisional?: boolean;
-  /** Grades of the range's ends, for an estimated model. */
-  range?: { low: Grade; high: Grade };
+  /** Grades of the range's ends, for an estimated model; high is null for a floor. */
+  range?: { low: Grade; high: Grade | null };
   /** Show range.low–range.high, not grade. */
   rangeOnly?: boolean;
+  /** "At least range.low": several agents answered and their count is unknown. */
+  floor?: boolean;
 }
 
 export type EstimateMethod = 'active-params' | 'tier';
@@ -199,30 +211,33 @@ export interface Impact {
     extrapolated: boolean;
     /** Set when the input ran past the fitted range: the figure is a lower bound. */
     clamped: { term: 'input'; atTokens: number; requestedTokens: number; fittedMaxTokens: number; reason: string } | null;
-    /** For an estimated model, the estimate's range. */
-    confidence: { minWh: number; maxWh: number };
-    /** Only for a model nobody has measured. With rangeOnly set, show lowWh–highWh, never wh. */
-    range: { lowWh: number; highWh: number; rangeOnly: boolean } | null;
+    /** For an estimated model, the estimate's range; maxWh is null for a floor. */
+    confidence: { minWh: number; maxWh: number | null };
+    /**
+     * Only for a model nobody has measured. With rangeOnly set, show lowWh–highWh, never wh.
+     * A floor (several agents, count unknown) has highWh null: show "at least lowWh".
+     */
+    range: { lowWh: number; highWh: number | null; rangeOnly: boolean; floor: boolean } | null;
   };
   water: {
     ml: number;
     l: number;
     breakdown: { onsiteMl: number; offsiteMl: number };
-    range: { lowMl: number; highMl: number } | null;
+    range: { lowMl: number; highMl: number | null } | null;
   };
   carbon: {
     gCO2e: number;
     kgCO2e: number;
     operationalG: number;
     embodiedG: number;
-    range: { lowG: number; highG: number } | null;
+    range: { lowG: number; highG: number | null } | null;
   };
   grade: ImpactGrade;
   /** How an unmeasured model was estimated (METHODOLOGY §2.5); null for benchmarked models. */
   estimate: EstimateInfo | null;
   factors: {
     taskMultiplier: number;
-    reasoningEffort: ReasoningEffort | null;
+    reasoningEffort: EffortLevel | null;
     pue: number;
     wueOnsite: number;
     wueOffsite: number;
@@ -300,6 +315,16 @@ export class ImpactEngine {
 export function fitCoefficients(bench: BenchPoint[]): Coefficients;
 export function autoDetectModel(hostname: string): string | null;
 export const REASONING_EFFORT: Record<ReasoningEffort, number>;
+export const EFFORT_LEVELS: Record<EffortLevel, { rank: number; low: number; high: number }>;
+export const EFFORT_VOCABULARIES: Record<EffortVocabulary, {
+  status: 'fetched' | 'search-only';
+  appDefault: EffortLevel | null;
+  labels: Record<string, EffortLevel | { level: EffortLevel; multiAgent: boolean }>;
+}>;
+/** Canonical level for a key or alias, any case; null when unknown. */
+export function effortLevel(key: unknown): EffortLevel | null;
+/** What one label in a provider's app means; null when it is not an effort setting. */
+export function effortFromLabel(vocab: string, label: string): { level: EffortLevel; multiAgent: boolean } | null;
 export const GRADE_BANDS: Array<{ grade: Grade; maxWh: number }>;
 export const MODEL_STATUSES: ModelStatus[];
 export const THINKING_MODES: ThinkingMode[];
