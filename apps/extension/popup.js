@@ -609,7 +609,9 @@
     state.settings = settings;
     state.engine = new Core.ImpactEngine({ models, grids, equivalents });
     state.conv = Core.createConverters(equivalents);
-    state.models = state.engine.listModels();
+    // Until the 2026 models land (PLAN.md Step 5) every entry is a reference
+    // model, so ask for those too. Step 5 removes this.
+    state.models = state.engine.listModels({ includeReference: true });
 
     // Quick grade per model (typical short query: 100 in / 300 out).
     for (const m of state.models) {

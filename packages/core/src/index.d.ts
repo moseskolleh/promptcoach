@@ -5,7 +5,10 @@
 export type Grade = 'A' | 'B' | 'C' | 'D' | 'E';
 export type ReasoningEffort = 'low' | 'standard' | 'high';
 export type QueryCategory = 'short' | 'medium' | 'long';
-export type DataSource = 'measured' | 'extrapolated' | 'anchored';
+export type DataSource = 'measured' | 'benchmarked' | 'extrapolated' | 'anchored';
+/** current = pickable today (released 2026+); reference = older entry kept as evidence and for stored history. */
+export type ModelStatus = 'current' | 'reference';
+export type ThinkingMode = 'always' | 'adaptive' | 'optional' | 'none';
 
 // ----------------------------------------------------------------- data files
 
@@ -25,6 +28,15 @@ export interface ProviderAnchor {
   label?: string;
 }
 
+/** Provenance of one fact: fetched = a primary page was opened on checked_on. */
+export interface SourceRef {
+  url: string;
+  status: 'fetched' | 'search-only';
+  checked_on: string;
+  /** Which facts this source backs, e.g. "params, released". */
+  fact?: string;
+}
+
 export interface ModelEntry {
   model_id: string;
   name: string;
@@ -33,9 +45,26 @@ export interface ModelEntry {
   host_key?: string;
   size_class?: string;
   data_source?: DataSource;
+  /** Defaults to 'current' for bundles that predate schema v3. */
+  status?: ModelStatus;
+  /** ISO date (YYYY, YYYY-MM or YYYY-MM-DD). Required for current entries. */
+  released?: string;
+  superseded_by?: string | null;
+  /** Defaults from is_reasoning for bundles that predate schema v3. */
+  thinking?: ThinkingMode;
+  /** @deprecated schema v2; use thinking. */
   is_reasoning?: boolean;
+  effort_vocab?: string;
+  open_weight?: boolean;
+  /** Parameter counts in billions; active_b is per token at decode. */
+  params?: { total_b: number; active_b: number; precision?: string };
+  /** How an unmeasured model is estimated. Not yet supported by the engine (PLAN.md Step 2). */
+  estimate?: { method: string; [input: string]: unknown };
+  sources?: SourceRef[];
   provider_reported_anchor?: ProviderAnchor;
-  performance: { short: BenchPoint; medium: BenchPoint; long: BenchPoint };
+  /** Benchmark points. A current entry must cite them in performance_source. */
+  performance?: { short: BenchPoint; medium: BenchPoint; long: BenchPoint };
+  performance_source?: { url: string; status: 'fetched' | 'search-only' };
 }
 
 export interface ModelsData {
@@ -85,6 +114,10 @@ export interface ModelSummary {
   host: string;
   sizeClass?: string;
   dataSource: DataSource | string;
+  status: ModelStatus;
+  released: string | null;
+  thinking: ThinkingMode;
+  /** thinking !== 'none' */
   isReasoning: boolean;
 }
 
@@ -206,14 +239,16 @@ export class ImpactEngine {
   equivalents: EquivalentsData | null;
   embodiedFactor: number;
   models: Record<string, ModelRecord>;
-  listModels(): ModelSummary[];
+  /** Current models only, unless includeReference is set. */
+  listModels(options?: { includeReference?: boolean }): ModelSummary[];
   getModel(modelId: string): ModelRecord | null;
   getCategory(inputTokens: number, outputTokens: number): QueryCategory;
   getRegionCif(regionKey?: string | null): number | null;
   listRegions(): Region[];
   estimateImpact(request: ImpactRequest): Impact | null;
   gradeFor(energyWh: number): GradeResult;
-  compareModels(request: { modelIds?: string[]; inputTokens: number; outputTokens: number; options?: ImpactOptions }): Comparison;
+  /** Omitting modelIds compares what listModels() would list. */
+  compareModels(request: { modelIds?: string[]; includeReference?: boolean; inputTokens: number; outputTokens: number; options?: ImpactOptions }): Comparison;
   aggregate(impacts: Array<Impact | HistoryLike | null | undefined> | null | undefined): Totals;
 }
 
@@ -221,6 +256,8 @@ export function fitCoefficients(bench: BenchPoint[]): Coefficients;
 export function autoDetectModel(hostname: string): string | null;
 export const REASONING_EFFORT: Record<ReasoningEffort, number>;
 export const GRADE_BANDS: Array<{ grade: Grade; maxWh: number }>;
+export const MODEL_STATUSES: ModelStatus[];
+export const THINKING_MODES: ThinkingMode[];
 
 // ------------------------------------------------------------------ analyzer
 

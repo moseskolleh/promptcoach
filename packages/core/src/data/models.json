@@ -1,7 +1,8 @@
 {
   "_metadata": {
     "version": "2.0.0",
-    "last_updated": "2026-09-24",
+    "schema_version": 3,
+    "last_updated": "2026-10-19",
     "primary_source": "Jegham et al. (2025), How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference, arXiv:2505.09598 (v6, Nov 2025 — 30 models, DEA eco-efficiency ranking)",
     "anchor_sources": [
       "Google (Aug 2025), Measuring the environmental impact of delivering AI at Google, arXiv:2508.15734 — median Gemini Apps text prompt: 0.24 Wh, 0.26 mL water, 0.03 gCO2e (market-based, incl. embodied)",
@@ -13,6 +14,9 @@
       "Adamska et al. (2025), Green Prompting, arXiv:2503.10666 — response length is the dominant energy driver (r~0.9); input length matters far less"
     ],
     "notes": {
+      "status_field": "current = a model a user can pick today: released on or after 2026-01-01 and still its provider's current offering (PLAN.md Step 5). reference = an older entry kept as evidence for the estimators and so stored history can re-score; resolvable by id, never listed in a picker (engine listModels() returns current entries unless asked for reference ones).",
+      "thinking_field": "always = every answer reasons (hidden chain-of-thought is part of the benchmark energy); adaptive = the model decides how much to think; optional = the user can switch it on; none = no hidden reasoning.",
+      "sources_field": "Per-fact provenance. status fetched = a primary page was opened on checked_on; search-only = only seen in search results or secondary sources. A current entry's estimate may not rest on search-only facts alone (PLAN.md Step 9).",
       "data_source_field": "measured = benchmarked in Jegham et al.; extrapolated = estimated from size class, hardware, and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
       "benchmark_configurations": "short = 100 in / 300 out, medium = 1000 in / 1000 out, long = 10000 in / 1500 out tokens",
       "reasoning_models": "Benchmark energy for reasoning models includes hidden chain-of-thought tokens at a typical thinking budget; the engine scales the fixed and decode terms (everything except prefill) for low/standard/high effort.",
@@ -27,17 +31,19 @@
       "anthropic_lineup_2026_09_24": "Anthropic's current lineup is Fable 5.1, Opus 5.5, Opus 5, Sonnet 5 and Haiku 4.5 (verified against Anthropic's own platform docs). Only Sonnet 5 is added here. Opus and Fable are DELIBERATELY ABSENT: no defensible energy figure exists for them, and seeding them from Sonnet's points would report a smaller, non-thinking model's number under a larger always-on-thinking model's name - repeating the exact understatement this release fixes. Until a measurement exists they resolve to no catalog entry, which the UI reports as such."
     },
     "data_source_field": "measured = an independent third-party hardware measurement (open-weight models only); benchmarked = estimated by the Jegham et al. infrastructure-aware framework, not instrumented - no third party can meter a closed hosted model; extrapolated = estimated from size class, hardware and measured siblings; anchored = calibrated against a provider-reported per-prompt figure",
-    "last_checked": "2026-09-24"
+    "last_checked": "2026-10-19"
   },
   "models": [
     {
       "model_id": "gpt-5",
+      "status": "reference",
       "name": "GPT-5 (Instant)",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
@@ -52,13 +58,14 @@
     },
     {
       "model_id": "gpt-5-thinking",
+      "status": "reference",
       "name": "GPT-5 (Thinking)",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
       "data_source": "extrapolated",
-      "is_reasoning": true,
+      "thinking": "always",
       "provider_reported_anchor": {
         "energy_wh": 18.35,
         "boundary": "Third-party estimate of a medium-length response with full reasoning budget",
@@ -72,12 +79,14 @@
     },
     {
       "model_id": "gpt-4o",
+      "status": "reference",
       "name": "GPT-4o",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
       "data_source": "benchmarked",
+      "thinking": "none",
       "provider_reported_anchor": {
         "energy_wh": 0.34,
         "water_ml": 0.32,
@@ -92,12 +101,14 @@
     },
     {
       "model_id": "gpt-4o-mini",
+      "status": "reference",
       "name": "GPT-4o mini",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Small",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.185, "energy_wh_std": 0.042 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.52, "energy_wh_std": 0.095 },
@@ -106,12 +117,14 @@
     },
     {
       "model_id": "gpt-4.1-nano",
+      "status": "reference",
       "name": "GPT-4.1 nano",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Nano",
       "data_source": "benchmarked",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.103, "energy_wh_std": 0.037 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.271, "energy_wh_std": 0.087 },
@@ -120,13 +133,14 @@
     },
     {
       "model_id": "o4-mini",
+      "status": "reference",
       "name": "o4-mini (reasoning)",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Medium",
       "data_source": "extrapolated",
-      "is_reasoning": true,
+      "thinking": "always",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 1.21, "energy_wh_std": 0.48 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 4.56, "energy_wh_std": 1.82 },
@@ -135,13 +149,14 @@
     },
     {
       "model_id": "o3",
+      "status": "reference",
       "name": "o3 (reasoning)",
       "provider": "OpenAI",
       "host": "Microsoft Azure",
       "host_key": "microsoft_azure",
       "size_class": "Large",
       "data_source": "benchmarked",
-      "is_reasoning": true,
+      "thinking": "always",
       "provider_reported_anchor": {
         "energy_wh": 33.0,
         "boundary": "Same as the engine (long benchmark prompt)",
@@ -155,12 +170,14 @@
     },
     {
       "model_id": "claude-sonnet-5",
+      "status": "reference",
       "name": "Claude Sonnet 5",
       "provider": "Anthropic",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "notes": "Benchmark points CARRIED FORWARD verbatim from Claude Sonnet 4.5 (same tier, same host). No lab has published a per-query energy figure for any 2026-generation model, so this is a transparent carry-forward, not a measurement of Sonnet 5. Named correctly so the reported number stops being attributed to a superseded model; the underlying figure is unchanged and equally extrapolated. Replace as soon as a measurement exists.",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
@@ -170,27 +187,31 @@
     },
     {
       "model_id": "claude-4.5-sonnet",
+      "status": "reference",
       "name": "Claude Sonnet 4.5",
       "provider": "Anthropic",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.78, "energy_wh_std": 0.2 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.14, "energy_wh_std": 0.54 },
         "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 4.35, "energy_wh_std": 1.09 }
       },
-      "notes": "Legacy. Superseded by claude-sonnet-5; kept so stored history stays resolvable."
+      "notes": "Legacy. Superseded by Claude Sonnet 5 and then 5.5; a reference entry kept so stored history stays resolvable."
     },
     {
       "model_id": "claude-4.5-haiku",
+      "status": "reference",
       "name": "Claude Haiku 4.5",
       "provider": "Anthropic",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Small",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.14, "energy_wh_std": 0.04 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.42, "energy_wh_std": 0.08 },
@@ -199,28 +220,31 @@
     },
     {
       "model_id": "claude-3.7-sonnet",
+      "status": "reference",
       "name": "Claude 3.7 Sonnet",
       "provider": "Anthropic",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Large",
       "data_source": "benchmarked",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.836, "energy_wh_std": 0.102 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.781, "energy_wh_std": 0.277 },
         "long": { "input_tokens": 10000, "output_tokens": 1500, "energy_wh_mean": 5.518, "energy_wh_std": 0.751 }
       },
-      "retired": true,
-      "notes": "Retired: absent from Anthropic's current model lineup. Kept for historical history entries; excluded from detection."
+      "notes": "Absent from Anthropic's current model lineup. A reference entry: resolvable for stored history, never listed in a picker."
     },
     {
       "model_id": "gemini-2.5-pro",
+      "status": "reference",
       "name": "Gemini 2.5 Pro",
       "provider": "Google",
       "host": "Google Cloud",
       "host_key": "google_cloud",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.42, "energy_wh_std": 0.11 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.18, "energy_wh_std": 0.3 },
@@ -229,12 +253,14 @@
     },
     {
       "model_id": "gemini-2.5-flash",
+      "status": "reference",
       "name": "Gemini 2.5 Flash",
       "provider": "Google",
       "host": "Google Cloud",
       "host_key": "google_cloud",
       "size_class": "Small",
       "data_source": "anchored",
+      "thinking": "none",
       "provider_reported_anchor": {
         "energy_wh": 0.24,
         "water_ml": 0.26,
@@ -250,12 +276,14 @@
     },
     {
       "model_id": "gemini-2.0-flash",
+      "status": "reference",
       "name": "Gemini 2.0 Flash",
       "provider": "Google",
       "host": "Google Cloud",
       "host_key": "google_cloud",
       "size_class": "Small",
       "data_source": "benchmarked",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.095, "energy_wh_std": 0.018 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.285, "energy_wh_std": 0.048 },
@@ -264,12 +292,14 @@
     },
     {
       "model_id": "mistral-large",
+      "status": "reference",
       "name": "Mistral Large 2",
       "provider": "Mistral AI",
       "host": "Mistral (EU)",
       "host_key": "mistral_eu",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "provider_reported_anchor": {
         "carbon_g": 1.14,
         "water_ml": 45,
@@ -284,12 +314,14 @@
     },
     {
       "model_id": "mistral-small",
+      "status": "reference",
       "name": "Mistral Small",
       "provider": "Mistral AI",
       "host": "Mistral (EU)",
       "host_key": "mistral_eu",
       "size_class": "Small",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.145, "energy_wh_std": 0.032 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.425, "energy_wh_std": 0.075 },
@@ -298,12 +330,20 @@
     },
     {
       "model_id": "llama-4-scout",
+      "status": "reference",
       "name": "Llama 4 Scout",
       "provider": "Meta",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Medium",
       "data_source": "extrapolated",
+      "thinking": "none",
+      "open_weight": true,
+      "params": { "total_b": 109, "active_b": 17 },
+      "released": "2025-04-05",
+      "sources": [
+        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama4/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+      ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.19, "energy_wh_std": 0.048 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.56, "energy_wh_std": 0.14 },
@@ -312,12 +352,20 @@
     },
     {
       "model_id": "llama-3.3-70b",
+      "status": "reference",
       "name": "Llama 3.3 70B",
       "provider": "Meta",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Medium",
       "data_source": "measured",
+      "thinking": "none",
+      "open_weight": true,
+      "params": { "total_b": 70, "active_b": 70 },
+      "released": "2024-12-06",
+      "sources": [
+        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_3/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+      ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.247, "energy_wh_std": 0.032 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.857, "energy_wh_std": 0.113 },
@@ -326,12 +374,20 @@
     },
     {
       "model_id": "llama-3.2-1b",
+      "status": "reference",
       "name": "Llama 3.2 1B",
       "provider": "Meta",
       "host": "AWS",
       "host_key": "aws",
       "size_class": "Nano",
       "data_source": "measured",
+      "thinking": "none",
+      "open_weight": true,
+      "params": { "total_b": 1.23, "active_b": 1.23 },
+      "released": "2024-10-24",
+      "sources": [
+        { "fact": "params, released", "url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/MODEL_CARD.md", "status": "fetched", "checked_on": "2026-10-19" }
+      ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.07, "energy_wh_std": 0.011 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 0.218, "energy_wh_std": 0.035 },
@@ -340,12 +396,19 @@
     },
     {
       "model_id": "deepseek-v3",
+      "status": "reference",
       "name": "DeepSeek V3",
       "provider": "DeepSeek",
       "host": "DeepSeek (China)",
       "host_key": "deepseek",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
+      "open_weight": true,
+      "params": { "total_b": 671, "active_b": 37 },
+      "sources": [
+        { "fact": "params", "url": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
+      ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.49, "energy_wh_std": 0.15 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 1.42, "energy_wh_std": 0.43 },
@@ -354,13 +417,19 @@
     },
     {
       "model_id": "deepseek-r1",
+      "status": "reference",
       "name": "DeepSeek R1 (reasoning)",
       "provider": "DeepSeek",
       "host": "DeepSeek (China)",
       "host_key": "deepseek",
       "size_class": "Large",
       "data_source": "measured",
-      "is_reasoning": true,
+      "thinking": "always",
+      "open_weight": true,
+      "params": { "total_b": 671, "active_b": 37 },
+      "sources": [
+        { "fact": "params", "url": "https://github.com/deepseek-ai/DeepSeek-R1/blob/main/README.md", "status": "fetched", "checked_on": "2026-10-19" }
+      ],
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 23.815, "energy_wh_std": 2.16 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 29.0, "energy_wh_std": 3.069 },
@@ -369,12 +438,14 @@
     },
     {
       "model_id": "grok-3",
+      "status": "reference",
       "name": "Grok 3",
       "provider": "xAI",
       "host": "xAI (Memphis)",
       "host_key": "xai",
       "size_class": "Large",
       "data_source": "extrapolated",
+      "thinking": "none",
       "performance": {
         "short": { "input_tokens": 100, "output_tokens": 300, "energy_wh_mean": 0.9, "energy_wh_std": 0.27 },
         "medium": { "input_tokens": 1000, "output_tokens": 1000, "energy_wh_mean": 2.9, "energy_wh_std": 0.87 },

@@ -104,6 +104,11 @@ function initTheme() {
 
 /* ============================ 3. State ============================ */
 
+// Every catalog entry is a reference model until the 2026 models land
+// (PLAN.md Step 5), so the pickers ask for reference entries too. Step 5
+// removes this, and with it every pre-2026 model from the UI.
+const MODEL_LIST = { includeReference: true };
+
 const state = {
   engine: null,
   conv: null,
@@ -219,7 +224,7 @@ function buildDemoFacts() {
   }
 
   // Fact 2: best vs worst on a typical short question.
-  const cmp = engine.compareModels({ inputTokens: 100, outputTokens: 300 });
+  const cmp = engine.compareModels({ ...MODEL_LIST, inputTokens: 100, outputTokens: 300 });
   if (cmp.best && cmp.worst && cmp.potentialSavings) {
     facts.push({
       emoji: '⚖️',
@@ -276,7 +281,7 @@ function initDemoStrip() {
 function populateModelSelect() {
   const select = $('model-select');
   clearChildren(select);
-  const models = state.engine.listModels();
+  const models = state.engine.listModels(MODEL_LIST);
 
   // Group by provider, keep data-file order within groups.
   const groups = new Map();
@@ -414,7 +419,7 @@ function tipAction(tip, analysis) {
     // models are excluded — "switch to a 1B model" isn't credible advice for
     // general tasks; Small (Haiku/mini/Flash class) is the floor the tip text
     // itself recommends.
-    const candidates = state.engine.listModels()
+    const candidates = state.engine.listModels(MODEL_LIST)
       .filter((m) => m.sizeClass !== 'Nano' && !m.isReasoning)
       .map((m) => m.id);
     if (!candidates.includes(state.modelId)) candidates.push(state.modelId);
@@ -796,7 +801,7 @@ function syncCompareChipStates() {
 function renderCompareChips() {
   const wrap = $('compare-chips');
   clearChildren(wrap);
-  for (const m of state.engine.listModels()) {
+  for (const m of state.engine.listModels(MODEL_LIST)) {
     const chip = el('button', 'chip', m.name);
     chip.type = 'button';
     chip.dataset.modelId = m.id;
@@ -1032,7 +1037,7 @@ function explorerMatches(meta) {
 
 function initExplorerToolbar() {
   const providerSelect = $('explorer-provider');
-  const providers = [...new Set(state.engine.listModels().map((m) => m.provider))].sort();
+  const providers = [...new Set(state.engine.listModels(MODEL_LIST).map((m) => m.provider))].sort();
   for (const p of providers) {
     const opt = document.createElement('option');
     opt.value = p;
@@ -1057,7 +1062,7 @@ function renderExplorer() {
   const grid = $('explorer-grid');
   clearChildren(grid);
 
-  const models = state.engine.listModels()
+  const models = state.engine.listModels(MODEL_LIST)
     .filter(explorerMatches)
     .map((m) => ({ meta: m, short: shortQueryImpact(m.id) }))
     .filter((x) => x.short)

@@ -23,7 +23,7 @@ test('coefficient fit reproduces the GPT-4o benchmark points', () => {
 });
 
 test('all models fit with non-negative, monotonic coefficients', () => {
-  for (const { id } of engine.listModels()) {
+  for (const { id } of engine.listModels({ includeReference: true })) {
     const m = engine.getModel(id);
     const c = m.coefficients;
     assert.ok(c.eIn >= 0 && c.eOut >= 0 && c.eFixed >= 0, `${id} has negative coefficient`);
@@ -228,14 +228,14 @@ test('vendored copies in the apps match core exactly (run scripts/sync-core.js)'
 });
 
 test('all auto-detect targets exist in the model catalog', () => {
-  const ids = new Set(engine.listModels().map((m) => m.id));
+  const ids = new Set(engine.listModels({ includeReference: true }).map((m) => m.id));
   for (const id of ['gpt-5', 'claude-4.5-sonnet', 'gemini-2.5-flash', 'mistral-large', 'deepseek-v3', 'gpt-4o-mini', 'grok-3']) {
     assert.ok(ids.has(id), `missing model: ${id}`);
   }
 });
 
 test('every model reproduces its own benchmark points (non-negative least squares)', () => {
-  for (const { id } of engine.listModels()) {
+  for (const { id } of engine.listModels({ includeReference: true })) {
     const m = engine.getModel(id);
     const { eIn, eOut, eFixed } = m.coefficients;
     for (const b of m.bench) {
@@ -248,7 +248,7 @@ test('every model reproduces its own benchmark points (non-negative least square
 
 test('relatable labels never show fractional sub-unit counts', () => {
   const awkward = /^0(?:\.\d+)?\s|\b0\.\d+ /;
-  for (const { id } of engine.listModels()) {
+  for (const { id } of engine.listModels({ includeReference: true })) {
     for (const [inputTokens, outputTokens] of [[100, 300], [1000, 1000], [10000, 1500]]) {
       const rel = converters.forImpact(engine.estimateImpact({ modelId: id, inputTokens, outputTokens }));
       for (const dim of ['energy', 'water', 'carbon']) {
@@ -276,7 +276,7 @@ test('extrapolation is flagged per axis and the confidence band widens', () => {
 });
 
 test('compareModels never rounds a real saving up to 100%, and [] means no models', () => {
-  const all = engine.compareModels({ inputTokens: 100, outputTokens: 300 });
+  const all = engine.compareModels({ includeReference: true, inputTokens: 100, outputTokens: 300 });
   assert.ok(all.potentialSavings.percentage <= 99);
   assert.ok(all.potentialSavings.ratio > 0.99);
   assert.strictEqual(engine.compareModels({ modelIds: [], inputTokens: 100, outputTokens: 300 }).results.length, 0);
@@ -372,7 +372,7 @@ test('detectModelFromLabels maps model-picker text to catalog ids per provider',
   assert.strictEqual(d('chatgpt.com', ['', 'x'.repeat(200) + ' Thinking']), null);
   assert.strictEqual(d('claude.ai', ['ChatGPT 5 Thinking']), null);
   // Every id the detector can return exists in the catalog.
-  const ids = new Set(engine.listModels().map((m) => m.id));
+  const ids = new Set(engine.listModels({ includeReference: true }).map((m) => m.id));
   for (const [host, labels] of [
     ['chatgpt.com', ['o4-mini', 'o3', 'Thinking', '4.1 nano', '4o mini', '4o', 'GPT-5']],
     // 'Sonnet' alone is deliberately absent: an unversioned label no longer
@@ -423,7 +423,7 @@ test('the input term is clamped beyond its fitted range, and says so', () => {
 
   // Every model has a non-zero input coefficient — the header comment used to
   // claim the fit recovers e_in ~ 0, which is false for all of them.
-  for (const m of engine.listModels()) {
+  for (const m of engine.listModels({ includeReference: true })) {
     assert.ok(engine.getModel(m.id).coefficients.eIn > 0, `${m.id} has a non-zero e_in`);
   }
 });
