@@ -5,6 +5,29 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Effort as each provider names it (PLAN.md Step 3)
+
+- **One effort scale:** `none`, `low`, `standard` (alias `medium`),
+  `high`, `xhigh`, `max`. Each level is a factor range on thinking. `xhigh`
+  and `max` start at `high` and only widen upward, since nothing past
+  `high` has been measured. See METHODOLOGY §2.5.7.
+- **Provider vocabularies** (`EFFORT_VOCABULARIES`, `effortFromLabel()`)
+  for Anthropic (fetched), plus OpenAI, Google, xAI, DeepSeek and Meta
+  (search-only).
+- **How the engine applies effort:**
+  - An unknown or missing effort now means the model's `default_effort`.
+    Only without one does it mean `standard`.
+  - `none` switches thinking off. An adaptive or optional model then gets
+    a point estimate; an `always` model treats it as `low`.
+  - `multiAgent: true` makes an estimated model's figure a floor:
+    `range.highWh` is null and `grade.floor` is set.
+- **Benchmarked thinking models keep their single factor.** `xhigh` and
+  `max` count as `high`, and `none` as `low`. The reference snapshot is
+  unchanged.
+- **Inherited property names no longer resolve.** Names like
+  `constructor` used to pass as an effort level, effort vocabulary,
+  weight precision or tier; now they are refused.
+
 ### Estimators for models nobody has measured (PLAN.md Step 2)
 
 - A `current` entry can now carry an `estimate` block instead of benchmark

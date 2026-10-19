@@ -178,6 +178,81 @@ const REASONING_EFFORT = {
   high: 2.5 // extended thinking / hard problems
 };
 
+// Every effort level a provider can name, cheapest first, as a range of
+// factors on thinking. low / standard / high are the three tiers above.
+// Nothing past high has been measured, so xhigh and max start at high and
+// widen by one more high-sized step each (METHODOLOGY §2.5.7). none means no
+// thinking at all, which only a model that can stop thinking honours.
+const EFFORT_LEVELS = Object.freeze({
+  none: Object.freeze({ rank: 0, low: 0, high: 0 }),
+  low: Object.freeze({ rank: 1, low: 0.4, high: 0.4 }),
+  standard: Object.freeze({ rank: 2, low: 1, high: 1 }),
+  high: Object.freeze({ rank: 3, low: 2.5, high: 2.5 }),
+  xhigh: Object.freeze({ rank: 4, low: 2.5, high: 2.5 * 2.5 }),
+  max: Object.freeze({ rank: 5, low: 2.5, high: 2.5 * 2.5 * 2.5 })
+});
+const EFFORT_ALIASES = Object.freeze({ medium: 'standard', 'extra high': 'xhigh', 'extra-high': 'xhigh' });
+
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+/** Canonical effort level for a key or alias (any case), or null. */
+function effortLevel(key) {
+  const k = typeof key === 'string' ? key.trim().toLowerCase() : '';
+  if (hasOwn(EFFORT_LEVELS, k)) return k;
+  return hasOwn(EFFORT_ALIASES, k) ? EFFORT_ALIASES[k] : null;
+}
+
+// What each provider's own app calls its effort settings, mapped onto
+// EFFORT_LEVELS, cheapest first. A label may also run several agents at once
+// (Grok Heavy), which makes the estimate a floor; a label that switches the
+// model (ChatGPT Pro runs on GPT-6 Astra) is detection's job (PLAN.md
+// Step 6), so it is not listed here. Sources: METHODOLOGY §2.5.7.
+const EFFORT_VOCABULARIES = Object.freeze({
+  anthropic: {
+    status: 'fetched',
+    appDefault: 'standard',
+    labels: { low: 'low', medium: 'standard', high: 'high', 'extra high': 'xhigh', max: 'max' }
+  },
+  openai: {
+    status: 'search-only',
+    appDefault: null,
+    labels: { instant: 'none', medium: 'standard', high: 'high', 'extra high': 'xhigh' }
+  },
+  google: {
+    status: 'search-only',
+    appDefault: 'low',
+    labels: { low: 'low', medium: 'standard', high: 'high' }
+  },
+  xai: {
+    status: 'search-only',
+    appDefault: 'low',
+    labels: { fast: 'low', expert: 'high', heavy: { level: 'high', multiAgent: true } }
+  },
+  deepseek: {
+    status: 'search-only',
+    appDefault: null,
+    labels: { 'non-think': 'none', instant: 'none', deepthink: 'high', 'think high': 'high', expert: 'high', 'think max': 'max' }
+  },
+  meta: {
+    status: 'search-only',
+    appDefault: null,
+    labels: { instant: 'none', thinking: 'standard', contemplating: { level: 'standard', multiAgent: true } }
+  }
+});
+
+/**
+ * What one label in a provider's vocabulary means:
+ * { level, multiAgent } or null when the label is not an effort setting.
+ */
+function effortFromLabel(vocab, label) {
+  if (!hasOwn(EFFORT_VOCABULARIES, vocab) || typeof label !== 'string') return null;
+  const labels = EFFORT_VOCABULARIES[vocab].labels;
+  const key = label.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!hasOwn(labels, key)) return null;
+  const hit = labels[key];
+  return typeof hit === 'string' ? { level: hit, multiAgent: false } : { level: hit.level, multiAgent: !!hit.multiAgent };
+}
+
 // How far past the largest fitted input benchmark the linear input term may
 // be extrapolated before it is held flat. The benchmarks top out at 10,000
 // input tokens, so 5x reaches 50,000 — beyond that the term would dominate a
@@ -256,6 +331,11 @@ const PRECISION_BITS = {
 
 const ESTIMATE_METHODS = ['active-params', 'tier'];
 
+/** Weight bits for a stated precision; EcoLogits' 16 when none is stated. */
+function precisionBits(precision) {
+  return hasOwn(PRECISION_BITS, precision) ? PRECISION_BITS[precision] : ECOLOGITS.defaultBits;
+}
+
 /** GPUs needed to hold the weights: EcoLogits' 1.2× memory overhead, rounded up to a power of two. */
 function ecologitsGpuCount(totalB, bits) {
   const memoryGb = (1.2 * totalB * bits) / 8;
@@ -300,12 +380,12 @@ function plainEnergyWh(c, benchMaxInput, tIn, tOut) {
  */
 function buildEvidence(fitted, grids) {
   const calibration = [];
-  const tiers = {};
+  const tiers = Object.create(null);
   const pairs = [];
   for (const m of fitted) {
     if (m.dataSource === 'measured' && m.thinking === 'none' && m.params) {
       const pue = grids.providers[m.hostKey].pue;
-      const eco = ecologitsItWhPerToken(m.params.active_b, m.params.total_b, PRECISION_BITS[m.params.precision] || ECOLOGITS.defaultBits);
+      const eco = ecologitsItWhPerToken(m.params.active_b, m.params.total_b, precisionBits(m.params.precision));
       const c = m.coefficients;
       calibration.push({
         id: m.id,
@@ -353,7 +433,7 @@ function buildEvidence(fitted, grids) {
 
 /** Plain-answer coefficients for an open-weight model, from its parameter counts. */
 function activeParamsCoefficients(params, pue, cal) {
-  const bits = PRECISION_BITS[params.precision] || ECOLOGITS.defaultBits;
+  const bits = precisionBits(params.precision);
   const eco = ecologitsItWhPerToken(params.active_b, params.total_b, bits);
   const eOut = eco.wh * pue * cal.k;
   return {
@@ -377,7 +457,7 @@ function estimateCoefficients(m, evidence, grids, hostKey) {
     if (!p || !(p.active_b > 0) || !(p.total_b >= p.active_b)) {
       throw new Error(`models.json: ${m.model_id} needs params.total_b >= params.active_b > 0 for active-params`);
     }
-    if (p.precision !== undefined && !PRECISION_BITS[p.precision]) {
+    if (p.precision !== undefined && !hasOwn(PRECISION_BITS, p.precision)) {
       throw new Error(`models.json: ${m.model_id} has unknown params.precision "${p.precision}"`);
     }
     const cal = evidence.calibration;
@@ -395,7 +475,7 @@ function estimateCoefficients(m, evidence, grids, hostKey) {
       inputs: { activeB: p.active_b, totalB: p.total_b, bits: plain.bits, gpus: plain.gpus, calibratedOn: cal.entries, ecologitsCommit: ECOLOGITS.commit }
     };
   }
-  const members = evidence.tiers[est.tier];
+  const members = hasOwn(evidence.tiers, est.tier) ? evidence.tiers[est.tier] : null;
   if (!members || !members.length) {
     throw new Error(`models.json: ${m.model_id} uses tier "${est.tier}", which no reference entry belongs to`);
   }
@@ -415,17 +495,17 @@ function estimateCoefficients(m, evidence, grids, hostKey) {
 
 /**
  * Hidden thinking tokens one answer adds at these token counts, low and high
- * across the reference pairs: the energy a pair's thinking entry spends
- * beyond its plain sibling, in the sibling's own decode tokens. They are
- * priced at the estimated model's own per-token cost, not as a ratio:
- * a ratio would double-count for a model that already costs more per token.
- * Effort scales the hidden tokens.
+ * across the reference pairs, at standard effort: the energy a pair's
+ * thinking entry spends beyond its plain sibling, in the sibling's own decode
+ * tokens. They are priced at the estimated model's own per-token cost, not as
+ * a ratio: a ratio would double-count for a model that already costs more per
+ * token. The caller scales them by the effort level's factor range.
  */
-function thinkingTokens(pairs, tIn, tOut, effort) {
+function thinkingTokens(pairs, tIn, tOut) {
   const tokens = pairs.map(({ thinking, base }) => {
     const extraWh = plainEnergyWh(thinking.coefficients, thinking.benchMaxInput, tIn, tOut) -
       plainEnergyWh(base.coefficients, base.benchMaxInput, tIn, tOut);
-    return base.coefficients.eOut > 0 ? Math.max(0, extraWh / base.coefficients.eOut) * effort : 0;
+    return base.coefficients.eOut > 0 ? Math.max(0, extraWh / base.coefficients.eOut) : 0;
   });
   return { low: Math.min(...tokens), high: Math.max(...tokens) };
 }
@@ -472,6 +552,13 @@ class ImpactEngine {
       if (!this.grids.providers || !this.grids.providers[hostKey]) {
         throw new Error(`models.json: ${m.model_id} host_key "${hostKey}" has no entry in grids.providers`);
       }
+      const defaultEffort = m.default_effort === undefined ? null : effortLevel(m.default_effort);
+      if (m.default_effort !== undefined && !defaultEffort) {
+        throw new Error(`models.json: ${m.model_id} has unknown default_effort "${m.default_effort}"`);
+      }
+      if (m.effort_vocab !== undefined && !hasOwn(EFFORT_VOCABULARIES, m.effort_vocab)) {
+        throw new Error(`models.json: ${m.model_id} has unknown effort_vocab "${m.effort_vocab}"`);
+      }
       const record = {
         id: m.model_id,
         name: m.name,
@@ -484,6 +571,8 @@ class ImpactEngine {
         released: m.released || null,
         thinking,
         isReasoning: thinking !== 'none',
+        defaultEffort,
+        effortVocab: m.effort_vocab || null,
         anchor: m.provider_reported_anchor || null,
         params: m.params || null,
         tier: m.tier || null,
@@ -594,7 +683,10 @@ class ImpactEngine {
    * @param {number} q.outputTokens   expected/observed visible output tokens
    * @param {Object} [q.options]
    * @param {number} [q.options.taskMultiplier=1]  task-type energy multiplier
-   * @param {'low'|'standard'|'high'} [q.options.reasoningEffort='standard']
+   * @param {string} [q.options.reasoningEffort]  an EFFORT_LEVELS key or alias;
+   *        unknown or missing means the model's default_effort, else 'standard'
+   * @param {boolean} [q.options.multiAgent=false]  several agents answer at
+   *        once (Grok Heavy): an estimated model's figure becomes a floor
    * @param {string} [q.options.regionKey]   override grid for carbon only
    * @param {number} [q.options.cifOverride] direct CIF override (kgCO2e/kWh)
    * @param {boolean} [q.options.includeEmbodied=true] include lifecycle uplift
@@ -610,11 +702,17 @@ class ImpactEngine {
     const tOut = finiteOrZero(outputTokens);
     const tm = Number(options.taskMultiplier);
     const taskMult = Number.isFinite(tm) && tm > 0 ? tm : 1;
-    // Unknown effort keys fall back to the benchmark condition — and say so.
-    const effortKey = REASONING_EFFORT[options.reasoningEffort] ? options.reasoningEffort : 'standard';
-    // An estimated model's coefficients describe a plain answer; its thinking
-    // is applied below as a multiplier range instead.
-    const effort = model.isReasoning && !model.estimate ? REASONING_EFFORT[effortKey] : 1;
+    // Unknown effort falls back to the model's documented default, else to the
+    // benchmark condition — and says which in factors.reasoningEffort.
+    const effortKey = effortLevel(options.reasoningEffort) || model.defaultEffort || 'standard';
+    // A benchmarked model scales its fitted thinking by a single factor:
+    // nothing past high is measured, and it cannot stop thinking, so xhigh
+    // and max count as high and none as low. An estimated model's
+    // coefficients describe a plain answer; its thinking is applied below
+    // as a range instead.
+    const fittedEffort = REASONING_EFFORT[effortKey] ||
+      (EFFORT_LEVELS[effortKey].rank < EFFORT_LEVELS.standard.rank ? REASONING_EFFORT.low : REASONING_EFFORT.high);
+    const effort = model.isReasoning && !model.estimate ? fittedEffort : 1;
     const includeEmbodied = options.includeEmbodied !== false;
 
     const { eIn, eOut, eFixed, relStd } = model.coefficients;
@@ -647,9 +745,12 @@ class ImpactEngine {
       let lowTokens = 0;
       let highTokens = 0;
       if (model.thinking !== 'none') {
-        const t = thinkingTokens(this.evidence.pairs, tIn, tOut, REASONING_EFFORT[effortKey]);
-        lowTokens = model.thinking === 'always' ? t.low : 0;
-        highTokens = t.high;
+        // A model that always thinks cannot be switched off: none is its
+        // least effort.
+        const level = model.thinking === 'always' && effortKey === 'none' ? EFFORT_LEVELS.low : EFFORT_LEVELS[effortKey];
+        const t = thinkingTokens(this.evidence.pairs, tIn, tOut);
+        lowTokens = model.thinking === 'always' ? t.low * level.low : 0;
+        highTokens = t.high * level.high;
         thinkingRange = { lowTokens, highTokens };
       }
       let lowWh;
@@ -675,9 +776,18 @@ class ImpactEngine {
         lowWh = (plain + lowTokens * eOut) * model.estimate.band.low;
         highWh = (plain + highTokens * eOut) * model.estimate.band.high;
       }
-      const rangeOnly = model.thinking !== 'none';
-      range = { lowWh: lowWh * taskMult, highWh: highWh * taskMult, rangeOnly };
-      if (rangeOnly) energyWh = Math.sqrt(range.lowWh * range.highWh);
+      // Thinking switched off (effort none) leaves a plain answer: a point.
+      const rangeOnly = highTokens > 0;
+      range = { lowWh: lowWh * taskMult, highWh: highWh * taskMult, rangeOnly, floor: false };
+      if (options.multiAgent === true) {
+        // Several agents answer at once and nobody documents how many: one
+        // agent's low end is all that is known, so the figure is a floor
+        // (PLAN.md Step 3).
+        range = { lowWh: range.lowWh, highWh: null, rangeOnly: true, floor: true };
+        energyWh = range.lowWh;
+      } else if (rangeOnly) {
+        energyWh = Math.sqrt(range.lowWh * range.highWh);
+      }
     }
     const energyKwh = energyWh / 1000;
     const scale = (value, wh) => (energyWh > 0 ? (value * wh) / energyWh : 0);
@@ -714,8 +824,13 @@ class ImpactEngine {
       ? { ...this.gradeFor(energyWh), provisional: true }
       : this.gradeFor(energyWh);
     if (range) {
-      grade.range = { low: this.gradeFor(range.lowWh).grade, high: this.gradeFor(range.highWh).grade };
+      grade.range = {
+        low: this.gradeFor(range.lowWh).grade,
+        high: range.highWh === null ? null : this.gradeFor(range.highWh).grade
+      };
       grade.rangeOnly = range.rangeOnly;
+      // A floor's grade is "at least" its low end.
+      if (range.floor) grade.floor = true;
     }
 
     return {
@@ -770,7 +885,7 @@ class ImpactEngine {
         l: waterL,
         breakdown: { onsiteMl: waterOnsiteL * 1000, offsiteMl: waterOffsiteL * 1000 },
         range: range
-          ? { lowMl: scale(waterL * 1000, range.lowWh), highMl: scale(waterL * 1000, range.highWh) }
+          ? { lowMl: scale(waterL * 1000, range.lowWh), highMl: range.highWh === null ? null : scale(waterL * 1000, range.highWh) }
           : null
       },
       carbon: {
@@ -779,7 +894,7 @@ class ImpactEngine {
         operationalG: energyKwh * cif * 1000,
         embodiedG: energyKwh * cif * (embodied - 1) * 1000,
         range: range
-          ? { lowG: scale(carbonKg * 1000, range.lowWh), highG: scale(carbonKg * 1000, range.highWh) }
+          ? { lowG: scale(carbonKg * 1000, range.lowWh), highG: range.highWh === null ? null : scale(carbonKg * 1000, range.highWh) }
           : null
       },
       // A clamped estimate is a lower bound, so its grade is a floor too —
@@ -1090,6 +1205,10 @@ const CalculatorModule = {
   familyForHost,
   isRoutedHost,
   REASONING_EFFORT,
+  EFFORT_LEVELS,
+  EFFORT_VOCABULARIES,
+  effortLevel,
+  effortFromLabel,
   GRADE_BANDS,
   INPUT_FIT_EXTRAPOLATION_LIMIT,
   MODEL_STATUSES,

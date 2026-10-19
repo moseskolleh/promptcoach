@@ -222,6 +222,9 @@ test('the engine refuses estimate blocks it cannot honour', () => {
   assert.throws(build({ thinking: 'none', estimate: { method: 'active-params' } }), /needs params/);
   assert.throws(build({ thinking: 'none', params: { total_b: 10, active_b: 20 }, estimate: { method: 'active-params' } }), /needs params/);
   assert.throws(build({ thinking: 'none', params: { total_b: 10, active_b: 1, precision: 'fp3' }, estimate: { method: 'active-params' } }), /unknown params.precision "fp3"/);
+  // Names Object.prototype carries are not precisions or tiers.
+  assert.throws(build({ thinking: 'none', params: { total_b: 10, active_b: 1, precision: 'constructor' }, estimate: { method: 'active-params' } }), /unknown params.precision "constructor"/);
+  assert.throws(build({ thinking: 'none', estimate: { method: 'tier', tier: 'constructor' } }), /tier "constructor", which no reference entry belongs to/);
   // No thinking evidence at all: a thinking model cannot be estimated.
   const noPairs = JSON.parse(JSON.stringify(modelsData));
   for (const m of noPairs.models) {

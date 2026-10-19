@@ -476,6 +476,19 @@ is in METHODOLOGY. Ranges are monotonic in tokens and effort. No
 **Done when:** the effort factor is monotonic within each vocabulary, every
 level has a test, and an unknown effort resolves to the model's default.
 
+> **Status (2026-10-19): built.** METHODOLOGY §2.5.7 documents it.
+> - **The scale.** One canonical scale: `none / low / standard / high /
+>   xhigh / max`, with `medium` as an alias of `standard`. Each level is a
+>   factor range on thinking. Past `high` the range only widens upward,
+>   because nothing there is measured.
+> - **Provider vocabularies.** Anthropic's is fetched; the others are
+>   search-only. Detection (Step 6) will read them through
+>   `effortFromLabel()`.
+> - **Several agents.** Grok *Heavy* and Muse *Contemplating* produce a
+>   floor (`multiAgent`), as this step specifies.
+> - **Not yet set.** Per-model `default_effort` and `effort_vocab` values
+>   arrive with the models in Step 5.
+
 ### Step 4 — Infrastructure for the new hosts · S
 - Add a `meta` entry to `grids.json` for Muse Spark. Use PUE, WUE and grid
   mix from Meta's latest sustainability report, read from the PDF itself.

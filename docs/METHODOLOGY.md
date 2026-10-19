@@ -322,6 +322,55 @@ How to read these:
   at long prompts. The shipped range spans both. That disagreement is why
   a thinking model is shown as a range only.
 
+#### 2.5.7 Effort levels, as each provider names them
+
+Providers no longer offer just "thinking on/off". Anthropic has five effort
+levels, ChatGPT's picker runs from Instant to Extra High, and Grok's *Heavy*
+runs several agents at once. The engine maps every one of these onto a
+single scale. Each level is a **range of factors** on the hidden thinking
+tokens of §2.5.3:
+
+| Level | Factor | Basis |
+|---|---|---|
+| `none` | 0 | No thinking. Honoured only by a model that can stop thinking; for an `always` model it means `low` |
+| `low` | 0.4 | The engine's existing low tier (§2.2) |
+| `standard` (alias `medium`) | 1 | The benchmark condition |
+| `high` | 2.5 | The engine's existing high tier |
+| `xhigh` | 2.5 – 6.25 | **Not measured.** At least `high`, up to one more high-sized step |
+| `max` | 2.5 – 15.6 | **Not measured.** At least `high`, up to two more steps |
+
+The ladder past `high` is an extrapolation with no evidence behind it. So
+the low end stays at `high`, and only the upper end widens. Because thinking
+models are shown as a range anyway (decision 4), widening is how this
+uncertainty shows up, rather than as a confident number.
+
+What each app's labels mean, cheapest first:
+
+| Provider | App labels → level | App default | Status |
+|---|---|---|---|
+| Anthropic (claude.ai) | Low → low · Medium → standard · High → high · Extra high → xhigh · Max → max | Medium | fetched (support.claude.com, platform.claude.com) |
+| OpenAI (ChatGPT, GPT-6 Sol) | Instant → none · Medium → standard · High → high · Extra High → xhigh | not documented | search-only (OpenAI help center) |
+| Google (Gemini app) | Low → low · Medium → standard · High → high | Low | search-only (Gemini help) |
+| xAI (grok.com) | Fast → low · Expert → high · **Heavy → high, several agents** | Fast | search-only (one secondary source) |
+| DeepSeek | Non-think / Instant → none · DeepThink / Think High / Expert → high · Think Max → max | not documented | search-only |
+| Meta (meta.ai) | Instant → none · Thinking → standard · **Contemplating → standard, several agents** | not documented | search-only |
+
+ChatGPT's *Pro* is not an effort level. It switches the model to GPT-6
+Astra, which detection resolves (PLAN.md Step 6).
+
+How effort is applied:
+- **No effort given, or an unknown one.** The model's documented
+  `default_effort` applies. Without one, the benchmark condition
+  (`standard`) applies.
+- **Several agents at once, with the count unknown.** One agent's low end
+  is all that is known, so the result is a **floor**: `range.highWh` is
+  null and `grade.floor` is set. It shows as "at least …" until someone
+  documents how many agents run.
+- **Benchmarked (reference) thinking models.** They keep the single factor
+  of §2.2. `xhigh` and `max` count as `high`, and `none` as `low`, because
+  a model whose thinking is baked into its benchmark points can neither
+  stop nor be scaled past what was measured.
+
 ---
 
 ## 3. Water model
