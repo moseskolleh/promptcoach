@@ -805,7 +805,7 @@ runbook has been used once for real (the Mistral Large 4 weights).
 >   current, so Step 5 meets that rule when it sets the mapping above.
 > - **Hard-coded ids.** `check-apps` scans the apps (vendored copies
 >   excluded), the demo pages and the core for strings shaped like model
->   ids. Each must exist in `models.json`. It found 44, all present.
+>   ids. Each must exist in `models.json`. All of them are present today.
 > - **The runbook** is `docs/CATALOG-REFRESH.md`. It hasn't been used for
 >   real yet: Mistral Large 4's weights are expected Oct 27–31, and
 >   mistral.ai and huggingface.co are still blocked from this environment.
