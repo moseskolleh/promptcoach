@@ -167,6 +167,21 @@ function fitCoefficients(bench) {
 // ----------------------------------------------------------------------------
 
 /** Coerce to a non-negative finite number; anything else counts as 0. */
+/**
+ * An entry's energy range: an impact's `energy.range`, or a stored
+ * history record's lowWh/highWh (a null highWh is a floor). Null when the
+ * entry is a single measured or benchmarked figure.
+ */
+function entryRange(i) {
+  if (i.energy && typeof i.energy === 'object') {
+    const r = i.energy.range;
+    if (!r || !Number.isFinite(r.lowWh)) return null;
+    return { lowWh: r.lowWh, highWh: Number.isFinite(r.highWh) ? r.highWh : null };
+  }
+  if (!Number.isFinite(i.lowWh) || i.lowWh < 0) return null;
+  return { lowWh: i.lowWh, highWh: Number.isFinite(i.highWh) && i.highWh >= i.lowWh ? i.highWh : null };
+}
+
 function finiteOrZero(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -985,13 +1000,39 @@ class ImpactEngine {
    */
   aggregate(impacts) {
     const totals = { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 };
+    // Estimates sum as ranges: lows with lows, highs with highs. A measured
+    // entry adds its own figure to both ends, and one floor makes the whole
+    // total a floor. `range` appears only when some entry had one
+    // (PLAN.md Step 8).
+    const sum = { lowWh: 0, highWh: 0, lowMl: 0, highMl: 0, lowG: 0, highG: 0 };
+    let anyRange = false;
     for (const i of Array.isArray(impacts) ? impacts : []) {
       if (!i || typeof i !== 'object') continue;
+      const wh = finiteOrZero(i.energy ? i.energy.wh : i.energyWh);
+      const ml = finiteOrZero(i.water ? i.water.ml : i.waterMl);
+      const g = finiteOrZero(i.carbon ? i.carbon.gCO2e : i.carbonG);
       totals.queries += 1;
-      totals.energyWh += finiteOrZero(i.energy ? i.energy.wh : i.energyWh);
-      totals.waterMl += finiteOrZero(i.water ? i.water.ml : i.waterMl);
-      totals.carbonG += finiteOrZero(i.carbon ? i.carbon.gCO2e : i.carbonG);
+      totals.energyWh += wh;
+      totals.waterMl += ml;
+      totals.carbonG += g;
+      const r = entryRange(i);
+      if (r) anyRange = true;
+      // Water and carbon scale with energy for one query on one host, as
+      // estimateImpact's own ranges do.
+      const lowShare = r && wh > 0 ? r.lowWh / wh : 1;
+      const highShare = r ? (r.highWh === null ? null : wh > 0 ? r.highWh / wh : 1) : 1;
+      sum.lowWh += r ? r.lowWh : wh;
+      sum.lowMl += ml * lowShare;
+      sum.lowG += g * lowShare;
+      if (highShare === null || sum.highWh === null) {
+        sum.highWh = sum.highMl = sum.highG = null;
+      } else {
+        sum.highWh += r ? r.highWh : wh;
+        sum.highMl += ml * highShare;
+        sum.highG += g * highShare;
+      }
     }
+    if (anyRange) totals.range = sum;
     return totals;
   }
 }

@@ -4,7 +4,9 @@
 // TODO(implementation):
 //  - TextInput (multiline) with debounced analyzePrompt()
 //  - Model picker (grouped by provider, grade dots) + region from settings
-//  - GradeBadge + 3× MetricCard (relatable.forImpact)
+//  - GradeBadge + 3× MetricCard (relatable.forImpact). For an estimate, use
+//    describeImpact: gradeText on the badge, plus its methodChip and
+//    "likely high" note (PLAN.md Step 8)
 //  - TipCard list; "Copy trimmed prompt" via generateOptimizedPrompt + Clipboard
 //  - "Save to library" → storage.saveLibraryEntry
 //  - Consume shareTarget.getInitialSharedPrompt() on mount
