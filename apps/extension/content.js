@@ -23,6 +23,15 @@
     E: '#EF4444'
   };
 
+  // An estimate's grade range ("B–E") is coloured from its low grade to its
+  // high one (PLAN.md Step 8).
+  function gradeBackground(desc) {
+    const from = GRADE_COLORS[desc.gradeLow];
+    return desc.gradeHigh && desc.gradeHigh !== desc.gradeLow
+      ? `linear-gradient(135deg, ${from}, ${GRADE_COLORS[desc.gradeHigh]})`
+      : from;
+  }
+
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
   let engine = null;
@@ -35,6 +44,7 @@
   let pill = null;
   let pillGrade = null;
   let pillText = null;
+  let pillEst = null; // "est." marker on a model nobody has measured
   let card = null;
   let cardOpen = false;
   let lastAnalysis = null;
@@ -252,7 +262,11 @@
     pillText = document.createElement('span');
     pillText.className = 'epc-pill-text';
     pillText.textContent = 'EcoPrompt';
-    pill.append(pillGrade, pillText);
+    pillEst = document.createElement('span');
+    pillEst.className = 'epc-pill-est';
+    pillEst.textContent = 'est.';
+    pillEst.hidden = true;
+    pill.append(pillGrade, pillText, pillEst);
     pill.addEventListener('click', toggleCard);
 
     card = document.createElement('div');
@@ -290,16 +304,25 @@
     }
     const head = document.createElement('div');
     head.className = 'epc-card-head';
+    const desc = Core.describeImpact(lastImpact);
     const grade = document.createElement('span');
     grade.className = 'epc-card-grade';
-    grade.textContent = lastImpact.grade.grade;
-    grade.style.background = GRADE_COLORS[lastImpact.grade.grade];
+    grade.textContent = desc.gradeText;
+    grade.style.background = gradeBackground(desc);
+    grade.title = desc.gradeLabel;
     const title = document.createElement('span');
     title.className = 'epc-card-title';
     title.textContent =
       `${lastImpact.model.name}${modelSource === 'picker' ? ' (detected on page)' : ''} · ${lastAnalysis.tokens} tokens`;
     head.append(grade, title);
     card.appendChild(head);
+    if (desc.estimated) {
+      const est = document.createElement('p');
+      est.className = 'epc-card-est';
+      est.textContent = `${desc.methodChip} · ${desc.note}`;
+      est.title = desc.noteReason;
+      card.appendChild(est);
+    }
 
     const c = conv.forImpact(lastImpact);
     card.appendChild(metricRow('Energy', c.energy.primary, c.energy.secondary));
@@ -382,7 +405,9 @@
       lastImpact = null;
       pillGrade.textContent = '–';
       pillGrade.style.background = '#64748B';
+      pillGrade.title = '';
       pillText.textContent = 'EcoPrompt';
+      pillEst.hidden = true;
       if (cardOpen) renderCard();
       return;
     }
@@ -394,9 +419,17 @@
       options: impactOptions({ taskMultiplier: lastAnalysis.energyMultiplier })
     });
     if (!lastImpact) return;
-    pillGrade.textContent = lastImpact.grade.grade;
-    pillGrade.style.background = GRADE_COLORS[lastImpact.grade.grade];
-    pillText.textContent = conv.energy(lastImpact.energy.wh).primary;
+    // An estimate shows its range, in everyday units, and says it is one.
+    const desc = Core.describeImpact(lastImpact);
+    const range = lastImpact.energy.range;
+    pillGrade.textContent = desc.gradeText;
+    pillGrade.style.background = gradeBackground(desc);
+    pillGrade.title = desc.gradeLabel;
+    pillText.textContent = range
+      ? conv.energyRange(range.lowWh, range.highWh).primary
+      : conv.energy(lastImpact.energy.wh).primary;
+    pillEst.hidden = !desc.estimated;
+    pillEst.title = desc.estimated ? `${desc.methodChip} · ${desc.note}` : '';
     if (cardOpen) renderCard();
     positionUi();
   }
@@ -423,6 +456,12 @@
       carbonG: lastImpact.carbon.gCO2e,
       grade: lastImpact.grade.grade
     };
+    // An estimate keeps its range, so totals can sum ranges (a null high
+    // end is a floor).
+    if (lastImpact.energy.range) {
+      entry.lowWh = lastImpact.energy.range.lowWh;
+      entry.highWh = lastImpact.energy.range.highWh;
+    }
     chrome.storage.local.get('eco_history', (data) => {
       const history = Array.isArray(data && data.eco_history) ? data.eco_history : [];
       history.push(entry);

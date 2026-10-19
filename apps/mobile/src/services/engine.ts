@@ -34,3 +34,7 @@ export const aggregate = (impacts: unknown[]) => engine.aggregate(impacts);
 export const analyzePrompt = (text: string) => core.analyzePrompt(text);
 export const generateOptimizedPrompt = (text: string) => core.generateOptimizedPrompt(text);
 export const relatable = converters; // .forImpact(impact), .forTotals(totals, label)
+// How to label an estimate (range, method chip, grade range), and which
+// savings its range allows (PLAN.md Step 8).
+export const describeImpact = core.describeImpact;
+export const savingClaim = core.savingClaim;

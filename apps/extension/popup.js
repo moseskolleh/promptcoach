@@ -15,6 +15,16 @@
     E: '#EF4444'
   };
 
+  // An estimate's grade range ("B–E") is coloured from its low grade to its
+  // high one (PLAN.md Step 8).
+  function gradeBackground(desc) {
+    if (!desc) return 'var(--muted)';
+    const from = GRADE_COLORS[desc.gradeLow];
+    return desc.gradeHigh && desc.gradeHigh !== desc.gradeLow
+      ? `linear-gradient(135deg, ${from}, ${GRADE_COLORS[desc.gradeHigh]})`
+      : from;
+  }
+
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
   // Shared popup state (Coach <-> Compare share prompt/token inputs).
@@ -23,7 +33,7 @@
     conv: null,
     settings: { ...DEFAULT_SETTINGS },
     models: [],
-    modelGrades: {}, // modelId -> grade letter (quick 100/300 estimate)
+    modelDescs: {}, // modelId -> Core.describeImpact at a quick 100/300 query
     prompt: '',
     analysis: null,
     inputTokens: 100,
@@ -123,11 +133,11 @@
       const group = document.createElement('optgroup');
       group.label = provider;
       for (const m of models) {
-        const grade = state.modelGrades[m.id] || '?';
+        const desc = state.modelDescs[m.id];
         const opt = document.createElement('option');
         opt.value = m.id;
-        opt.textContent = `${m.name} · ${grade}`;
-        opt.dataset.grade = grade;
+        opt.textContent = `${m.name} · ${desc ? desc.gradeText : '?'}${desc && desc.estimated ? ' · est.' : ''}`;
+        opt.dataset.grade = desc ? desc.gradeLow : '?';
         group.appendChild(opt);
       }
       select.appendChild(group);
@@ -138,9 +148,9 @@
     const id = $('model-select').value;
     const model = state.models.find((m) => m.id === id);
     // Grade-colored dot reflects the selected model's quick grade.
-    const grade = state.modelGrades[id];
-    $('model-grade-dot').style.background = GRADE_COLORS[grade] || 'var(--muted)';
-    $('model-grade-dot').title = grade ? `Eco-grade ${grade} for a typical short query` : '';
+    const desc = state.modelDescs[id];
+    $('model-grade-dot').style.background = gradeBackground(desc);
+    $('model-grade-dot').title = desc ? `${desc.gradeLabel} for a typical short query` : '';
     // Reasoning-effort control only applies to reasoning models.
     $('effort-select').classList.toggle('hidden', !(model && model.isReasoning));
     renderCoach();
@@ -184,11 +194,18 @@
     });
     if (!impact) return;
 
-    // Header: grade + chips
+    // Header: grade + chips. An estimate shows a grade range, its method
+    // and "likely high" (PLAN.md Step 8).
+    const desc = Core.describeImpact(impact);
     const badge = $('grade-badge');
-    badge.textContent = impact.grade.grade;
-    badge.style.background = GRADE_COLORS[impact.grade.grade];
-    badge.title = `Eco-score ${impact.grade.score}/100`;
+    badge.textContent = desc.gradeText;
+    badge.style.background = gradeBackground(desc);
+    badge.classList.toggle('is-span', desc.gradeText.length > 1);
+    badge.title = desc.estimated ? desc.gradeLabel : `Eco-score ${impact.grade.score}/100`;
+    const estChip = $('chip-est');
+    estChip.classList.toggle('hidden', !desc.estimated);
+    estChip.textContent = desc.estimated ? `${desc.methodChip} · ${desc.note}` : '';
+    estChip.title = desc.estimated ? desc.noteReason : '';
     $('chip-tokens').textContent = `${analysis.tokens} tokens in`;
     $('chip-task').textContent = analysis.taskType;
     $('chip-output').textContent =
@@ -200,10 +217,16 @@
     $('energy-secondary').textContent = c.energy.secondary;
     const conf = impact.energy.confidence;
     const range = $('energy-range');
-    range.textContent = `± ${conf.minWh.toFixed(2)}–${conf.maxWh.toFixed(2)} Wh`;
-    range.title = impact.energy.extrapolated
-      ? 'Wider range: extrapolated beyond measured benchmark conditions'
-      : 'Benchmark uncertainty range';
+    if (desc.estimated) {
+      // The secondary line is already the range; say where it comes from.
+      range.textContent = desc.methodChip;
+      range.title = desc.noteReason;
+    } else {
+      range.textContent = `± ${conf.minWh.toFixed(2)}–${conf.maxWh.toFixed(2)} Wh`;
+      range.title = impact.energy.extrapolated
+        ? 'Wider range: extrapolated beyond measured benchmark conditions'
+        : 'Benchmark uncertainty range';
+    }
     $('water-primary').textContent = c.water.primary;
     $('water-secondary').textContent = c.water.secondary;
     $('carbon-primary').textContent = c.carbon.primary;
@@ -292,7 +315,7 @@
         box.addEventListener('change', () => onCheckChange(box));
         const dot = document.createElement('span');
         dot.className = 'grade-dot';
-        dot.style.background = GRADE_COLORS[state.modelGrades[m.id]] || 'var(--muted)';
+        dot.style.background = gradeBackground(state.modelDescs[m.id]);
         const name = document.createElement('span');
         name.className = 'check-name';
         name.textContent = m.name + (m.isReasoning ? ' · reasoning' : '');
@@ -369,13 +392,16 @@
       )
     });
 
-    // Savings banner
-    const savings = comparison.potentialSavings;
-    if (savings && savings.percentage > 0 && comparison.best && comparison.worst) {
+    // Savings banner: a percentage only where the ranges allow one
+    // (PLAN.md Step 27).
+    const { best, worst } = comparison;
+    const claim = best && worst && best !== worst ? Core.savingClaim(best, worst) : null;
+    if (claim) {
       banner.classList.remove('hidden');
-      banner.textContent =
-        `Save ${savings.percentage}% by switching from ${comparison.worst.model.name} ` +
-        `to ${comparison.best.model.name}`;
+      banner.textContent = claim.claim === 'percent'
+        ? `Save ${claim.atLeast ? 'at least ' : ''}${claim.percentage}% by switching from ${worst.model.name} ` +
+          `to ${best.model.name}`
+        : `${best.model.name} probably uses less than ${worst.model.name}; their estimated ranges overlap`;
     } else {
       banner.classList.add('hidden');
     }
@@ -389,13 +415,23 @@
       if (comparison.best && impact.model.id === comparison.best.model.id) {
         tr.classList.add('is-best');
       }
+      const desc = Core.describeImpact(impact);
       const nameTd = document.createElement('td');
       nameTd.textContent = impact.model.name;
+      if (desc.estimated) {
+        const est = document.createElement('span');
+        est.className = 'cell-secondary cell-est';
+        est.textContent = `${desc.methodChip} · ${desc.note}`;
+        est.title = desc.noteReason;
+        nameTd.appendChild(est);
+      }
       const gradeTd = document.createElement('td');
       const pill = document.createElement('span');
       pill.className = 'grade-pill';
-      pill.textContent = impact.grade.grade;
-      pill.style.background = GRADE_COLORS[impact.grade.grade];
+      pill.textContent = desc.gradeText;
+      pill.title = desc.gradeLabel;
+      pill.style.background = gradeBackground(desc);
+      pill.classList.toggle('is-span', desc.gradeText.length > 1);
       gradeTd.appendChild(pill);
       tr.append(nameTd, gradeTd);
       for (const metric of [
@@ -457,8 +493,12 @@
     const allTotals = state.engine.aggregate(history);
 
     // Period cards: query counts + short energy line
-    const periodSub = (totals) =>
-      totals.queries ? state.conv.energy(totals.energyWh).secondary : 'no queries';
+    // With an estimate among them, totals are a range.
+    const periodSub = (totals) => {
+      if (!totals.queries) return 'no queries';
+      const r = totals.range;
+      return r ? state.conv.energyRange(r.lowWh, r.highWh).secondary : state.conv.energy(totals.energyWh).secondary;
+    };
     $('period-today').textContent = String(todayTotals.queries);
     $('period-today-sub').textContent = periodSub(todayTotals);
     $('period-week').textContent = String(weekTotals.queries);
@@ -613,15 +653,17 @@
     // model, so ask for those too. Step 5 removes this.
     state.models = state.engine.listModels({ includeReference: true });
 
-    // Quick grade per model (typical short query: 100 in / 300 out).
+    // Quick grade per model (typical short query: 100 in / 300 out), at the
+    // saved effort: the effort select is not restored yet, so its value
+    // would be its first option.
     for (const m of state.models) {
       const impact = state.engine.estimateImpact({
         modelId: m.id,
         inputTokens: 100,
         outputTokens: 300,
-        options: impactOptions()
+        options: impactOptions({ reasoningEffort: settings.reasoningEffort })
       });
-      state.modelGrades[m.id] = impact ? impact.grade.grade : '?';
+      if (impact) state.modelDescs[m.id] = Core.describeImpact(impact);
     }
 
     populateModelSelect();

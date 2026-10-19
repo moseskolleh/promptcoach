@@ -537,10 +537,16 @@ input[type="range"]::-moz-range-thumb {
 .grade-badge[data-grade="D"], .grade-pill[data-grade="D"] { background: var(--grade-d); }
 .grade-badge[data-grade="E"], .grade-pill[data-grade="E"] { background: var(--grade-e); }
 .grade-letter { font-size: 2rem; font-weight: 800; line-height: 1; }
+/* An estimate's grade range ("B–E") is coloured from its low grade to its
+   high one; a range or floor ("≥ C") needs room for three characters. */
+.grade-badge[data-span="true"],
+.grade-pill[data-span="true"] { background: linear-gradient(135deg, var(--grade-from), var(--grade-to)); }
+.grade-badge.is-span .grade-letter { font-size: 1.45rem; white-space: nowrap; }
 .grade-caption { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9; }
 .grade-meta { min-width: 0; }
 .grade-summary { font-weight: 700; margin-bottom: 0.15em; }
 .grade-detail { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.grade-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
 
 .grade-pill {
   display: inline-flex;
@@ -551,6 +557,7 @@ input[type="range"]::-moz-range-thumb {
   color: #fff;
   font-weight: 800;
 }
+.grade-pill.is-span { width: auto; min-width: 2em; padding: 0 0.45em; white-space: nowrap; }
 
 .metric-cards { display: grid; grid-template-columns: 1fr; gap: 0.9rem; }
 @media (min-width: 560px) { .metric-cards { grid-template-columns: repeat(3, 1fr); } }
@@ -743,6 +750,7 @@ input[type="range"]::-moz-range-thumb {
 .chart-label { font-family: var(--font); font-size: 13px; font-weight: 600; fill: var(--ink); }
 .chart-value { font-family: var(--font); font-size: 12px; fill: var(--muted); }
 .chart-track { fill: var(--surface-soft); }
+.chart-span { opacity: 0.3; }
 
 /* ---------- Model explorer ---------- */
 .explorer-grid {
@@ -787,6 +795,8 @@ input[type="range"]::-moz-range-thumb {
 .info-chip[data-kind="anchored"] { color: var(--blue); border-color: var(--blue); background: rgba(59, 130, 246, 0.1); }
 .info-chip[data-kind="anchor"] { color: var(--blue); border-color: var(--blue); background: rgba(59, 130, 246, 0.08); }
 .info-chip[data-kind="reasoning"] { color: var(--danger); border-color: var(--danger); background: rgba(239, 68, 68, 0.08); }
+.info-chip[data-kind="estimated"] { color: var(--amber); border-color: var(--amber); background: rgba(245, 158, 11, 0.1); }
+.info-chip[data-kind="likely-high"] { border-style: dashed; cursor: help; }
 
 .explorer-note { color: var(--muted); font-size: 0.88rem; margin-top: 1.5rem; max-width: 64em; }
 
@@ -1016,6 +1026,8 @@ input[type="range"]::-moz-range-thumb {
 .sticky-grade[data-grade="C"] { background: var(--grade-c); }
 .sticky-grade[data-grade="D"] { background: var(--grade-d); }
 .sticky-grade[data-grade="E"] { background: var(--grade-e); }
+.sticky-grade[data-span="true"] { background: linear-gradient(135deg, var(--grade-from), var(--grade-to)); }
+.sticky-grade.is-span { width: auto; padding: 0 0.55em; border-radius: 999px; white-space: nowrap; }
 
 /* ---------- Explorer toolbar + compare buttons ---------- */
 .explorer-toolbar {

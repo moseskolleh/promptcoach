@@ -640,6 +640,14 @@ becomes reference data with the rest.
 | perplexity.ai | floor | routed; its default is its own Sonar model, which has no entry |
 | poe.com | `claude-sonnet-5-5` | routed; nothing current verified |
 
+**Also in this step** (handed on by Steps 1 and 8):
+- Remove the apps' `includeReference: true` opt-in. That takes every
+  pre-2026 model out of the pickers.
+- Replace the README example (GPT-4o, DeepSeek-R1) with current models.
+- Replace the hard-coded default ids with current ones: `gpt-4o-mini` in
+  the web coach, and `gpt-4o` and `gemini-2.0-flash` in the extension.
+  Step 9's check covers them.
+
 **Done when:** every row has an id, a release date, a thinking mode, an
 estimation method, and sources with a status. A test asserts that every
 `current` model was released on or after 2026-01-01.
@@ -722,6 +730,33 @@ without.
 
 **Done when:** no UI path shows a current model's number without its range
 and method label, and no old model name appears in any app's UI copy.
+
+> **Status (2026-10-19): built, except the README example.** METHODOLOGY
+> §2.5.8 documents it.
+> - **One labelling function.** Core `describeImpact()` gives the range,
+>   the method chip, the grade range, and the floor. Web coach, sticky pill,
+>   Compare (cards, table, chart), explorer and library use it. So do the
+>   extension pill, card and popup, and the mobile badge accepts it.
+>   `forImpact()` writes ranges in everyday units.
+> - **"Likely high" is on every estimate,** not only on thinking models.
+>   It is the direction of error Step 2 chose (2025 hardware), which
+>   applies to both estimators.
+> - **Pulled forward from Step 27:** `savingClaim()`. Compare's banner and
+>   the coach's switch button claim a percentage only between ranges that
+>   don't overlap, as "at least N%". Overlapping ranges say "probably
+>   less".
+> - **Added beyond the list above:**
+>   - Totals sum ranges, and the extension's history stores each
+>     estimate's range.
+>   - The energy breakdown shows shares for an estimate.
+>   - Library entries keep their range.
+> - **Old-model copy.** The hero facts and Compare's opening trio are now
+>   picked from the catalog, so they name 2026 models once Step 5 lands.
+>   The README example still names GPT-4o and DeepSeek-R1, because no
+>   current model exists to put there; Step 5 replaces it.
+> - **Checked** with core tests and in a browser against a copy of the
+>   catalog holding synthetic estimated models: web, popup, and the
+>   content script on a test page.
 
 ### Step 9 — Gates and a monthly refresh · S
 - CI checks, in addition to Step 17's schema validator and freshness gate:
