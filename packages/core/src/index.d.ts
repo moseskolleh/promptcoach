@@ -159,6 +159,8 @@ export interface ImpactOptions {
   reasoningEffort?: EffortLevel | 'medium' | string;
   /** Several agents answer at once (Grok Heavy): an estimated model's figure becomes a floor. */
   multiAgent?: boolean;
+  /** The page shows thinking switched on: an optional-thinking model pays the least thinking, like one that always thinks. */
+  thinkingOn?: boolean;
   /** Override the carbon grid (regions in grids.json); energy and water are unaffected. */
   regionKey?: string;
   /** Direct carbon-intensity override in kgCO2e/kWh. */
@@ -332,7 +334,37 @@ export class ImpactEngine {
 }
 
 export function fitCoefficients(bench: BenchPoint[]): Coefficients;
+/** A site's default model; null for an unknown site or one whose models aren't in the catalog. */
 export function autoDetectModel(hostname: string): string | null;
+
+export interface HostDefault {
+  modelId: string | null;
+  /** The site is supported; with no modelId, its current models aren't in the catalog yet. */
+  known: boolean;
+  /** The site routes per prompt, so its model can't be read off the page. */
+  routed: boolean;
+  family: string | null;
+}
+export function hostDefault(hostname: string): HostDefault;
+export function familyForHost(hostname: string): string | null;
+export function isRoutedHost(hostname: string): boolean;
+
+export interface ModelDetection {
+  /** Null with an effort: a mode with no model of its own; pair it with the site default. */
+  modelId: string | null;
+  effort: EffortLevel | null;
+  /** Several agents answer at once (Grok Heavy, Muse Contemplating). */
+  multiAgent: boolean;
+  matchedText: string;
+  source: 'label' | 'mode' | 'unknown-generation';
+  /** A label named a later generation than the catalog carries. */
+  unknownGeneration?: boolean;
+}
+export function detectModelFromLabels(
+  hostname: string,
+  labels: Array<string | { text: string; active?: boolean }>,
+  opts?: { family?: string; modelIds?: string[] }
+): ModelDetection | null;
 export const REASONING_EFFORT: Record<ReasoningEffort, number>;
 export const EFFORT_LEVELS: Record<EffortLevel, { rank: number; low: number; high: number }>;
 export const EFFORT_VOCABULARIES: Record<EffortVocabulary, {

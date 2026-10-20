@@ -220,13 +220,22 @@ How a model's thinking mode shapes its range:
 | Thinking mode | Low end | High end |
 |---|---|---|
 | `always` (Opus 5.5, Fable 5.1) | the least hidden tokens | the most |
+| `optional`, with the page showing thinking on (`thinkingOn`) | the least hidden tokens | the most |
 | `adaptive`, `optional` | no thinking at all | the most hidden tokens |
 | `none` | the plain range | the plain range |
 
-For a tier model that always thinks, the low end also has a **floor**: the
+For a tier model sure to think, the low end also has a **floor**: the
 tier's median plain answer, plus the least thinking. Such a model can
 never be estimated below a non-thinking frontier model, which is the
 understatement RESEARCH-2026 §4.1 rejected.
+
+An optional-thinking model is sure to think only when the page says so.
+The extension sets `thinkingOn` when it reads a thinking mode off the
+page, such as ChatGPT's *Medium*, *High* or *Extra High* on GPT-6 Sol.
+Without it, those modes started at a plain answer's 0.25 Wh. An adaptive
+model decides for itself whether to think, so a mode on the page doesn't
+change its low end. A saved effort setting doesn't set it either, because
+it says how hard to think, not whether.
 
 What the engine shows today, for model shapes like the 2026 roster
 (standard effort, 150 in / 400 out, unless noted):

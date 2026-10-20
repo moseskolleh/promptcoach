@@ -32,6 +32,8 @@ const engine = engineWith([
   current('always', { thinking: 'always', estimate: { method: 'tier', tier: 'frontier' } }),
   current('adaptive', { thinking: 'adaptive', estimate: { method: 'tier', tier: 'frontier' } }),
   current('optional', { thinking: 'optional', estimate: { method: 'tier', tier: 'small' } }),
+  current('optional-frontier', { thinking: 'optional', estimate: { method: 'tier', tier: 'frontier' } }),
+  current('adaptive-small', { thinking: 'adaptive', estimate: { method: 'tier', tier: 'small' } }),
   current('open-always', { thinking: 'always', params: { total_b: 320, active_b: 18, precision: 'fp8' }, estimate: { method: 'active-params' } }),
   current('defaults-high', { thinking: 'adaptive', default_effort: 'high', effort_vocab: 'anthropic', estimate: { method: 'tier', tier: 'frontier' } })
 ]);
@@ -127,6 +129,21 @@ test('effort none switches thinking off, except for a model that always thinks',
   // A model that always thinks cannot stop: none is its least effort.
   assert.deepStrictEqual(est('always', 'none').energy.range, est('always', 'low').energy.range);
   assert.strictEqual(est('always', 'none').estimate.rangeOnly, true);
+});
+
+test('thinking the page shows switched on is paid, for a model whose thinking is optional', () => {
+  for (const level of ['low', 'standard', 'high', 'xhigh', 'max']) {
+    // Switched on, optional thinking costs what always-on thinking does.
+    assert.deepStrictEqual(est('optional-frontier', level, { thinkingOn: true }).energy.range,
+      est('always', level).energy.range, level);
+    // Without the page saying so, it may not think at all.
+    assert.ok(est('optional-frontier', level).energy.range.lowWh < est('always', level).energy.range.lowWh, level);
+    // An adaptive model still decides for itself.
+    assert.deepStrictEqual(est('adaptive-small', level, { thinkingOn: true }).energy.range,
+      est('adaptive-small', level).energy.range, level);
+  }
+  // Effort none is thinking off, whatever the flag says.
+  assert.deepStrictEqual(est('optional', 'none', { thinkingOn: true }).energy, est('optional', 'none').energy);
 });
 
 test('past high the range widens upward, never down', () => {

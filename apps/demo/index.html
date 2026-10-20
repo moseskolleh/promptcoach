@@ -36,6 +36,8 @@
     .swatch-chatgpt { background: linear-gradient(135deg, #212121 60%, #19c37d); }
     .swatch-claude { background: linear-gradient(135deg, #f5f4ee 60%, #d97757); }
     .swatch-gemini { background: linear-gradient(135deg, #ffffff 50%, #4285f4, #d96570); }
+    .swatch-meta { background: linear-gradient(135deg, #ffffff 50%, #0064e0, #7a3ff2); }
+    .swatch-grok { background: linear-gradient(135deg, #000000 60%, #e7e7e7); }
     .watch-list { list-style: none; }
     .watch-list li {
       border: 1px solid var(--line); border-radius: 10px; background: var(--composer-bg);
@@ -55,7 +57,7 @@
   <main>
     <h1>🌱 EcoPrompt Coach — Test Playground</h1>
     <p class="lead">
-      Three mock chat interfaces that look and behave like the real thing —
+      Five mock chat interfaces that look and behave like the real thing —
       composer, streaming replies, the lot — so you can test the EcoPrompt
       Coach extension with real-world prompts without sending anything to an
       actual AI model.
@@ -79,17 +81,27 @@
       <a class="skin-card" href="chatgpt.html">
         <div class="swatch swatch-chatgpt"></div>
         <h3>NovaChat</h3>
-        <p>ChatGPT-style: dark theme, contenteditable composer. Simulates GPT-5.</p>
+        <p>ChatGPT-style: dark theme, contenteditable composer. Modes Instant to Extra High are GPT-6 Sol at that effort; Pro is GPT-6 Astra.</p>
       </a>
       <a class="skin-card" href="claude.html">
         <div class="swatch swatch-claude"></div>
         <h3>Clarion</h3>
-        <p>Claude-style: warm cream, serif greeting, rich-text composer. Simulates Claude Sonnet 4.5.</p>
+        <p>Claude-style: warm cream, serif greeting, rich-text composer. Sonnet, Opus, Haiku 5.5 and Fable 5.1, with an effort setting.</p>
       </a>
       <a class="skin-card" href="gemini.html">
         <div class="swatch swatch-gemini"></div>
         <h3>Lumina</h3>
-        <p>Gemini-style: Google light theme, plain textarea composer. Simulates Gemini 2.5 Flash.</p>
+        <p>Gemini-style: Google light theme, plain textarea composer. Auto, 3.8 Flash, 3.5 Flash-Lite and 4 Argon.</p>
+      </a>
+      <a class="skin-card" href="meta.html">
+        <div class="swatch swatch-meta"></div>
+        <h3>Orbit</h3>
+        <p>meta.ai-style: light theme, Lexical-like composer. Instant, Thinking and Contemplating are Muse Spark 1.3.</p>
+      </a>
+      <a class="skin-card" href="grok.html">
+        <div class="swatch swatch-grok"></div>
+        <h3>Quasar</h3>
+        <p>Grok-style: black theme, plain textarea composer. Fast, Expert and Heavy are Grok 4.7 at rising effort.</p>
       </a>
     </div>
 
@@ -99,7 +111,8 @@
       <li><b>Output budgets pay off.</b> Type “Explain how photosynthesis works”, then add “Answer in 50 words or less” — the estimate drops and the coach acknowledges the budget instead of nagging.</li>
       <li><b>Courtesy costs tokens.</b> The over-polite email example shows how many tokens the please-and-thank-you padding costs — open the pill's card to see the trim suggestion.</li>
       <li><b>Some prompts shouldn't be prompts.</b> Ask for tomorrow's weather or a 15% tip and the coach recommends a weather app or calculator instead. Ask for a <i>poem</i> about weather and it correctly stays quiet.</li>
-      <li><b>Model gaps are huge.</b> Send the same prompt in NovaChat (GPT-5) and Lumina (Gemini Flash) and compare grades — then open the extension popup for the full model comparison and your recorded history.</li>
+      <li><b>Modes are models too.</b> Cycle NovaChat from Instant to Extra High, or Quasar from Fast to Heavy, and watch the range climb. Heavy and Contemplating run several agents, so the pill shows a floor (“≥”), not a range.</li>
+      <li><b>Model gaps are huge.</b> Send the same prompt in Lumina on 3.5 Flash-Lite and in Clarion on Opus 5.5 and compare grades — then open the extension popup for the full model comparison and your recorded history.</li>
       <li><b>Sends are recorded.</b> Every message you send here lands in the extension popup's personal impact dashboard, just like on the real sites.</li>
     </ul>
 
@@ -113,7 +126,7 @@
 
   <footer>
     Mock interfaces are visual look-alikes for testing only — not affiliated with
-    OpenAI, Anthropic, or Google. Replies are canned text generated locally;
+    OpenAI, Anthropic, Google, Meta or xAI. Replies are canned text generated locally;
     no AI model is called and nothing leaves your browser.
     Source: <a href="https://github.com/moseskolleh/promptcoach">github.com/moseskolleh/promptcoach</a>
   </footer>

@@ -194,13 +194,6 @@ test('analyzer: zero-AI alternatives detected', () => {
   assert.strictEqual(core.detectSpecialQueryType('Explain quantum entanglement simply'), null);
 });
 
-test('autoDetectModel maps chat hosts', () => {
-  assert.strictEqual(core.autoDetectModel('chatgpt.com'), 'gpt-5');
-  assert.strictEqual(core.autoDetectModel('claude.ai'), 'claude-sonnet-5');
-  assert.strictEqual(core.autoDetectModel('gemini.google.com'), 'gemini-2.5-flash');
-  assert.strictEqual(core.autoDetectModel('example.com'), null);
-});
-
 test('vendored copies in the apps match core exactly (run scripts/sync-core.js)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
@@ -224,13 +217,6 @@ test('vendored copies in the apps match core exactly (run scripts/sync-core.js)'
         `apps/${app}/vendor/data/${f} is stale — run node scripts/sync-core.js`
       );
     }
-  }
-});
-
-test('all auto-detect targets exist in the model catalog', () => {
-  const ids = new Set(engine.listModels({ includeReference: true }).map((m) => m.id));
-  for (const id of ['gpt-5', 'claude-4.5-sonnet', 'gemini-2.5-flash', 'mistral-large', 'deepseek-v3', 'gpt-4o-mini', 'grok-3']) {
-    assert.ok(ids.has(id), `missing model: ${id}`);
   }
 });
 
@@ -307,87 +293,6 @@ test('a model whose host has no grid entry is rejected at construction', () => {
     medium: { input_tokens: 1000, output_tokens: 1000, energy_wh_mean: 2 },
     long: { input_tokens: 10000, output_tokens: 1500, energy_wh_mean: 3 } } }] };
   assert.throws(() => new core.ImpactEngine({ models, grids: core.data.grids }), /nowhere_cloud/);
-});
-
-test('autoDetectModel matches domains and subdomains, never substrings', () => {
-  assert.strictEqual(core.autoDetectModel('www.perplexity.ai'), 'gpt-4o-mini');
-  assert.strictEqual(core.autoDetectModel('CHATGPT.COM'), 'gpt-5');
-  assert.strictEqual(core.autoDetectModel('notclaude.ai'), null);
-  assert.strictEqual(core.autoDetectModel('claude.ai.evil.example'), null);
-  assert.strictEqual(core.autoDetectModel(undefined), null);
-});
-
-test('detectModelFromLabels maps model-picker text to catalog ids per provider', () => {
-  const d = (host, labels, opts) => (core.detectModelFromLabels(host, labels, opts) || {}).modelId || null;
-  // OpenAI
-  assert.strictEqual(d('chatgpt.com', ['ChatGPT 5 Thinking']), 'gpt-5-thinking');
-  assert.strictEqual(d('chatgpt.com', ['Model selector, current model is GPT-5']), 'gpt-5');
-  assert.strictEqual(d('chatgpt.com', ['ChatGPT 5']), 'gpt-5');
-  assert.strictEqual(d('chatgpt.com', ['GPT-4o mini']), 'gpt-4o-mini');
-  assert.strictEqual(d('chatgpt.com', ['GPT-4o']), 'gpt-4o');
-  assert.strictEqual(d('chatgpt.com', ['o4-mini']), 'o4-mini');
-  assert.strictEqual(d('chatgpt.com', ['o3']), 'o3');
-  assert.strictEqual(d('chatgpt.com', ['Think longer']), 'gpt-5-thinking');
-  // Anthropic
-  assert.strictEqual(d('claude.ai', ['Sonnet 4.5']), 'claude-4.5-sonnet');
-  assert.strictEqual(d('claude.ai', ['Haiku 4.5']), 'claude-4.5-haiku');
-  assert.strictEqual(d('claude.ai', ['Claude 3.7 Sonnet']), 'claude-3.7-sonnet');
-  assert.strictEqual(d('claude.ai', ['Opus 4.1']), null, 'models outside the catalog are not guessed');
-  // Fail closed on newer generations. Each of these previously resolved to an
-  // older, cheaper or non-reasoning sibling, so detection error only ever ran
-  // in the direction of understating the footprint.
-  assert.strictEqual(d('claude.ai', ['Sonnet 5']), 'claude-sonnet-5', 'Sonnet 5 resolves to its own entry, not Sonnet 4.5');
-  assert.strictEqual(d('claude.ai', ['Opus 5.5']), null, 'Opus has no catalog entry at any version');
-  assert.strictEqual(d('claude.ai', ['Sonnet']), null, 'an unversioned label names no specific model');
-  assert.strictEqual(d('chatgpt.com', ['GPT-5.1']), null, 'an unknown GPT-5 minor version is not GPT-5');
-  assert.strictEqual(d('chatgpt.com', ['Auto']), null, 'a router mode picks a model we cannot observe');
-  assert.strictEqual(d('gemini.google.com', ['Gemini 3 Pro']), null, 'Gemini 3 is not Gemini 2.5');
-  assert.strictEqual(
-    d('gemini.google.com', ['Gemini 3 Deep Think']), null,
-    'a heavy-reasoning selection must not resolve to a non-reasoning entry'
-  );
-  assert.strictEqual(d('grok.com', ['Grok 4 Heavy']), null, 'Grok 4 is not Grok 3');
-  assert.strictEqual(d('chat.deepseek.com', ['V4']), null, 'DeepSeek V4 is not V3');
-  // Copilot has its own family: ChatGPT's "Deep Research" rule must not leak
-  // onto it and report a reasoning model for Copilot's non-reasoning default.
-  assert.strictEqual(core.familyForHost('copilot.microsoft.com'), 'microsoft');
-  assert.strictEqual(d('copilot.microsoft.com', ['Deep Research']), null);
-  // Hosts that route per query cannot have their served model read off-page.
-  assert.ok(core.isRoutedHost('perplexity.ai') && core.isRoutedHost('poe.com'));
-  assert.ok(!core.isRoutedHost('chatgpt.com'));
-  // Versioned labels the catalog does carry still resolve.
-  assert.strictEqual(d('gemini.google.com', ['2.5 Pro']), 'gemini-2.5-pro', 'a decimal is not a bare generation');
-  assert.strictEqual(d('gemini.google.com', ['2.5 Flash']), 'gemini-2.5-flash');
-  // Google
-  assert.strictEqual(d('gemini.google.com', ['2.5 Flash']), 'gemini-2.5-flash');
-  assert.strictEqual(d('gemini.google.com', ['2.5 Pro']), 'gemini-2.5-pro');
-  assert.strictEqual(d('gemini.google.com', ['2.0 Flash']), 'gemini-2.0-flash');
-  // DeepSeek: the DeepThink toggle only counts when it is on.
-  assert.strictEqual(d('chat.deepseek.com', [{ text: 'DeepThink (R1)', active: false }]), null);
-  assert.strictEqual(d('chat.deepseek.com', [{ text: 'DeepThink (R1)', active: true }]), 'deepseek-r1');
-  // Unknown host: nothing unless a family is given (demo pages do this).
-  assert.strictEqual(d('localhost', ['ChatGPT 5 Thinking']), null);
-  assert.strictEqual(d('localhost', ['ChatGPT 5 Thinking'], { family: 'openai' }), 'gpt-5-thinking');
-  // Noise is ignored: long strings, empty strings, wrong family.
-  assert.strictEqual(d('chatgpt.com', ['', 'x'.repeat(200) + ' Thinking']), null);
-  assert.strictEqual(d('claude.ai', ['ChatGPT 5 Thinking']), null);
-  // Every id the detector can return exists in the catalog.
-  const ids = new Set(engine.listModels({ includeReference: true }).map((m) => m.id));
-  for (const [host, labels] of [
-    ['chatgpt.com', ['o4-mini', 'o3', 'Thinking', '4.1 nano', '4o mini', '4o', 'GPT-5']],
-    // 'Sonnet' alone is deliberately absent: an unversioned label no longer
-    // resolves, so the caller falls back to a documented host default.
-    ['claude.ai', ['Haiku', '3.7', 'Sonnet 4.5']],
-    ['gemini.google.com', ['2.0 Flash', 'Flash', 'Pro']],
-    ['chat.mistral.ai', ['Small', 'Large']],
-    ['chat.deepseek.com', [{ text: 'DeepThink', active: true }, 'V3']],
-    ['grok.com', ['Grok 3']]
-  ]) {
-    for (const label of labels) {
-      const id = d(host, [label]);
-      assert.ok(id && ids.has(id), `${host} "${typeof label === 'string' ? label : label.text}" -> ${id}`);
-    }
-  }
 });
 
 test('the input term is clamped beyond its fitted range, and says so', () => {

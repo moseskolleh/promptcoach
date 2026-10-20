@@ -769,6 +769,69 @@ estimation method, and sources with a status. A test asserts that every
 "next version" labels fail closed for every family. The demo exercises
 every provider's 2026 labels.
 
+> **Status (2026-10-20): built.** `packages/core/test/detection.test.js`
+> covers it.
+> - **Patterns.** Every version pattern is anchored at both ends, and the
+>   bare catch-alls are gone. All 23 labels of finding 2 resolve correctly.
+> - **Fail closed, generated.** The newest version of each line (GPT,
+>   Claude, Opus, Sonnet, Haiku, Fable, Gemini, Grok, DeepSeek, Muse,
+>   Mistral Medium, Small and Large) comes from the catalog ids. The test
+>   checks "newest + 0.1" and "newest + 1" for every line.
+>   - A newer label returns `unknownGeneration`, and the extension stops
+>     there. That is Step 10's fall-through fix, done here because the
+>     function was being rewritten.
+>   - The card then shows the site default, labelled *newer model on page,
+>     not in catalog yet*. Step 31 turns it into a floor.
+> - **Modes.** `detectModelFromLabels` returns `{modelId, effort,
+>   multiAgent, source}` and reads modes through `EFFORT_VOCABULARIES`. A
+>   mode word counts only in its own family.
+>   - A mode that names no model means GPT-6 Sol on ChatGPT, Grok 4.7 on
+>     Grok and Muse Spark 1.3 on meta.ai.
+>   - DeepSeek's modes name V4 models that aren't in the catalog, so they
+>     give an effort but no model.
+> - **Thinking switched on.** A thinking mode read off the page sets the
+>   new `thinkingOn` option. An optional-thinking model then pays at least
+>   the least thinking, as one that always thinks does (METHODOLOGY
+>   §2.5.3). Before, ChatGPT's *Medium* on GPT-6 Sol started at a plain
+>   answer's 0.25 Wh and graded A–E. It now grades D–E.
+> - **Site defaults.** `hostDefault()` returns `{modelId, known, routed,
+>   family}`. The card says *assumed: site default*, or *router: model not
+>   visible* on a router.
+>
+>   | Site | Default | Note |
+>   |---|---|---|
+>   | chatgpt.com | GPT-6 Sol | Free plans get Luna, but the page doesn't show the plan, so the dearer model |
+>   | claude.ai | Claude Sonnet 5.5 | |
+>   | gemini.google.com | Gemini 3.8 Flash | router (*Auto*) |
+>   | copilot.microsoft.com | GPT-6 Sol | router |
+>   | chat.mistral.ai (Vibe) | Mistral Medium 3.5 | |
+>   | grok.com | Grok 4.7 | |
+>   | meta.ai | Muse Spark 1.3 | new site |
+>   | poe.com | Claude Sonnet 5.5 | router |
+>   | perplexity.ai | none | router; its Sonar model has no entry |
+>   | chat.deepseek.com | none | V4 isn't in the catalog |
+>
+>   A supported site with no default shows *model not in catalog yet*,
+>   with no estimate, and records nothing. It never shows another lab's
+>   model.
+> - **meta.ai** is a supported site: manifest matches for `meta.ai` and
+>   `www.meta.ai`, a `meta` family and a host default.
+> - **Demo.**
+>   - NovaChat, Clarion and Lumina carry 2026 labels and model hints.
+>     Clarion has an effort switch beside its model switch.
+>   - Orbit (meta.ai-style) and Quasar (Grok-style) are new.
+>   - Mistral and DeepSeek have no page. Vibe shows only its default, and
+>     DeepSeek's models aren't in the catalog. The detection tests cover
+>     their labels.
+> - **Checked in a browser.** The content script was injected into every
+>   demo page, and every label was cycled. The demo pages were also served
+>   on real hostnames, to check:
+>   - the site default and a mode on chatgpt.com;
+>   - a newer generation on chatgpt.com and claude.ai;
+>   - DeepSeek with no model;
+>   - Poe as a router;
+>   - meta.ai.
+
 ### Step 7 — Migration: nothing breaks for existing users · S
 - **Settings.** A saved `defaultModel` that is now a reference id (`gpt-4o`
   is the extension's default today) follows its `superseded_by` chain to
@@ -904,7 +967,8 @@ Extension:
 - Remove the `keydown` listener with the same `capture` flag it was added
   with.
 - In `pickerModel()`, stop at the first group that reports
-  `unknownGeneration`. Don't fall through.
+  `unknownGeneration`. Don't fall through. *(Done in Step 6, in
+  `pickerDetection()`.)*
 - Compute popup quick grades *after* the effort select is restored. Give the
   `standard` option `selected`.
 - Add `chrome.alarms` for a midnight badge refresh. Build day buckets from

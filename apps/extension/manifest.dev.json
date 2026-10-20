@@ -49,6 +49,8 @@
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
         "https://grok.com/*",
+        "https://meta.ai/*",
+        "https://www.meta.ai/*",
         "https://moseskolleh.github.io/*",
         "http://localhost/*",
         "http://127.0.0.1/*"
@@ -83,6 +85,8 @@
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
         "https://grok.com/*",
+        "https://meta.ai/*",
+        "https://www.meta.ai/*",
         "https://moseskolleh.github.io/*",
         "http://localhost/*",
         "http://127.0.0.1/*"

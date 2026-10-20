@@ -1,4 +1,4 @@
-// EcoPrompt Coach demo — shared mock-chat logic for all three skins.
+// EcoPrompt Coach demo — shared mock-chat logic for all five skins.
 //
 // The page provides either a <textarea> or a [contenteditable] composer plus
 // a send button; this script wires up sending, fake streaming replies, and
@@ -243,20 +243,21 @@
   autoGrow();
 
   // ---------------------------------------------------------------------
-  // Model switcher — mimics the real sites' model dropdown. Clicking cycles
-  // through the options; the EcoPrompt extension reads the button's label
-  // (via its MutationObserver) and re-estimates for the selected model.
+  // Model and mode switchers — mimic the real sites' model dropdown and
+  // effort or mode picker. Clicking cycles through the options; the
+  // EcoPrompt extension reads the labels (via its MutationObserver) and
+  // re-estimates for the selected model and effort.
   // ---------------------------------------------------------------------
 
-  const switcher = document.querySelector('[data-demo-models]');
-  if (switcher) {
+  for (const switcher of document.querySelectorAll('[data-demo-models]')) {
     const options = switcher.dataset.demoModels.split('|').map((s) => s.trim()).filter(Boolean);
+    const ariaPrefix = switcher.dataset.demoAria || 'Model selector, current model is';
     let index = Math.max(0, options.indexOf(switcher.textContent.trim()));
     switcher.addEventListener('click', () => {
       index = (index + 1) % options.length;
       switcher.textContent = options[index];
       if (switcher.getAttribute('aria-label')) {
-        switcher.setAttribute('aria-label', `Model selector, current model is ${options[index]}`);
+        switcher.setAttribute('aria-label', `${ariaPrefix} ${options[index]}`);
       }
     });
   }

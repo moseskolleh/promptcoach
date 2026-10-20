@@ -5,6 +5,33 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Detection for 2026 pickers (PLAN.md Step 6)
+
+- **The model pickers people see today are read correctly.** All 23 labels
+  checked in PLAN.md finding 2 now resolve to the right model. Before, six
+  of them silently resolved to an older, cheaper sibling.
+- **Modes count.** ChatGPT's *Instant … Extra High* and *Pro*, Grok's
+  *Fast*, *Expert* and *Heavy*, and meta.ai's *Instant*, *Thinking* and
+  *Contemplating* set the model and its effort. The card says which, for
+  example "GPT-6 Sol (mode detected on page) · extra-high effort".
+- **A thinking mode on the page means thinking is on.** For a model whose
+  thinking is optional, the estimate's low end now includes the least
+  thinking (new `thinkingOn` option; METHODOLOGY §2.5.3).
+- **Newer generations fail closed**, from a list generated from the
+  catalog: GPT-7, Claude 6, Opus 5.6, Gemini 5 and the like. The card
+  shows the site default and says the page's model isn't in the catalog
+  yet.
+- **Site defaults are 2026 models**, shown as assumed. Routers
+  (Perplexity, Poe, Copilot, Gemini's *Auto*) say the model isn't visible.
+  DeepSeek and Perplexity show no estimate, since their models aren't in
+  the catalog.
+- **meta.ai is supported.**
+- **Demo playground:** 2026 labels on every page, an effort switch on
+  Clarion, and two new pages, Orbit (meta.ai-style) and Quasar
+  (Grok-style).
+- Fix: an unknown generation no longer falls through to the looser
+  selector group, where an unrelated label could read as an older model.
+
 ### The 2026 roster (PLAN.md Step 5)
 
 - **23 current models** join the catalog, each estimated (`data_source:
