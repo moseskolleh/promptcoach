@@ -144,18 +144,13 @@ function initTheme() {
 
 /* ============================ 3. State ============================ */
 
-// Every catalog entry is a reference model until the 2026 models land
-// (PLAN.md Step 5), so the pickers ask for reference entries too. Step 5
-// removes this, and with it every pre-2026 model from the UI.
-const MODEL_LIST = { includeReference: true };
-
 const state = {
   engine: null,
   conv: null,
   modelsRaw: null, // parsed models.json (for provider anchors)
 
   // Coach
-  modelId: 'gpt-4o-mini',
+  modelId: 'gpt-6-luna',
   regionKey: 'default',
   reasoningEffort: 'standard',
   outputTokens: 300,
@@ -248,7 +243,7 @@ function shortQueryImpact(modelId) {
 
 /** Models the catalog lists, cheapest at a short query first. */
 function modelsByShortQuery(filter) {
-  return state.engine.listModels(MODEL_LIST)
+  return state.engine.listModels()
     .filter(filter)
     .sort((a, b) => shortQueryImpact(a.id).energy.wh - shortQueryImpact(b.id).energy.wh);
 }
@@ -260,13 +255,14 @@ function firstThinker(models) {
 
 /**
  * Compare's opening trio, from whatever the catalog lists: the greenest
- * small plain model, the first large plain model and the first model that
- * thinks, topped up in catalog order.
+ * small model, the first large model that can think less, and the first
+ * model that always thinks, topped up in catalog order. Every 2026 model
+ * thinks, so "can think less" means not `always`.
  */
 function defaultCompareIds() {
-  const models = state.engine.listModels(MODEL_LIST);
-  const small = modelsByShortQuery((m) => m.sizeClass === 'Small' && !m.isReasoning)[0];
-  const large = models.find((m) => m.sizeClass === 'Large' && !m.isReasoning);
+  const models = state.engine.listModels();
+  const small = modelsByShortQuery((m) => m.sizeClass === 'Small')[0];
+  const large = models.find((m) => m.sizeClass === 'Large' && m.thinking !== 'always');
   const ids = [...new Set([small, large, firstThinker(models)].filter(Boolean).map((m) => m.id))];
   for (const m of models) {
     if (ids.length >= 3) break;
@@ -283,19 +279,19 @@ function buildDemoFacts() {
   const tag = (impact) => (impact.estimate ? ', estimated' : '');
 
   // Fact 1: a thinking model's answer, in everyday units (computed live).
-  const thinker = firstThinker(engine.listModels(MODEL_LIST));
+  const thinker = firstThinker(engine.listModels());
   const thinking = thinker && engine.estimateImpact({ modelId: thinker.id, ...short });
   if (thinking) {
     const e = conv.forImpact(thinking).energy;
     facts.push({
       emoji: '🧠',
-      text: `One ${thinking.model.name} answer uses ${e.primary} (${e.secondary}${tag(thinking)}).`
+      text: `One ${thinking.model.name} answer ≈ ${e.primary} (${e.secondary}${tag(thinking)}).`
     });
   }
 
   // Fact 2: best vs worst on a typical short question, claiming only what
   // the ranges support.
-  const cmp = engine.compareModels({ ...MODEL_LIST, ...short });
+  const cmp = engine.compareModels({ ...short });
   const claim = cmp.best && cmp.worst && cmp.best !== cmp.worst ? savingClaim(cmp.best, cmp.worst) : null;
   if (claim) {
     facts.push({
@@ -306,13 +302,13 @@ function buildDemoFacts() {
   }
 
   // Fact 3: a day of efficient prompting with the greenest everyday model.
-  const everyday = modelsByShortQuery((m) => m.sizeClass !== 'Nano' && !m.isReasoning)[0];
+  const everyday = modelsByShortQuery((m) => m.sizeClass !== 'Nano')[0];
   const daily = everyday && engine.estimateImpact({ modelId: everyday.id, ...short });
   if (daily) {
     const rel = conv.forImpact(daily, 25);
     facts.push({
       emoji: '💧',
-      text: `25 ${daily.model.name} queries a day use ${rel.energy.primary} and ${rel.water.primary}.`
+      text: `25 ${daily.model.name} queries a day: ${rel.energy.primary}, and ${rel.water.primary}.`
     });
   }
 
@@ -352,7 +348,7 @@ function initDemoStrip() {
 function populateModelSelect() {
   const select = $('model-select');
   clearChildren(select);
-  const models = state.engine.listModels(MODEL_LIST);
+  const models = state.engine.listModels();
 
   // Group by provider, keep data-file order within groups.
   const groups = new Map();
@@ -501,9 +497,10 @@ function tipAction(tip, analysis) {
     // Offer a switch only when a meaningfully greener model exists. Nano-class
     // models are excluded — "switch to a 1B model" isn't credible advice for
     // general tasks; Small (Haiku/mini/Flash class) is the floor the tip text
-    // itself recommends.
-    const candidates = state.engine.listModels(MODEL_LIST)
-      .filter((m) => m.sizeClass !== 'Nano' && !m.isReasoning)
+    // itself recommends. Thinking models count too: every 2026 model thinks,
+    // and savingClaim offers a switch only when the ranges don't overlap.
+    const candidates = state.engine.listModels()
+      .filter((m) => m.sizeClass !== 'Nano')
       .map((m) => m.id);
     if (!candidates.includes(state.modelId)) candidates.push(state.modelId);
     const cmp = state.engine.compareModels({
@@ -641,8 +638,11 @@ function updateCoach() {
   const cifLabel = state.regionKey === 'default'
     ? `${impact.model.host} grid`
     : 'your selected grid';
+  // A host with no published figures borrows another's, and says so.
+  const proxy = impact.factors.hostProxyOf && state.engine.grids.providers[impact.factors.hostProxyOf];
   $('carbon-detail').textContent =
-    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied`;
+    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied` +
+    (proxy ? ` · borrowed from ${proxy.name} until ${impact.model.provider}'s own figures are read` : '');
 
   setSegmentWidths(impact);
   renderTips(analysis);
@@ -895,7 +895,7 @@ function syncCompareChipStates() {
 function renderCompareChips() {
   const wrap = $('compare-chips');
   clearChildren(wrap);
-  for (const m of state.engine.listModels(MODEL_LIST)) {
+  for (const m of state.engine.listModels()) {
     const chip = el('button', 'chip', m.name);
     chip.type = 'button';
     chip.dataset.modelId = m.id;
@@ -1174,7 +1174,7 @@ function explorerMatches(meta) {
 
 function initExplorerToolbar() {
   const providerSelect = $('explorer-provider');
-  const providers = [...new Set(state.engine.listModels(MODEL_LIST).map((m) => m.provider))].sort();
+  const providers = [...new Set(state.engine.listModels().map((m) => m.provider))].sort();
   for (const p of providers) {
     const opt = document.createElement('option');
     opt.value = p;
@@ -1199,7 +1199,7 @@ function renderExplorer() {
   const grid = $('explorer-grid');
   clearChildren(grid);
 
-  const models = state.engine.listModels(MODEL_LIST)
+  const models = state.engine.listModels()
     .filter(explorerMatches)
     .map((m) => ({ meta: m, short: shortQueryImpact(m.id) }))
     .filter((x) => x.short)

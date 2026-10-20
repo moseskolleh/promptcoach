@@ -10,6 +10,7 @@
 //      deny-list
 //   6. every superseded_by chain ends at a current model, or at an explicit
 //      null for a history-only entry
+//   7. every grid entry cites a source, or is a proxy that says why
 //
 // catalog.test.js runs these rules against models.json and against
 // synthetic catalogs that break each one, so a rule with nothing to check
@@ -34,13 +35,27 @@ const ISO_DATE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
 const FACTS = ['name', 'released', 'params', 'precision', 'thinking', 'effort', 'tier', 'open_weight', 'status', 'pricing'];
 
 // The facts each estimator's numbers rest on. A current entry needs a
-// fetched source for every one, or it waits (PLAN.md Step 9). The plan names
-// active parameters, thinking mode and tier; precision is added because the
-// active-parameter estimator's GPU count depends on it (METHODOLOGY §2.5.1).
+// fetched source for every one, or it waits (PLAN.md Step 9): active
+// parameters, thinking mode and tier. Weight precision also moves the
+// active-parameter estimate (its GPU count), so a stated precision needs a
+// fetched source too. A lab that publishes none is estimated at 16 bits,
+// the larger figure, so the error runs high (METHODOLOGY §2.5.1) — but only
+// within the range EcoLogits' constants were fitted on. Past it, assuming 16
+// bits for a trillion-parameter model is no longer an estimate, so an
+// unpublished precision means the entry waits.
+const FITTED_MAX_TOTAL_B = 200;
+
 const ESTIMATE_FACTS = {
-  'active-params': ['params', 'precision', 'thinking'],
+  'active-params': ['params', 'thinking'],
   tier: ['tier', 'thinking']
 };
+
+function estimateFacts(m) {
+  const facts = ESTIMATE_FACTS[m.estimate.method].slice();
+  if (m.estimate.method === 'active-params' && m.params &&
+      (m.params.precision !== undefined || m.params.total_b > FITTED_MAX_TOTAL_B)) facts.push('precision');
+  return facts;
+}
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 
@@ -140,7 +155,7 @@ function catalogProblems(data, { denyList = [] } = {}) {
     // An estimate rests on a few facts; each needs a page someone opened.
     if (m.estimate && hasOwn(ESTIMATE_FACTS, m.estimate.method)) {
       const fetched = new Set((m.sources || []).filter((s) => s.status === 'fetched').flatMap(factsOf));
-      const missing = ESTIMATE_FACTS[m.estimate.method].filter((f) => !fetched.has(f));
+      const missing = estimateFacts(m).filter((f) => !fetched.has(f));
       if (missing.length) {
         problems.push(`${id}: its ${m.estimate.method} estimate rests on facts no fetched source supports (${missing.join(', ')}). Fetch the primary page, or the entry waits`);
       }
@@ -176,14 +191,32 @@ function modelIdsIn(text) {
   return found;
 }
 
+/**
+ * Every grid entry cites the source of its figures, or borrows another
+ * host's and says why (PLAN.md Step 4). The engine checks that a proxy
+ * resolves; this checks that it is visible.
+ */
+function gridProblems(grids) {
+  const problems = [];
+  for (const [key, p] of Object.entries(grids.providers || {})) {
+    if (p.proxy_of !== undefined) {
+      if (!p.notes) problems.push(`grids.json ${key}: a proxy must say why in its notes`);
+    } else if (!p.source) {
+      problems.push(`grids.json ${key}: needs a source, or proxy_of naming the host it borrows from`);
+    }
+  }
+  return problems;
+}
+
 module.exports = {
-  CURRENT_FROM, SOURCE_STATUSES, FACTS, ESTIMATE_FACTS, MODEL_FAMILIES,
-  catalogProblems, readDenyList, loadDenyList, factsOf, modelIdsIn
+  CURRENT_FROM, SOURCE_STATUSES, FACTS, ESTIMATE_FACTS, FITTED_MAX_TOTAL_B, MODEL_FAMILIES,
+  catalogProblems, gridProblems, readDenyList, loadDenyList, factsOf, modelIdsIn
 };
 
 if (require.main === module) {
   const data = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'models.json'), 'utf8'));
-  const problems = catalogProblems(data, { denyList: loadDenyList() });
+  const grids = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'grids.json'), 'utf8'));
+  const problems = [...catalogProblems(data, { denyList: loadDenyList() }), ...gridProblems(grids)];
   if (problems.length) {
     console.error(`check-catalog: ${problems.length} problem(s) in models.json\n`);
     for (const p of problems) console.error(`  ✗ ${p}`);

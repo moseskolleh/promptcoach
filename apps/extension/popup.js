@@ -649,9 +649,7 @@
     state.settings = settings;
     state.engine = new Core.ImpactEngine({ models, grids, equivalents });
     state.conv = Core.createConverters(equivalents);
-    // Until the 2026 models land (PLAN.md Step 5) every entry is a reference
-    // model, so ask for those too. Step 5 removes this.
-    state.models = state.engine.listModels({ includeReference: true });
+    state.models = state.engine.listModels();
 
     // Quick grade per model (typical short query: 100 in / 300 out), at the
     // saved effort: the effort select is not restored yet, so its value
@@ -683,7 +681,7 @@
       populateChecklist();
     } else {
       // Sensible default comparison: current model + an efficient small model.
-      const small = state.models.find((m) => m.id === 'gemini-2.0-flash') || state.models[0];
+      const small = state.models.find((m) => m.id === 'gemini-3.5-flash-lite') || state.models[0];
       state.compareIds = [...new Set([modelSelect.value, small.id])];
       populateChecklist();
     }

@@ -19,9 +19,7 @@ export interface ImpactRequest {
 
 const { engine, converters } = core.createDefaultEngine();
 
-// Until the 2026 models land (PLAN.md Step 5) every entry is a reference
-// model, so ask for those too. Step 5 removes this.
-export const listModels = () => engine.listModels({ includeReference: true });
+export const listModels = () => engine.listModels();
 export const listRegions = () => engine.listRegions();
 export const estimateImpact = (req: ImpactRequest) => engine.estimateImpact(req);
 export const compareModels = (req: {

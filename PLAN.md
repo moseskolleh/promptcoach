@@ -506,6 +506,17 @@ level has a test, and an unknown effort resolves to the model's default.
 **Done when:** every current model's `host_key` resolves. Each new grid
 entry cites a fetched source or is visibly marked as a proxy.
 
+> **Status (2026-10-20): built, with every new host a proxy.** METHODOLOGY
+> §4.1 documents it.
+> - `meta`, `moonshot`, `alibaba` and `zai` are in `grids.json`, each with
+>   `proxy_of` and a note saying what replaces it.
+> - **Meta borrows AWS's figures.** Meta's sustainability report PDF is on
+>   hosts the build environment can't reach (checked 2026-10-20). Once
+>   someone reads the PDF, the entry gets its own figures and loses
+>   `proxy_of`.
+> - Moonshot, Alibaba and Z.ai borrow the DeepSeek China averages, as above.
+> - Gemma 4 uses `google_cloud` and Nemotron 3 Ultra uses `aws` (Step 5).
+
 ### Step 5 — The 2026 roster · M
 **The rule:** a model is `current` if it was released on or after
 2026-01-01 **and** is still its provider's current offering for its tier.
@@ -652,6 +663,74 @@ becomes reference data with the rest.
 estimation method, and sources with a status. A test asserts that every
 `current` model was released on or after 2026-01-01.
 
+> **Status (2026-10-20): built: 23 current models, 23 reference entries.**
+> - **Where the facts come from.** Most vendor sites are blocked here, so
+>   every fact was opened on the vendor's own pages:
+>   - Anthropic's docs, opened today;
+>   - each lab's own GitHub repositories (SDKs, model catalogs, cookbooks,
+>     model cards), pinned to a commit.
+>
+>   Each entry lists its sources, one row per fact, all `fetched`.
+> - **Changed from the table above, after reading the primary sources:**
+>   - *OpenAI.* GPT-6.1 Sol and GPT-6 Astra always reason, because `none`
+>     is not supported. GPT-6 Sol and Luna can switch reasoning off.
+>     OpenAI calls Sol the "previous generation", so `gpt-6-sol` is a
+>     reference entry with `superseded_by: gpt-6.1-sol`. It keeps its
+>     estimate so ChatGPT detection still resolves.
+>   - *Meta.*
+>     - Muse Spark 1.3 counts as always thinking, because Meta says `none`
+>       "isn't reliably available yet". Its frontier tier comes from Meta's
+>       own HackBench ("frontier proprietary models").
+>     - Muse Spark Open ships both BF16 and NVFP4 checkpoints; the estimate
+>       uses BF16.
+>     - Muse Glimmer 30B is BF16 and always thinks.
+>   - *Google.* Gemini 4 Argon's thinking can't be switched off: low,
+>     medium (default) or high. Gemini 3.8 Flash and 3.5 Flash-Lite are
+>     adaptive, because "minimal" is roughly off.
+>   - *Release dates.* Several are a month (`2026-09`) or an SDK or repo
+>     date. Each entry's notes say which.
+> - **Waiting, because no primary source could be read:**
+>   - DeepSeek V4: only Hugging Face's blog has it. `deepseek-v3` and
+>     `deepseek-r1` get `superseded_by: null` until it enters.
+>   - Qwen3.8-2.4T-A95B: Qwen publishes no precision. At 2.4T it is far
+>     past the 200B the estimator was fitted on, so 16 bits can't be
+>     assumed; assuming it gave 134–640 Wh per short query.
+>   - Gemini 3.1 Pro: Google's files have only `gemini-3.1-pro-preview`.
+>     `gemini-2.5-pro` now points to Gemini 4 Argon.
+>   - Gemma 4 E4B: its total parameters are unpublished.
+>   - Mistral Large 4: weights "Coming soon".
+> - **The gate, refined.** A precision a lab does not publish is estimated
+>   at 16 bits, which errs high. Qwen3.8 and Mistral publish none
+>   (Step 9's status has the rule).
+> - **Apps.**
+>   - The `includeReference` opt-in is gone, so the pickers list only the
+>     23 current models.
+>   - New default models: web coach `gpt-6-luna`, extension
+>     `gpt-6.1-sol`, popup's small comparison model `gemini-3.5-flash-lite`.
+>   - The README example now uses GPT-6 Luna and Claude Opus 5.5.
+>   - The demo pages' model hints wait for Step 6, with their labels.
+> - **Open question: very large open-weight models.** The parameter-based
+>   estimate gives very large figures for them at 150 in / 400 out:
+>
+>   | Model | At standard effort | At the vendor's own default effort |
+>   |---|---|---|
+>   | Kimi K3 | 35–169 Wh | 85 Wh – 2.5 kWh (default max) |
+>   | GLM-5.3 | 11–53 Wh | 26–770 Wh (default max) |
+>   | Muse Spark Open | 20–97 Wh | 49–572 Wh (default xhigh) |
+>
+>   DeepSeek-R1, a measured reference entry, uses 24.5 Wh at standard.
+>   The standard-effort figures sit within a few times of that. Two things
+>   push them far higher:
+>   - EcoLogits' constants were fitted on models up to 200B parameters;
+>     these have 0.7–2.8T.
+>   - At the vendor's default effort, the `xhigh` and `max` ranges (Step
+>     3) reach ×6.25 and ×15.6 on hidden tokens.
+>
+>   The apps pass standard effort unless the user picks another, so the
+>   default-effort figures appear only when effort is unknown. Whether to
+>   cap those ranges, or keep the giants out until they're measured, needs
+>   a decision.
+
 ### Step 6 — Detection and site defaults for 2026 pickers · M
 - **Anchor every version pattern at both ends** with `(?![\d.])`, so
   `Sonnet 5` can't match "Sonnet 5.5". Delete the bare catch-alls
@@ -794,10 +873,13 @@ runbook has been used once for real (the Mistral Large 4 weights).
 >   as their own step, and `npm test` runs them too. `catalog.test.js`
 >   proves each rule fails on a synthetic catalog that breaks it.
 > - **Sources name their facts.** `fact` takes values from a fixed list.
->   An `active-params` estimate needs fetched `params`, `precision` and
->   `thinking`; a `tier` estimate needs fetched `tier` and `thinking`.
->   `precision` is added to the plan's list because the GPU count depends
->   on it.
+>   An `active-params` estimate needs fetched `params` and `thinking`; a
+>   `tier` estimate needs fetched `tier` and `thinking`. Precision moves the
+>   GPU count, so a **stated** precision needs a fetched source too. A lab
+>   that publishes none is estimated at 16 bits, which errs high, but only
+>   up to 200B total parameters, the range the estimator was fitted on.
+>   Past that, an unpublished precision means the entry waits (refined
+>   2026-10-20: Qwen and Mistral publish no shipped precision).
 > - **The deny-list is read from RESEARCH-2026 §3.1 itself,** so it has
 >   one home. The check fails loudly if that section moves.
 > - **`superseded_by`.** Once the catalog holds a current model, every

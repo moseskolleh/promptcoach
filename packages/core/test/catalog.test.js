@@ -81,6 +81,15 @@ test('an estimate never rests on search-only facts alone', () => {
     estimated('open-ok', 'active-params', [source('name, released, params, precision, thinking')])
   ] };
   assert.deepStrictEqual(catalogProblems(ok), []);
+  // A lab that publishes no precision: estimated at 16 bits, nothing to source.
+  const unstated = estimated('open-unstated', 'active-params', [source('name, released, params, thinking')]);
+  delete unstated.params.precision;
+  assert.deepStrictEqual(catalogProblems({ models: [unstated] }), []);
+  // ...but only within the estimator's fitted range: a trillion-parameter
+  // model at an assumed 16 bits is not an estimate, so it waits.
+  const giant = estimated('open-giant', 'active-params', [source('name, released, params, thinking')]);
+  giant.params = { total_b: 2400, active_b: 95 };
+  assert.match(catalogProblems({ models: [giant] })[0], /^open-giant: .*\(precision\)/);
 
   const broken = { models: [
     estimated('tier-search-only', 'tier', [source('name, released, thinking'), source('tier', 'search-only')]),
@@ -169,7 +178,9 @@ test('the apps check finds hard-coded model ids, and only those', () => {
 
 test('every reference id still estimates exactly what it did before schema v3', () => {
   const engine = new ImpactEngine({ models: modelsData, grids });
-  const ids = modelsData.models.filter((m) => m.status === 'reference').map((m) => m.model_id);
+  // The benchmarked entries: reference entries with an estimate block (a
+  // superseded 2026 model) are pinned by the estimator tests instead.
+  const ids = modelsData.models.filter((m) => m.status === 'reference' && !m.estimate).map((m) => m.model_id);
   assert.deepStrictEqual(ids.sort(), Object.keys(referenceSnapshot).sort());
   assert.deepStrictEqual(snapshot(engine, ids), referenceSnapshot);
 });
