@@ -39,7 +39,12 @@ const FACTS = ['name', 'released', 'params', 'precision', 'thinking', 'effort', 
 // parameters, thinking mode and tier. Weight precision also moves the
 // active-parameter estimate (its GPU count), so a stated precision needs a
 // fetched source too. A lab that publishes none is estimated at 16 bits,
-// the larger figure, so the error runs high (METHODOLOGY §2.5.1).
+// the larger figure, so the error runs high (METHODOLOGY §2.5.1) — but only
+// within the range EcoLogits' constants were fitted on. Past it, assuming 16
+// bits for a trillion-parameter model is no longer an estimate, so an
+// unpublished precision means the entry waits.
+const FITTED_MAX_TOTAL_B = 200;
+
 const ESTIMATE_FACTS = {
   'active-params': ['params', 'thinking'],
   tier: ['tier', 'thinking']
@@ -47,7 +52,8 @@ const ESTIMATE_FACTS = {
 
 function estimateFacts(m) {
   const facts = ESTIMATE_FACTS[m.estimate.method].slice();
-  if (m.estimate.method === 'active-params' && m.params && m.params.precision !== undefined) facts.push('precision');
+  if (m.estimate.method === 'active-params' && m.params &&
+      (m.params.precision !== undefined || m.params.total_b > FITTED_MAX_TOTAL_B)) facts.push('precision');
   return facts;
 }
 
@@ -203,7 +209,7 @@ function gridProblems(grids) {
 }
 
 module.exports = {
-  CURRENT_FROM, SOURCE_STATUSES, FACTS, ESTIMATE_FACTS, MODEL_FAMILIES,
+  CURRENT_FROM, SOURCE_STATUSES, FACTS, ESTIMATE_FACTS, FITTED_MAX_TOTAL_B, MODEL_FAMILIES,
   catalogProblems, gridProblems, readDenyList, loadDenyList, factsOf, modelIdsIn
 };
 

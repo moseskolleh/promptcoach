@@ -5,6 +5,40 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### The 2026 roster (PLAN.md Step 5)
+
+- **23 current models** join the catalog, each estimated (`data_source:
+  "estimated"`), with one fetched source per fact:
+  - Anthropic: Claude Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5.
+  - OpenAI: GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna.
+  - Google: Gemini 4 Argon, Gemini 3.8 Flash, Gemini 3.5 Flash-Lite,
+    Gemma 4 26B-A4B, Gemma 4 31B.
+  - Meta: Muse Spark 1.3, Muse Spark Open, Muse Glimmer 30B.
+  - xAI: Grok 4.7.
+  - Moonshot: Kimi K3.
+  - Z.ai: GLM-5.3, GLM-5.3-Flash.
+  - Alibaba: Qwen3.8-27B.
+  - Mistral: Mistral Small 4, Mistral Medium 3.5.
+  - NVIDIA: Nemotron 3 Ultra.
+- **GPT-6 Sol is a reference entry** superseded by GPT-6.1 Sol, as OpenAI
+  calls it the previous generation.
+- **Every old entry says what replaced it** (`superseded_by`). DeepSeek V3
+  and R1 point nowhere until DeepSeek V4 can be read from a primary source.
+- **Waiting for a primary source:** DeepSeek V4, Qwen3.8-2.4T-A95B (no
+  published precision, and too large to assume one), Gemini 3.1 Pro
+  (preview id only), Gemma 4 E4B, Mistral Large 4.
+- **The pickers list only current models.** The default models are now
+  GPT-6 Luna (web coach), GPT-6.1 Sol (extension) and Gemini 3.5 Flash-Lite
+  (popup comparison).
+- **Gate refinement:** a precision a lab doesn't publish is estimated at 16
+  bits, which errs high, so only a stated precision needs a source. This
+  holds up to 200B total parameters, the range the estimator was fitted
+  on. A larger model with no published precision waits.
+- **Known issue:** very large open-weight models (Kimi K3, GLM-5.3, Muse
+  Spark Open) estimate at tens of Wh per query at standard effort. At their
+  vendors' default max or xhigh effort, that rises to hundreds of Wh. See
+  PLAN.md Step 5's status note.
+
 ### Hosts for the 2026 models (PLAN.md Step 4)
 
 - **Four new hosts** in `grids.json`: Meta, Moonshot AI, Alibaba Cloud and

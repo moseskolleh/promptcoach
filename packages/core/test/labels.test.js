@@ -38,7 +38,7 @@ const at = (modelId, inputTokens = 150, outputTokens = 400, options = {}) =>
   engine.estimateImpact({ modelId, inputTokens, outputTokens, options });
 
 test('a measured or benchmarked model keeps its single number and grade', () => {
-  for (const { id } of engine.listModels({ includeReference: true }).filter((m) => m.status === 'reference')) {
+  for (const { id } of engine.listModels({ includeReference: true }).filter((m) => !engine.getModel(m.id).estimate)) {
     const impact = at(id);
     const d = describeImpact(impact);
     assert.strictEqual(d.estimated, false, id);

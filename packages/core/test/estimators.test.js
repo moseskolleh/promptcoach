@@ -208,7 +208,7 @@ test('weight precision decides the GPU count', () => {
 
 test('reference numbers do not depend on the estimators', () => {
   const plain = new ImpactEngine({ models: modelsData, grids });
-  for (const { id } of plain.listModels({ includeReference: true })) {
+  for (const { id } of plain.listModels({ includeReference: true }).filter((m) => !plain.getModel(m.id).estimate)) {
     assert.deepStrictEqual(engine.estimateImpact({ modelId: id, inputTokens: 150, outputTokens: 400 }),
       plain.estimateImpact({ modelId: id, inputTokens: 150, outputTokens: 400 }), id);
     assert.strictEqual(plain.estimateImpact({ modelId: id, inputTokens: 1, outputTokens: 1 }).estimate, null);

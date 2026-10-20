@@ -119,9 +119,11 @@ checks the apps. Both run in CI and in `npm test`.
 | *model id "…" is not in models.json* (check-apps) | Use a catalog id in that file, or add the entry. |
 
 The active-parameter estimate needs fetched `params` and `thinking`. A
-stated `precision` needs a fetched source too; when a lab publishes none,
+stated `precision` needs a fetched source too. When a lab publishes none,
 leave `params.precision` out and the estimate assumes 16 bits, which errs
-high. The tier estimate needs fetched `tier` and `thinking`.
+high. That holds only up to 200B total parameters, the range the estimator
+was fitted on; a larger model with no published precision waits. The tier
+estimate needs fetched `tier` and `thinking`.
 
 ## 5. The pull request
 

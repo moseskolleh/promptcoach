@@ -90,15 +90,17 @@ Then everything is translated: *"This prompt ≈ 4 minutes of an LED bulb,
 EU energy labels, anchored so a median 2025 prompt is an A and a heavy
 reasoning run is an E.
 
-## Example (from the engine, GPT-4o, 100 in / 300 out tokens)
+## Example (from the engine, GPT-6 Luna with thinking off, 100 in / 300 out tokens)
 
-- ⚡ **2.8% of a phone charge** (0.42 Wh) — grade **B**
-- 💧 **~20 drops of water** (1.0 mL)
-- 🌍 **Driving a car 1 meter** (0.17 g CO₂e)
+- ⚡ **About 52 seconds of an LED bulb** (0.095–0.190 Wh) — grade **A**
+- 💧 **About 7 drops of water** (0.2–0.5 mL)
+- 🌍 **About 5 seconds of breathing** (0.04–0.08 g CO₂e)
 
-Same question to a reasoning model (DeepSeek-R1): **the energy of riding an
-e-bike 2.4 km** (23.8 Wh) — grade **E**, ~57× more. That's the coaching
-moment.
+Nobody has measured a 2026 model, so every figure is an estimate with a
+range and a method chip (*estimated · tier*). The same question to a model
+that always thinks (Claude Opus 5.5 at standard effort): **5.3–12.5 minutes
+of video streaming** (6.90–16.2 Wh) — grade **D–E**. Luna with thinking off
+uses at least 97% less. That's the coaching moment.
 
 ## Status
 
@@ -106,8 +108,8 @@ What is verified working, by running it rather than by reading it:
 
 | | |
 |---|---|
-| **Engine** | ✅ v2 with the 2025/2026 evidence base, 22-model catalog, **45/45 tests pass** |
-| **Static checks** | ✅ 721 checks across 22 scripts, 16 JSON files, 7 pages (`npm run check`) |
+| **Engine** | ✅ v2 with the 2025/2026 evidence base: 23 current 2026 models (estimated) and 23 reference entries, **95/95 tests pass** |
+| **Static checks** | ✅ 930 checks across 30 scripts, 17 JSON files, 7 pages (`npm run check`), plus the catalog gates (`npm run check:catalog`) |
 | **CI** | ✅ Node 20 + 22 on every push and PR, including the vendored-copy sync gate |
 | **Web app + demo playground** | ✅ live on GitHub Pages, redeployed on every push to `main` |
 | **Chrome extension** | ⚠️ works when loaded unpacked — **not yet published to any store** |

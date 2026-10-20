@@ -37,7 +37,7 @@
   let engine = null;
   let conv = null;
   let settings = { ...DEFAULT_SETTINGS };
-  let modelId = 'gpt-4o';
+  let modelId = DEFAULT_SETTINGS.defaultModel;
   let modelSource = 'default'; // 'picker' | 'host' | 'meta' | 'settings' | 'default'
 
   let inputEl = null; // the chat prompt input we're attached to
@@ -160,7 +160,7 @@
       source = 'settings';
     }
     if (!candidate || !engine.getModel(candidate)) {
-      candidate = 'gpt-4o';
+      candidate = DEFAULT_SETTINGS.defaultModel;
       source = 'default';
     }
     const changed = candidate !== modelId;

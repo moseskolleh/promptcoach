@@ -65,7 +65,7 @@ export async function getSettings(): Promise<Settings> {
   const raw = await AsyncStorage.getItem(KEYS.settings);
   return raw
     ? JSON.parse(raw)
-    : { defaultModelId: 'gpt-5', regionKey: 'default', reasoningEffort: 'standard', includeEmbodied: true };
+    : { defaultModelId: 'gpt-6.1-sol', regionKey: 'default', reasoningEffort: 'standard', includeEmbodied: true };
 }
 
 export async function setSettings(settings: Settings): Promise<void> {

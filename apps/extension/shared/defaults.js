@@ -5,7 +5,7 @@
 
 (function (root) {
   root.EcoPromptDefaults = Object.freeze({
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-6.1-sol',
     regionKey: 'default',
     reasoningEffort: 'standard',
     showPill: true,
