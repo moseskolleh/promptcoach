@@ -8,18 +8,19 @@
        reads the model switcher below like it does on chatgpt.com) and which
        model to assume if the switcher can't be read. -->
   <meta name="ecoprompt-family" content="openai">
-  <meta name="ecoprompt-model" content="gpt-5">
+  <meta name="ecoprompt-model" content="gpt-6-sol">
   <link rel="stylesheet" href="demo.css">
 </head>
 <body class="skin-chatgpt" data-assistant-initial="N">
   <header class="demo-topbar">
     <span class="demo-brand">NovaChat</span>
     <span class="demo-model-tag">mimics chatgpt.com</span>
-    <!-- ChatGPT-style model switcher: the extension reads this label. Click to cycle. -->
+    <!-- ChatGPT-style mode picker: Instant … Extra High are GPT-6 Sol at that
+         effort, Pro is GPT-6 Astra. The extension reads this label. Click to cycle. -->
     <button type="button" class="demo-model-switcher" data-testid="model-switcher-dropdown-button"
-            aria-haspopup="menu" aria-label="Model selector, current model is ChatGPT 5"
-            title="Click to switch the simulated model — watch the pill re-estimate"
-            data-demo-models="ChatGPT 5|ChatGPT 5 Thinking|GPT-4o mini|o3">ChatGPT 5</button>
+            aria-haspopup="menu" aria-label="Model selector, current model is Instant"
+            title="Click to switch the simulated mode — watch the pill re-estimate"
+            data-demo-models="Instant|Medium|High|Extra High|Pro">Instant</button>
     <span class="demo-spacer"></span>
     <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
     <a href="index.html">← demo home</a>

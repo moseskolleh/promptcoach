@@ -732,6 +732,10 @@ class ImpactEngine {
    *        unknown or missing means the model's default_effort, else 'standard'
    * @param {boolean} [q.options.multiAgent=false]  several agents answer at
    *        once (Grok Heavy): an estimated model's figure becomes a floor
+   * @param {boolean} [q.options.thinkingOn=false]  the page shows thinking
+   *        switched on (ChatGPT's Medium … Extra High): a model whose thinking
+   *        is optional then pays the least thinking, like one that always
+   *        thinks. Adaptive models still decide for themselves.
    * @param {string} [q.options.regionKey]   override grid for carbon only
    * @param {number} [q.options.cifOverride] direct CIF override (kgCO2e/kWh)
    * @param {boolean} [q.options.includeEmbodied=true] include lifecycle uplift
@@ -785,8 +789,11 @@ class ImpactEngine {
     let range = null;
     let thinkingRange = null;
     if (model.estimate) {
-      // Hidden tokens. Only a model that always thinks is sure to pay the
-      // low end; adaptive and optional thinking may not think at all.
+      // Hidden tokens. Only a model that always thinks, or optional thinking
+      // the page shows switched on, is sure to pay the low end; adaptive
+      // thinking may not think at all.
+      const surelyThinks = model.thinking === 'always' ||
+        (model.thinking === 'optional' && options.thinkingOn === true && effortKey !== 'none');
       let lowTokens = 0;
       let highTokens = 0;
       if (model.thinking !== 'none') {
@@ -794,7 +801,7 @@ class ImpactEngine {
         // least effort.
         const level = model.thinking === 'always' && effortKey === 'none' ? EFFORT_LEVELS.low : EFFORT_LEVELS[effortKey];
         const t = thinkingTokens(this.evidence.pairs, tIn, tOut);
-        lowTokens = model.thinking === 'always' ? t.low * level.low : 0;
+        lowTokens = surelyThinks ? t.low * level.low : 0;
         highTokens = t.high * level.high;
         thinkingRange = { lowTokens, highTokens };
       }
@@ -809,10 +816,10 @@ class ImpactEngine {
         }));
         lowWh = Math.min(...members.map((x) => x.plain + lowTokens * x.eOut));
         highWh = Math.max(...members.map((x) => x.plain + highTokens * x.eOut));
-        // A model that always thinks is never estimated below its tier's
-        // median plain answer plus the least thinking: the understatement
+        // A model sure to think is never estimated below its tier's median
+        // plain answer plus the least thinking: the understatement
         // RESEARCH-2026 §4.1 rejected (PLAN.md Step 2).
-        if (model.thinking === 'always') {
+        if (surelyThinks) {
           const floor = median(members.map((x) => x.plain)) + lowTokens * median(members.map((x) => x.eOut));
           lowWh = Math.max(lowWh, floor);
         }
@@ -1074,26 +1081,34 @@ class ImpactEngine {
 // Which model is this chat page using?
 // ----------------------------------------------------------------------------
 
+// Each site's default model when nothing on the page names one (PLAN.md
+// Step 6). A default is an assumption, and the apps show it as one
+// ("assumed: site default"). A null default means the site's current models
+// are not in the catalog yet, so the caller shows no number rather than
+// another lab's model.
 const HOST_DEFAULTS = {
-  'chatgpt.com': 'gpt-5',
-  'chat.openai.com': 'gpt-5',
-  'claude.ai': 'claude-sonnet-5',
-  'gemini.google.com': 'gemini-2.5-flash',
-  'copilot.microsoft.com': 'gpt-5',
-  'chat.mistral.ai': 'mistral-large',
-  'chat.deepseek.com': 'deepseek-v3',
-  // Perplexity and Poe are multi-model routers: the served model is chosen
-  // per query and is not observable from the page, so these defaults are a
-  // guess, not a detection. They are kept so the UI has something to show,
-  // and flagged below so a caller can label them honestly.
-  'perplexity.ai': 'gpt-4o-mini',
-  'poe.com': 'claude-4.5-sonnet',
-  'grok.com': 'grok-3'
+  // Paid plans get GPT-6 Sol; Free and Go get Luna. The page doesn't show
+  // the plan, so this is the paid default.
+  'chatgpt.com': 'gpt-6-sol',
+  'chat.openai.com': 'gpt-6-sol',
+  'claude.ai': 'claude-sonnet-5-5',
+  'gemini.google.com': 'gemini-3.8-flash',
+  'copilot.microsoft.com': 'gpt-6-sol',
+  // Le Chat is now Vibe, on the same host; Medium 3.5 is its default.
+  'chat.mistral.ai': 'mistral-medium-3.5',
+  // DeepSeek V4 is not in the catalog: no primary source could be read.
+  'chat.deepseek.com': null,
+  'meta.ai': 'muse-spark-1.3',
+  // Perplexity's default is its own Sonar model, which has no entry.
+  'perplexity.ai': null,
+  'poe.com': 'claude-sonnet-5-5',
+  'grok.com': 'grok-4.7'
 };
 
 // Hosts whose served model cannot be read off the page at all. A number shown
 // for these is a per-site assumption, not a measurement of the user's choice.
-const ROUTED_HOSTS = ['perplexity.ai', 'poe.com', 'copilot.microsoft.com'];
+// Gemini joins them: its Auto mode picks the model per prompt.
+const ROUTED_HOSTS = ['perplexity.ai', 'poe.com', 'copilot.microsoft.com', 'gemini.google.com'];
 
 function isRoutedHost(hostname) {
   const host = String(hostname || '').toLowerCase();
@@ -1105,92 +1120,223 @@ function hostMatches(hostname, domain) {
 }
 
 /**
- * Map a chat site hostname to the model most likely serving it (the site's
- * default). Matches the domain or a subdomain of it — never a substring, so
- * "notclaude.ai" is not Claude.
+ * The model a chat site serves by default. Matches the domain or a subdomain
+ * of it — never a substring, so "notclaude.ai" is not Claude. Null for an
+ * unknown site, and for a known site whose current models are not in the
+ * catalog; hostDefault() tells the two apart.
  */
 function autoDetectModel(hostname) {
-  const host = String(hostname || '').toLowerCase();
-  for (const [domain, modelId] of Object.entries(HOST_DEFAULTS)) {
-    if (hostMatches(host, domain)) return modelId;
-  }
-  return null;
+  return hostDefault(hostname).modelId;
 }
 
-// The model the user has *selected* is the single largest source of error in
-// the extension's estimates: the same ChatGPT tab is a 0.5 Wh gpt-5 answer or
-// a 30× costlier "Thinking" answer depending on one dropdown. Chat UIs show
-// the selection as short text in a model-switcher button; the content script
-// collects such labels and this pure function maps them to catalog ids.
-// Patterns are ordered most-specific first, per provider family. A label
-// that names no catalog model returns null so the caller keeps its default.
-// A label naming a generation the catalog does not carry must NOT fall
-// through to the nearest older sibling. Every such fallback resolved to a
-// cheaper, non-reasoning model, so detection error was one-directional: the
-// product only ever understated. These run before the family patterns and
-// force a null (the caller then shows a documented host default, which is
-// explainable, instead of asserting a specific wrong model's coefficients).
-const UNKNOWN_GENERATION = [
-  // GPT-6+ and any GPT-5 minor version the catalog has no entry for.
-  /\bgpt[\s-]?[6-9]\b/i,
-  /\b(?:gpt[\s-]?|chatgpt\s+)5\.[1-9]\b/i,
-  // Claude generations with no catalog entry. Sonnet 5 is deliberately NOT
-  // listed here — it has an entry, so it is matched below.
-  /\b(?:opus|fable|mythos)[\s-]*\d/i,
-  /\b(?:sonnet|haiku)[\s-]*[6-9]\b/i,
-  /\bclaude[\s-]*[6-9]\b/i,
-  // Opus has no catalog entry at any version — never guess a sibling tier.
-  /\bopus\b/i,
-  // Gemini 3+.
-  /\bgemini[\s-]*[3-9]\b/i,
-  // The lookbehind keeps "2.5 Pro" out: without it \b matches after the
-  // decimal point and the trailing "5 Pro" reads as a bare generation.
-  /(?<![\d.])[3-9][\s-]*(?:pro|flash|deep\s+think)\b/i,
-  // Grok 4+, DeepSeek V4+, Mistral generations past the catalog.
-  /\bgrok[\s-]?[4-9]\b/i,
-  /\bv[4-9]\b/i,
-  // Router / auto modes pick a model we cannot observe.
-  /\bauto\b/i
-];
+/**
+ * What a site's default is, and how far to trust it:
+ * { modelId, known, routed, family }. `known` without a modelId means the
+ * site is supported but its models are not in the catalog yet.
+ */
+function hostDefault(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  for (const [domain, modelId] of Object.entries(HOST_DEFAULTS)) {
+    if (hostMatches(host, domain)) {
+      return { modelId, known: true, routed: isRoutedHost(host), family: familyForHost(host) };
+    }
+  }
+  return { modelId: null, known: false, routed: false, family: null };
+}
 
+// The model a user has *selected* is the single largest source of error in
+// the extension's estimates. Chat UIs show the selection as short text in a
+// model-switcher button; the content script collects such labels and this
+// pure function maps them to catalog ids.
+//
+// Every version is anchored at both ends with (?![\d.]), so "Sonnet 5" can't
+// match "Sonnet 5.5". There are no bare catch-alls (haiku, flash, pro, large,
+// medium): they absorbed every new generation into an older, cheaper sibling,
+// so detection only ever understated (PLAN.md Step 6, finding 2). A label
+// that names no catalog model returns null and the caller falls back to the
+// site's documented default.
 const MODEL_LABEL_PATTERNS = {
   openai: [
+    { re: /\b(?:gpt|chatgpt)[\s-]?6\.1(?![\d.])/i, id: 'gpt-6.1-sol' },
+    { re: /\bastra\b/i, id: 'gpt-6-astra' },
+    { re: /\bluna\b/i, id: 'gpt-6-luna' },
+    // ChatGPT's Pro is GPT-6 Astra. As a bare mode word it counts only as
+    // the whole label.
+    { re: /\b(?:gpt|chatgpt)[\s-]?6(?![\d.])[\s-]*pro\b/i, id: 'gpt-6-astra' },
+    { re: /^pro$/i, id: 'gpt-6-astra' },
+    { re: /\b(?:gpt|chatgpt)[\s-]?6(?![\d.])/i, id: 'gpt-6-sol' },
+    // 2025 models still resolve where a page names them.
     { re: /\bo4[\s-]?mini\b/i, id: 'o4-mini' },
     { re: /\bo3\b(?![\s-]?mini)/i, id: 'o3' },
-    { re: /\b(?:gpt[\s-]?)?5[\s-]*(?:thinking|pro|reasoning)\b|\bthinking\b|\bthink\s+longer\b|\bdeep\s+research\b/i, id: 'gpt-5-thinking' },
+    { re: /\b(?:gpt|chatgpt)[\s-]?5(?![\d.])[\s-]*(?:thinking|pro|reasoning)\b/i, id: 'gpt-5-thinking' },
     { re: /\b4\.1[\s-]?nano\b/i, id: 'gpt-4.1-nano' },
     { re: /\b4o[\s-]?mini\b/i, id: 'gpt-4o-mini' },
     { re: /\b(?:gpt[\s-]?)?4o\b/i, id: 'gpt-4o' },
-    // Anchored to bare 5 — "5.6" is handled by UNKNOWN_GENERATION above.
-    { re: /\b(?:gpt[\s-]?|chatgpt\s+)?5\b(?:[\s-]*(?:instant|chat|fast|mini|nano))?/i, id: 'gpt-5' }
+    { re: /\b(?:gpt|chatgpt)[\s-]?5(?![\d.])/i, id: 'gpt-5' }
   ],
   anthropic: [
-    // Version-first, most-specific-first. There is deliberately no bare
-    // /\bsonnet\b/ catch-all: it silently absorbed every future Sonnet.
-    { re: /\bhaiku[\s-]*4\.5\b|\b4\.5[\s-]*haiku\b/i, id: 'claude-4.5-haiku' },
-    { re: /\bhaiku\b/i, id: 'claude-4.5-haiku' },
-    { re: /\b(?:sonnet[\s-]*)?3\.7\b/i, id: 'claude-3.7-sonnet' },
-    { re: /\bsonnet[\s-]*4\.5\b|\b4\.5[\s-]*sonnet\b/i, id: 'claude-4.5-sonnet' },
-    { re: /\bsonnet[\s-]*5\b|\b5[\s-]*sonnet\b/i, id: 'claude-sonnet-5' }
+    { re: /\bfable[\s-]*5\.1(?![\d.])/i, id: 'claude-fable-5-1' },
+    { re: /\bopus[\s-]*5\.5(?![\d.])/i, id: 'claude-opus-5-5' },
+    { re: /\bsonnet[\s-]*5\.5(?![\d.])|(?<![\d.])5\.5[\s-]*sonnet\b/i, id: 'claude-sonnet-5-5' },
+    { re: /\bhaiku[\s-]*5\.5(?![\d.])|(?<![\d.])5\.5[\s-]*haiku\b/i, id: 'claude-haiku-5-5' },
+    { re: /\bsonnet[\s-]*5(?![\d.])|(?<![\d.])5[\s-]*sonnet\b/i, id: 'claude-sonnet-5' },
+    { re: /\bsonnet[\s-]*4\.5(?![\d.])|(?<![\d.])4\.5[\s-]*sonnet\b/i, id: 'claude-4.5-sonnet' },
+    { re: /\bhaiku[\s-]*4\.5(?![\d.])|(?<![\d.])4\.5[\s-]*haiku\b/i, id: 'claude-4.5-haiku' },
+    { re: /(?<![\d.])3\.7(?![\d.])[\s-]*sonnet\b|\bsonnet[\s-]*3\.7(?![\d.])/i, id: 'claude-3.7-sonnet' }
   ],
   google: [
-    { re: /\b2\.0[\s-]?flash\b/i, id: 'gemini-2.0-flash' },
-    { re: /\b2\.5[\s-]?flash(?:[\s-]?lite)?\b|\bflash(?:[\s-]?lite)?\b/i, id: 'gemini-2.5-flash' },
-    { re: /\b2\.5[\s-]?pro\b|\bpro\b|\bdeep\s+think\b|\bthinking\b/i, id: 'gemini-2.5-pro' }
+    { re: /\bargon\b/i, id: 'gemini-4-argon' },
+    { re: /(?<![\d.])3\.8[\s-]*flash\b(?![\s-]*lite)/i, id: 'gemini-3.8-flash' },
+    { re: /(?<![\d.])3\.5[\s-]*flash[\s-]*lite\b/i, id: 'gemini-3.5-flash-lite' },
+    { re: /(?<![\d.])2\.0[\s-]*flash\b/i, id: 'gemini-2.0-flash' },
+    { re: /(?<![\d.])2\.5[\s-]*flash\b/i, id: 'gemini-2.5-flash' },
+    { re: /(?<![\d.])2\.5[\s-]*pro\b/i, id: 'gemini-2.5-pro' }
   ],
   mistral: [
-    { re: /\bsmall\b|\bministral\b/i, id: 'mistral-small' },
-    { re: /\blarge\b|\bmedium\b/i, id: 'mistral-large' }
+    { re: /\bmedium[\s-]*3\.5(?![\d.])/i, id: 'mistral-medium-3.5' },
+    { re: /\bsmall[\s-]*4(?![\d.])/i, id: 'mistral-small-4' },
+    { re: /\blarge[\s-]*2(?![\d.])/i, id: 'mistral-large' }
   ],
   deepseek: [
-    // DeepThink is a toggle: only an *active* toggle means R1 is in use.
-    { re: /\bdeep\s*think\b|\br1\b|\breason(?:er|ing)?\b/i, id: 'deepseek-r1', requiresActive: true },
-    { re: /\bv3\b|\bchat\b/i, id: 'deepseek-v3' }
+    // DeepSeek's own V4 modes (Instant, Expert) name models the catalog does
+    // not carry yet, so only an explicit 2025 label resolves.
+    { re: /\br1\b/i, id: 'deepseek-r1', requiresActive: true },
+    { re: /\bv3(?![\d.])/i, id: 'deepseek-v3' }
   ],
   xai: [
-    { re: /\bgrok[\s-]?3\b/i, id: 'grok-3' }
-  ]
+    { re: /\bgrok[\s-]?4\.7(?![\d.])/i, id: 'grok-4.7' },
+    { re: /\bgrok[\s-]?3(?![\d.])/i, id: 'grok-3' }
+  ],
+  meta: [
+    { re: /\bmuse[\s-]*spark(?:[\s-]*1\.3(?![\d.]))?(?![\s-]*(?:\d|open\b))/i, id: 'muse-spark-1.3' }
+  ],
+  // Copilot does not show which model served a turn: nothing to match, so
+  // the caller uses the site default. A family of its own keeps ChatGPT's
+  // rules off its pages.
+  microsoft: []
 };
+
+// Each family's effort vocabulary (EFFORT_VOCABULARIES), and the model a
+// mode word means when no label names one: ChatGPT's Instant … Extra High
+// are GPT-6 Sol at that effort, Grok's Fast, Expert and Heavy are Grok 4.7,
+// and meta.ai's Instant, Thinking and Contemplating are Muse Spark 1.3.
+// DeepSeek's modes name V4 models the catalog does not carry, so they give
+// an effort but no model.
+const FAMILY_MODES = {
+  openai: { vocab: 'openai', modelId: 'gpt-6-sol' },
+  anthropic: { vocab: 'anthropic', modelId: null },
+  google: { vocab: 'google', modelId: null },
+  xai: { vocab: 'xai', modelId: 'grok-4.7' },
+  deepseek: { vocab: 'deepseek', modelId: null },
+  meta: { vocab: 'meta', modelId: 'muse-spark-1.3' }
+};
+
+// How each model line's version reads in a label and in a catalog id. The
+// newest version per line comes from the catalog, so a label naming a later
+// one fails closed without anyone writing the list by hand: GPT-7, Claude 6,
+// Opus 5.6, Gemini 5, Grok 5, DeepSeek V5, Muse 2 (PLAN.md Step 6).
+const MODEL_LINES = [
+  { family: 'openai', line: 'gpt', labels: [/\b(?:gpt|chatgpt)[\s-]?(\d+(?:\.\d+)?)(?![\d.])/gi], id: /^gpt-(\d+(?:\.\d+)?)(?=-|$)/ },
+  { family: 'anthropic', line: 'claude', labels: [/\bclaude[\s-]*(\d+(?:\.\d+)?)(?![\d.])/gi], id: claudeVersion(null) },
+  { family: 'anthropic', line: 'opus', labels: lineLabels('opus'), id: claudeVersion('opus') },
+  { family: 'anthropic', line: 'sonnet', labels: lineLabels('sonnet'), id: claudeVersion('sonnet') },
+  { family: 'anthropic', line: 'haiku', labels: lineLabels('haiku'), id: claudeVersion('haiku') },
+  { family: 'anthropic', line: 'fable', labels: lineLabels('fable'), id: claudeVersion('fable') },
+  {
+    family: 'google',
+    line: 'gemini',
+    labels: [/\bgemini[\s-]*(\d+(?:\.\d+)?)(?![\d.])/gi, /(?<![\d.])(\d+(?:\.\d+)?)[\s-]*(?:pro|flash|argon|deep[\s-]*think)\b/gi],
+    id: /^gemini-(\d+(?:\.\d+)?)(?=-)/
+  },
+  { family: 'xai', line: 'grok', labels: [/\bgrok[\s-]?(\d+(?:\.\d+)?)(?![\d.])/gi], id: /^grok-(\d+(?:\.\d+)?)$/ },
+  { family: 'deepseek', line: 'deepseek', labels: [/(?<![\w.])v(\d+(?:\.\d+)?)(?![\d.])/gi], id: /^deepseek-v(\d+(?:\.\d+)?)$/ },
+  // "Muse Glimmer 30B" is a size, not a version.
+  { family: 'meta', line: 'muse', labels: [/\bmuse(?:[\s-]*spark)?[\s-]*(\d+(?:\.\d+)?)(?![\d.])(?![\s-]*b\b)/gi], id: /^muse-spark-(\d+(?:\.\d+)?)$/ },
+  { family: 'mistral', line: 'medium', labels: [/\bmedium[\s-]*(\d+(?:\.\d+)?)(?![\d.])/gi], id: /^mistral-medium-(\d+(?:\.\d+)?)$/ },
+  { family: 'mistral', line: 'small', labels: [/\bsmall[\s-]*(\d+(?:\.\d+)?)(?![\d.])/gi], id: /^mistral-small-(\d+(?:\.\d+)?)$/ },
+  // mistral-large is Mistral Large 2, from before ids carried a version.
+  {
+    family: 'mistral',
+    line: 'large',
+    labels: [/\blarge[\s-]*(\d+(?:\.\d+)?)(?![\d.])/gi],
+    id: { exec: (id) => (id === 'mistral-large' ? [id, '2'] : /^mistral-large-(\d+(?:\.\d+)?)$/.exec(id)) }
+  }
+];
+
+function lineLabels(name) {
+  return [
+    new RegExp(`\\b${name}[\\s-]*(\\d+(?:\\.\\d+)?)(?![\\d.])`, 'gi'),
+    new RegExp(`(?<![\\d.])(\\d+(?:\\.\\d+)?)[\\s-]*${name}\\b`, 'gi')
+  ];
+}
+
+/** A Claude id's version, in either naming: claude-opus-5-5, claude-4.5-sonnet. */
+function claudeVersion(name) {
+  const tier = name || '(?:opus|sonnet|haiku|fable)';
+  const newer = new RegExp(`^claude-${tier}-(\\d+(?:-\\d+)?)$`);
+  const older = new RegExp(`^claude-(\\d+(?:\\.\\d+)?)-${tier}$`);
+  return {
+    exec(id) {
+      const m = newer.exec(id);
+      if (m) return [m[0], m[1].replace('-', '.')];
+      return older.exec(id);
+    }
+  };
+}
+
+function parseVersion(text) {
+  return String(text).split('.').map((n) => Number(n));
+}
+
+function compareVersions(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] || 0) - (b[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Every catalog id a detector can return; the fallback catalog. */
+function patternIds() {
+  const ids = [];
+  for (const list of Object.values(MODEL_LABEL_PATTERNS)) for (const p of list) ids.push(p.id);
+  for (const mode of Object.values(FAMILY_MODES)) if (mode.modelId) ids.push(mode.modelId);
+  return ids;
+}
+
+/** The newest version of each model line among the given catalog ids. */
+function newestVersions(modelIds) {
+  const newest = {};
+  for (const line of MODEL_LINES) {
+    for (const id of modelIds) {
+      const m = line.id.exec(id);
+      if (!m) continue;
+      const v = parseVersion(m[1]);
+      if (!newest[line.line] || compareVersions(v, newest[line.line]) > 0) newest[line.line] = v;
+    }
+  }
+  return newest;
+}
+
+/**
+ * The first label that names a later generation than the catalog's newest
+ * in its line, or null. A line with no catalog version fails closed on any.
+ */
+function laterGeneration(family, items, newest) {
+  for (const line of MODEL_LINES) {
+    if (line.family !== family) continue;
+    for (const item of items) {
+      for (const re of line.labels) {
+        re.lastIndex = 0;
+        for (const m of item.text.matchAll(re)) {
+          const top = newest[line.line];
+          if (!top || compareVersions(parseVersion(m[1]), top) > 0) return item.text;
+        }
+      }
+    }
+  }
+  return null;
+}
 
 const HOST_FAMILY = [
   ['chatgpt.com', 'openai'],
@@ -1206,7 +1352,8 @@ const HOST_FAMILY = [
   ['gemini.google.com', 'google'],
   ['chat.mistral.ai', 'mistral'],
   ['chat.deepseek.com', 'deepseek'],
-  ['grok.com', 'xai']
+  ['grok.com', 'xai'],
+  ['meta.ai', 'meta']
 ];
 
 function familyForHost(hostname) {
@@ -1218,8 +1365,8 @@ function familyForHost(hostname) {
 }
 
 /**
- * Detect the selected model from model-picker labels scraped off a chat
- * page.
+ * Detect the selected model, and the selected effort or mode, from
+ * model-picker labels scraped off a chat page.
  *
  * @param {string} hostname   page hostname (chooses the provider family)
  * @param {Array<string|{text:string, active?:boolean}>} labels
@@ -1227,43 +1374,67 @@ function familyForHost(hostname) {
  *        pressed/checked toggle; {active} marks toggles that are on
  * @param {Object} [opts]
  * @param {string} [opts.family]  override the family (demo pages, unknown hosts)
- * @returns {{modelId:string, matchedText:string}|null}
+ * @param {string[]} [opts.modelIds]  the catalog's ids, for the fail-closed
+ *        check; defaults to the ids the detector itself can return
+ * @returns {{modelId:string|null, effort:string|null, multiAgent:boolean,
+ *            matchedText:string, source:string, unknownGeneration?:boolean}|null}
+ *          modelId null with an effort means a mode with no model of its own
+ *          (claude.ai's "Extra high"); the caller pairs it with the site
+ *          default. null means nothing on the page was recognised.
  */
 function detectModelFromLabels(hostname, labels, opts = {}) {
   const family = opts.family || familyForHost(hostname);
+  if (!hasOwn(MODEL_LABEL_PATTERNS, family) || !Array.isArray(labels)) return null;
   const patterns = MODEL_LABEL_PATTERNS[family];
-  if (!patterns || !Array.isArray(labels)) return null;
   const items = labels
     .map((l) => (typeof l === 'string' ? { text: l, active: false } : l))
     .filter((l) => l && typeof l.text === 'string')
     .map((l) => ({ text: l.text.replace(/\s+/g, ' ').trim(), active: !!l.active }))
     .filter((l) => l.text.length > 0 && l.text.length <= 80);
-  // Fail closed first. If any visible label names a generation the catalog
-  // does not carry, refuse rather than matching a looser pattern further
-  // down — that path always resolved to an older, cheaper, non-reasoning
-  // sibling and made the product understate.
-  for (const item of items) {
-    for (const re of UNKNOWN_GENERATION) {
-      if (re.test(item.text)) {
-        return {
-          modelId: null,
-          matchedText: item.text,
-          source: 'unknown-generation',
-          unknownGeneration: true
-        };
-      }
-    }
+
+  // Fail closed first. A label naming a later generation than the catalog
+  // carries must not fall through to an older, cheaper sibling or to a mode
+  // that implies one.
+  const newest = newestVersions(Array.isArray(opts.modelIds) ? opts.modelIds : patternIds());
+  const later = laterGeneration(family, items, newest);
+  if (later !== null) {
+    return { modelId: null, effort: null, multiAgent: false, matchedText: later, source: 'unknown-generation', unknownGeneration: true };
   }
 
+  let model = null;
   for (const { re, id, requiresActive } of patterns) {
     for (const item of items) {
       if (requiresActive && !item.active) continue;
       if (re.test(item.text)) {
-        return { modelId: id, matchedText: item.text, source: 'label' };
+        model = { id, text: item.text };
+        break;
+      }
+    }
+    if (model) break;
+  }
+
+  // A mode or effort label, in the family's own words.
+  const modes = hasOwn(FAMILY_MODES, family) ? FAMILY_MODES[family] : null;
+  let effort = null;
+  if (modes) {
+    for (const item of items) {
+      const hit = effortFromLabel(modes.vocab, item.text);
+      if (hit) {
+        effort = { ...hit, text: item.text };
+        break;
       }
     }
   }
-  return null;
+
+  if (!model && effort && modes.modelId) model = { id: modes.modelId, text: effort.text };
+  if (!model && !effort) return null;
+  return {
+    modelId: model ? model.id : null,
+    effort: effort ? effort.level : null,
+    multiAgent: effort ? effort.multiAgent : false,
+    matchedText: model ? model.text : effort.text,
+    source: model && (!effort || model.text !== effort.text) ? 'label' : 'mode'
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -1275,6 +1446,7 @@ const CalculatorModule = {
   ImpactEngine,
   fitCoefficients,
   autoDetectModel,
+  hostDefault,
   detectModelFromLabels,
   familyForHost,
   isRoutedHost,

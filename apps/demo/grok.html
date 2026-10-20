@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quasar — EcoPrompt Coach demo (Grok-style)</title>
+  <!-- Tells the EcoPrompt extension which provider this demo page mimics (so it
+       reads the mode picker below like it does on grok.com) and which model to
+       assume if the picker can't be read. -->
+  <meta name="ecoprompt-family" content="xai">
+  <meta name="ecoprompt-model" content="grok-4.7">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body class="skin-grok" data-assistant-initial="Q">
+  <header class="demo-topbar">
+    <span class="demo-brand">Quasar</span>
+    <span class="demo-model-tag">mimics grok.com</span>
+    <!-- Grok-style mode picker: Fast, Expert and Heavy are all Grok 4.7 at
+         rising effort; Heavy is a team of agents. The extension reads this
+         label. Click to cycle. -->
+    <button type="button" class="demo-model-switcher" id="model-select-trigger"
+            aria-haspopup="menu" aria-label="Model selector, current model is Fast"
+            title="Click to switch the simulated mode — watch the pill re-estimate"
+            data-demo-models="Fast|Expert|Heavy">Fast</button>
+    <span class="demo-spacer"></span>
+    <button type="button" class="demo-drawer-btn" data-demo-drawer-toggle>Example prompts</button>
+    <a href="index.html">← demo home</a>
+  </header>
+
+  <div class="demo-shell">
+    <main class="demo-main">
+      <div class="demo-thread" data-demo-thread>
+        <div class="demo-thread-inner">
+          <div class="demo-greeting" data-demo-greeting>
+            <h1>What do you want to know?</h1>
+            <p>This is a mock chat for testing the EcoPrompt Coach extension.
+               Type a prompt (or pick an example) and watch the eco-pill grade it
+               as you type. Replies are canned — nothing reaches a real model.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-composer-area">
+        <!-- Grok-style DOM: plain textarea + type="submit" send button -->
+        <div class="demo-composer-row">
+          <textarea class="demo-composer" rows="1" aria-label="Ask Quasar anything"
+                    placeholder="What do you want to know?" data-demo-composer></textarea>
+          <button type="submit" class="demo-send" aria-label="Submit" data-demo-send>↑</button>
+        </div>
+        <p class="demo-disclaimer">Demo chat — responses are simulated locally. No AI model is called.</p>
+      </div>
+    </main>
+
+    <aside class="demo-drawer" data-demo-drawer>
+      <h2>Example prompts</h2>
+      <p class="demo-drawer-sub">Real-world prompts chosen to exercise each coaching feature. Click one, watch the pill, then send it.</p>
+    </aside>
+  </div>
+
+  <script src="examples.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>
