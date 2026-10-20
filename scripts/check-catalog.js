@@ -35,13 +35,21 @@ const ISO_DATE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
 const FACTS = ['name', 'released', 'params', 'precision', 'thinking', 'effort', 'tier', 'open_weight', 'status', 'pricing'];
 
 // The facts each estimator's numbers rest on. A current entry needs a
-// fetched source for every one, or it waits (PLAN.md Step 9). The plan names
-// active parameters, thinking mode and tier; precision is added because the
-// active-parameter estimator's GPU count depends on it (METHODOLOGY §2.5.1).
+// fetched source for every one, or it waits (PLAN.md Step 9): active
+// parameters, thinking mode and tier. Weight precision also moves the
+// active-parameter estimate (its GPU count), so a stated precision needs a
+// fetched source too. A lab that publishes none is estimated at 16 bits,
+// the larger figure, so the error runs high (METHODOLOGY §2.5.1).
 const ESTIMATE_FACTS = {
-  'active-params': ['params', 'precision', 'thinking'],
+  'active-params': ['params', 'thinking'],
   tier: ['tier', 'thinking']
 };
+
+function estimateFacts(m) {
+  const facts = ESTIMATE_FACTS[m.estimate.method].slice();
+  if (m.estimate.method === 'active-params' && m.params && m.params.precision !== undefined) facts.push('precision');
+  return facts;
+}
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 
@@ -141,7 +149,7 @@ function catalogProblems(data, { denyList = [] } = {}) {
     // An estimate rests on a few facts; each needs a page someone opened.
     if (m.estimate && hasOwn(ESTIMATE_FACTS, m.estimate.method)) {
       const fetched = new Set((m.sources || []).filter((s) => s.status === 'fetched').flatMap(factsOf));
-      const missing = ESTIMATE_FACTS[m.estimate.method].filter((f) => !fetched.has(f));
+      const missing = estimateFacts(m).filter((f) => !fetched.has(f));
       if (missing.length) {
         problems.push(`${id}: its ${m.estimate.method} estimate rests on facts no fetched source supports (${missing.join(', ')}). Fetch the primary page, or the entry waits`);
       }

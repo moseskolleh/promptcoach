@@ -81,6 +81,10 @@ test('an estimate never rests on search-only facts alone', () => {
     estimated('open-ok', 'active-params', [source('name, released, params, precision, thinking')])
   ] };
   assert.deepStrictEqual(catalogProblems(ok), []);
+  // A lab that publishes no precision: estimated at 16 bits, nothing to source.
+  const unstated = estimated('open-unstated', 'active-params', [source('name, released, params, thinking')]);
+  delete unstated.params.precision;
+  assert.deepStrictEqual(catalogProblems({ models: [unstated] }), []);
 
   const broken = { models: [
     estimated('tier-search-only', 'tier', [source('name, released, thinking'), source('tier', 'search-only')]),

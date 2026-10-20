@@ -805,10 +805,11 @@ runbook has been used once for real (the Mistral Large 4 weights).
 >   as their own step, and `npm test` runs them too. `catalog.test.js`
 >   proves each rule fails on a synthetic catalog that breaks it.
 > - **Sources name their facts.** `fact` takes values from a fixed list.
->   An `active-params` estimate needs fetched `params`, `precision` and
->   `thinking`; a `tier` estimate needs fetched `tier` and `thinking`.
->   `precision` is added to the plan's list because the GPU count depends
->   on it.
+>   An `active-params` estimate needs fetched `params` and `thinking`; a
+>   `tier` estimate needs fetched `tier` and `thinking`. Precision moves the
+>   GPU count, so a **stated** precision needs a fetched source too. A lab
+>   that publishes none is estimated at 16 bits, which errs high
+>   (refined 2026-10-20: Qwen and Mistral publish no shipped precision).
 > - **The deny-list is read from RESEARCH-2026 §3.1 itself,** so it has
 >   one home. The check fails loudly if that section moves.
 > - **`superseded_by`.** Once the catalog holds a current model, every
