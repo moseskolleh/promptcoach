@@ -525,6 +525,36 @@ function thinkingTokens(pairs, tIn, tOut) {
   return { low: Math.min(...tokens), high: Math.max(...tokens) };
 }
 
+// The numbers a grid entry must carry, unless it borrows them.
+const GRID_NUMBERS = ['pue', 'wue_onsite_l_per_kwh', 'wue_offsite_l_per_kwh', 'cif_kgco2e_per_kwh'];
+
+/**
+ * A host with no fetched source of its own borrows another host's numbers,
+ * and says so: `proxy_of: "deepseek"` (PLAN.md Step 4). The entry keeps its
+ * name and notes; the numbers are the target's. A proxy carries no numbers
+ * of its own and can't point at another proxy, so what it borrows is never
+ * ambiguous.
+ */
+function resolveProxies(providers) {
+  if (!providers || typeof providers !== 'object') return providers;
+  const out = {};
+  for (const [key, p] of Object.entries(providers)) {
+    if (!p || p.proxy_of === undefined) {
+      out[key] = p;
+      continue;
+    }
+    const target = hasOwn(providers, p.proxy_of) ? providers[p.proxy_of] : null;
+    if (!target) throw new Error(`grids.json: ${key} is a proxy of "${p.proxy_of}", which is not a provider`);
+    if (target.proxy_of !== undefined) throw new Error(`grids.json: ${key} is a proxy of "${p.proxy_of}", which is itself a proxy`);
+    const own = GRID_NUMBERS.filter((n) => p[n] !== undefined);
+    if (own.length) throw new Error(`grids.json: ${key} is a proxy of "${p.proxy_of}" but carries its own ${own.join(', ')}`);
+    const borrowed = {};
+    for (const n of GRID_NUMBERS) borrowed[n] = target[n];
+    out[key] = { ...p, ...borrowed };
+  }
+  return out;
+}
+
 class ImpactEngine {
   /**
    * @param {Object} bundle
@@ -537,7 +567,7 @@ class ImpactEngine {
       throw new Error('ImpactEngine requires { models, grids } data');
     }
     this.meta = bundle.models._metadata || {};
-    this.grids = bundle.grids;
+    this.grids = { ...bundle.grids, providers: resolveProxies(bundle.grids.providers) };
     this.equivalents = bundle.equivalents || null;
     this.embodiedFactor =
       (bundle.grids.lifecycle && bundle.grids.lifecycle.embodied_factor) || 1.15;
@@ -564,7 +594,7 @@ class ImpactEngine {
         throw new Error(`models.json: ${m.model_id} has both performance points and an estimate block; keep one`);
       }
       const hostKey = m.host_key || String(m.host || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      if (!this.grids.providers || !this.grids.providers[hostKey]) {
+      if (!this.grids.providers || !hasOwn(this.grids.providers, hostKey)) {
         throw new Error(`models.json: ${m.model_id} host_key "${hostKey}" has no entry in grids.providers`);
       }
       const defaultEffort = m.default_effort === undefined ? null : effortLevel(m.default_effort);
@@ -933,6 +963,9 @@ class ImpactEngine {
         cif,
         cifSource,
         cifHostDefault: infra.cif_kgco2e_per_kwh,
+        // Set when the host has no figures of its own yet and borrows
+        // another host's (PLAN.md Step 4).
+        hostProxyOf: infra.proxy_of || null,
         embodiedFactor: embodied
       }
     };

@@ -90,6 +90,11 @@ export interface ProviderGrid {
   cif_kgco2e_per_kwh: number;
   notes?: string;
   source?: string;
+  /**
+   * In grids.json, a host with no fetched figures names the host whose
+   * figures it borrows and carries none of its own; the engine fills them in.
+   */
+  proxy_of?: string;
 }
 
 export interface GridsData {
@@ -244,6 +249,8 @@ export interface Impact {
     cif: number;
     cifSource: string;
     cifHostDefault: number;
+    /** The host whose figures this host borrows, or null. */
+    hostProxyOf: string | null;
     embodiedFactor: number;
   };
 }

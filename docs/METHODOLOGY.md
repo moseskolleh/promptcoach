@@ -452,6 +452,24 @@ We use **location-based** CIF, not market-based. Google's headline
 0.03 gCO₂e/prompt relies on market-based clean-energy purchasing; the
 electron physically consumed still comes from the local grid, and
 location-based accounting is the behaviour-relevant signal.
+### 4.1 Hosts that borrow another host's figures
+
+Every host's PUE, WUE and CIF come from a document someone read
+(RESEARCH-2026 §5.3). Four hosts that serve 2026 models have no such
+document yet, so each borrows another host's figures and says so
+(`proxy_of` in `grids.json`):
+
+| Host | Borrows | Why | What replaces it |
+|---|---|---|---|
+| Meta (own data centers) | AWS | Meta's sustainability report PDF couldn't be opened from the build environment on 2026-10-20 | PUE, WUE and grid mix read from Meta's latest sustainability report PDF |
+| Moonshot AI (China) | DeepSeek's China averages | No published figures | Figures Moonshot publishes |
+| Alibaba Cloud (China) | DeepSeek's China averages | No fetched source yet | A fetched Alibaba Cloud source |
+| Z.ai (China) | DeepSeek's China averages | No published figures | Figures Z.ai publishes |
+
+The web coach shows the borrowing on the carbon card ("borrowed from AWS
+until Meta's own figures are read"), and every estimate reports it in
+`factors.hostProxyOf`. Inventing per-company figures is not an option; a
+proxy is the honest stand-in until a document exists.
 
 ---
 

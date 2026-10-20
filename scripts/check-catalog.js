@@ -10,6 +10,7 @@
 //      deny-list
 //   6. every superseded_by chain ends at a current model, or at an explicit
 //      null for a history-only entry
+//   7. every grid entry cites a source, or is a proxy that says why
 //
 // catalog.test.js runs these rules against models.json and against
 // synthetic catalogs that break each one, so a rule with nothing to check
@@ -176,14 +177,32 @@ function modelIdsIn(text) {
   return found;
 }
 
+/**
+ * Every grid entry cites the source of its figures, or borrows another
+ * host's and says why (PLAN.md Step 4). The engine checks that a proxy
+ * resolves; this checks that it is visible.
+ */
+function gridProblems(grids) {
+  const problems = [];
+  for (const [key, p] of Object.entries(grids.providers || {})) {
+    if (p.proxy_of !== undefined) {
+      if (!p.notes) problems.push(`grids.json ${key}: a proxy must say why in its notes`);
+    } else if (!p.source) {
+      problems.push(`grids.json ${key}: needs a source, or proxy_of naming the host it borrows from`);
+    }
+  }
+  return problems;
+}
+
 module.exports = {
   CURRENT_FROM, SOURCE_STATUSES, FACTS, ESTIMATE_FACTS, MODEL_FAMILIES,
-  catalogProblems, readDenyList, loadDenyList, factsOf, modelIdsIn
+  catalogProblems, gridProblems, readDenyList, loadDenyList, factsOf, modelIdsIn
 };
 
 if (require.main === module) {
   const data = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'models.json'), 'utf8'));
-  const problems = catalogProblems(data, { denyList: loadDenyList() });
+  const grids = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'grids.json'), 'utf8'));
+  const problems = [...catalogProblems(data, { denyList: loadDenyList() }), ...gridProblems(grids)];
   if (problems.length) {
     console.error(`check-catalog: ${problems.length} problem(s) in models.json\n`);
     for (const p of problems) console.error(`  ✗ ${p}`);

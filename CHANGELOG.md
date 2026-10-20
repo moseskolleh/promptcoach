@@ -5,6 +5,24 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Hosts for the 2026 models (PLAN.md Step 4)
+
+- **Four new hosts** in `grids.json`: Meta, Moonshot AI, Alibaba Cloud and
+  Z.ai. None has a document of its own that could be read from the build
+  environment, so each **borrows** another host's figures and says so
+  (`proxy_of`). Meta borrows AWS's until Meta's sustainability report PDF
+  is read. The three China hosts borrow DeepSeek's China averages, as the
+  plan specifies. See METHODOLOGY §4.1.
+- **The engine resolves a proxy once, at load.** A proxy carries no numbers
+  of its own and can't point at another proxy; anything else is refused.
+  Estimates report the borrowing in `factors.hostProxyOf`.
+- **Shown in the web coach:** the carbon card says "borrowed from AWS until
+  Meta's own figures are read".
+- **Gated in CI:** every grid entry cites a source, or is a proxy whose
+  notes say why.
+- Fix: a `host_key` such as `constructor` no longer resolves to an inherited
+  property.
+
 ### Catalog gates and a monthly refresh (PLAN.md Step 9)
 
 - **`scripts/check-catalog.js`** checks `models.json` in CI, as its own

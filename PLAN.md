@@ -506,6 +506,17 @@ level has a test, and an unknown effort resolves to the model's default.
 **Done when:** every current model's `host_key` resolves. Each new grid
 entry cites a fetched source or is visibly marked as a proxy.
 
+> **Status (2026-10-20): built, with every new host a proxy.** METHODOLOGY
+> §4.1 documents it.
+> - `meta`, `moonshot`, `alibaba` and `zai` are in `grids.json`, each with
+>   `proxy_of` and a note saying what replaces it.
+> - **Meta borrows AWS's figures.** Meta's sustainability report PDF is on
+>   hosts the build environment can't reach (checked 2026-10-20). Once
+>   someone reads the PDF, the entry gets its own figures and loses
+>   `proxy_of`.
+> - Moonshot, Alibaba and Z.ai borrow the DeepSeek China averages, as above.
+> - Gemma 4 uses `google_cloud` and Nemotron 3 Ultra uses `aws` (Step 5).
+
 ### Step 5 — The 2026 roster · M
 **The rule:** a model is `current` if it was released on or after
 2026-01-01 **and** is still its provider's current offering for its tier.

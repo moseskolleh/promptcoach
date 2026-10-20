@@ -641,8 +641,11 @@ function updateCoach() {
   const cifLabel = state.regionKey === 'default'
     ? `${impact.model.host} grid`
     : 'your selected grid';
+  // A host with no published figures borrows another's, and says so.
+  const proxy = impact.factors.hostProxyOf && state.engine.grids.providers[impact.factors.hostProxyOf];
   $('carbon-detail').textContent =
-    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied`;
+    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied` +
+    (proxy ? ` · borrowed from ${proxy.name} until ${impact.model.provider}'s own figures are read` : '');
 
   setSegmentWidths(impact);
   renderTips(analysis);

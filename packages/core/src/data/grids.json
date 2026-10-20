@@ -71,6 +71,26 @@
       "cif_kgco2e_per_kwh": 0.55,
       "notes": "Estimated — site partially powered by on-site gas turbines, raising effective carbon intensity",
       "source": "Estimate from public reporting on the Memphis site (2025)"
+    },
+    "meta": {
+      "name": "Meta (own data centers)",
+      "proxy_of": "aws",
+      "notes": "PROXY: borrows AWS's US hyperscaler figures until Meta's latest sustainability report is read from the PDF itself (RESEARCH-2026 §5.3: no grid number without the primary document). The PDF host was unreachable from the build environment on 2026-10-20. Serves Muse Spark on meta.ai and Meta's API (PLAN.md Step 4)."
+    },
+    "moonshot": {
+      "name": "Moonshot AI (China)",
+      "proxy_of": "deepseek",
+      "notes": "PROXY: borrows the DeepSeek China averages until Moonshot publishes figures of its own. Serves Kimi through Moonshot's first-party API (PLAN.md Step 4)."
+    },
+    "alibaba": {
+      "name": "Alibaba Cloud (China)",
+      "proxy_of": "deepseek",
+      "notes": "PROXY: borrows the DeepSeek China averages until a fetched Alibaba Cloud source exists. Serves Qwen through Alibaba's first-party API (PLAN.md Step 4)."
+    },
+    "zai": {
+      "name": "Z.ai (China)",
+      "proxy_of": "deepseek",
+      "notes": "PROXY: borrows the DeepSeek China averages until Z.ai publishes figures of its own. Serves GLM through Z.ai's first-party API (PLAN.md Step 4)."
     }
   },
   "regions": {
