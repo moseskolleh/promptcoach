@@ -56,8 +56,8 @@
         "http://127.0.0.1/*"
       ],
       "js": [
-        "shared/defaults.js",
         "vendor/calculator.js",
+        "shared/defaults.js",
         "vendor/analyzer.js",
         "vendor/conversions.js",
         "content.js"

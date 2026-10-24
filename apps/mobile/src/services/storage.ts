@@ -4,6 +4,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { DEFAULT_MODEL_ID, migrateModelId } from './engine';
+
 export interface HistoryEntry {
   ts: number;
   source: 'share' | 'manual' | 'clipboard';
@@ -61,11 +63,22 @@ export async function saveLibraryEntry(entry: LibraryEntry): Promise<void> {
   await AsyncStorage.setItem(KEYS.library, JSON.stringify([entry, ...library]));
 }
 
+const DEFAULT_SETTINGS: Settings = {
+  defaultModelId: DEFAULT_MODEL_ID,
+  regionKey: 'default',
+  reasoningEffort: 'standard',
+  includeEmbodied: true
+};
+
 export async function getSettings(): Promise<Settings> {
   const raw = await AsyncStorage.getItem(KEYS.settings);
-  return raw
-    ? JSON.parse(raw)
-    : { defaultModelId: 'gpt-6.1-sol', regionKey: 'default', reasoningEffort: 'standard', includeEmbodied: true };
+  const saved: Partial<Settings> = raw ? JSON.parse(raw) : {};
+  // A saved model that is no longer current follows its superseded_by chain
+  // to a current one (PLAN.md Step 7); the move is written back once.
+  const move = migrateModelId(saved.defaultModelId);
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...saved, defaultModelId: move.modelId };
+  if (move.changed) await setSettings(settings);
+  return settings;
 }
 
 export async function setSettings(settings: Settings): Promise<void> {

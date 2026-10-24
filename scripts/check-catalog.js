@@ -11,6 +11,7 @@
 //   6. every superseded_by chain ends at a current model, or at an explicit
 //      null for a history-only entry
 //   7. every grid entry cites a source, or is a proxy that says why
+//   8. the one default model (core's DEFAULT_MODEL_ID) is a current entry
 //
 // catalog.test.js runs these rules against models.json and against
 // synthetic catalogs that break each one, so a rule with nothing to check
@@ -22,7 +23,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { MODEL_STATUSES, THINKING_MODES } = require('../packages/core/src/calculator');
+const { MODEL_STATUSES, THINKING_MODES, DEFAULT_MODEL_ID } = require('../packages/core/src/calculator');
 
 const root = path.join(__dirname, '..');
 
@@ -82,10 +83,15 @@ function loadDenyList() {
 }
 
 /** Every way a catalog breaks the rules, as readable strings. */
-function catalogProblems(data, { denyList = [] } = {}) {
+function catalogProblems(data, { denyList = [], defaultModelId = null } = {}) {
   const problems = [];
   const byId = new Map(data.models.map((m) => [m.model_id, m]));
   const anyCurrent = data.models.some((m) => m.status === 'current');
+  // Every surface starts from the default model, so a refresh that retires
+  // it must name a new one in core (PLAN.md Step 7).
+  if (defaultModelId && anyCurrent && !(byId.has(defaultModelId) && byId.get(defaultModelId).status === 'current')) {
+    problems.push(`${defaultModelId}: the default model (DEFAULT_MODEL_ID in calculator.js) must be a current entry`);
+  }
 
   for (const m of data.models) {
     const id = m.model_id;
@@ -216,7 +222,10 @@ module.exports = {
 if (require.main === module) {
   const data = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'models.json'), 'utf8'));
   const grids = JSON.parse(fs.readFileSync(path.join(root, 'packages', 'core', 'src', 'data', 'grids.json'), 'utf8'));
-  const problems = [...catalogProblems(data, { denyList: loadDenyList() }), ...gridProblems(grids)];
+  const problems = [
+    ...catalogProblems(data, { denyList: loadDenyList(), defaultModelId: DEFAULT_MODEL_ID }),
+    ...gridProblems(grids)
+  ];
   if (problems.length) {
     console.error(`check-catalog: ${problems.length} problem(s) in models.json\n`);
     for (const p of problems) console.error(`  ✗ ${p}`);

@@ -144,6 +144,8 @@ export interface ModelRecord extends ModelSummary {
   params: { total_b: number; active_b: number; precision?: string } | null;
   tier: string | null;
   thinkingPairOf: string | null;
+  /** A reference entry's successor id; null for a current model or a line that ended. */
+  supersededBy: string | null;
   /** Set for an estimated model; bench is then empty. */
   estimate: { method: EstimateMethod; band: { low: number; high: number } | null; tierMembers: ModelRecord[] | null; inputs: EstimateInfo['inputs'] } | null;
   bench: BenchPoint[];
@@ -323,6 +325,10 @@ export class ImpactEngine {
   /** Current models only, unless includeReference is set. */
   listModels(options?: { includeReference?: boolean }): ModelSummary[];
   getModel(modelId: string): ModelRecord | null;
+  /** The current model that replaced this one (itself when current); null when its line ended or the id is unknown. */
+  currentSuccessor(modelId: string): string | null;
+  /** A saved model choice brought up to date: kept, moved to its successor, or moved to DEFAULT_MODEL_ID. */
+  migrateModelId(modelId: string | null | undefined): ModelMigration;
   getCategory(inputTokens: number, outputTokens: number): QueryCategory;
   getRegionCif(regionKey?: string | null): number | null;
   listRegions(): Region[];
@@ -378,6 +384,16 @@ export function effortLevel(key: unknown): EffortLevel | null;
 export function effortFromLabel(vocab: string, label: string): { level: EffortLevel; multiAgent: boolean } | null;
 export const GRADE_BANDS: Array<{ grade: Grade; maxWh: number }>;
 export const MODEL_STATUSES: ModelStatus[];
+/** The one default model every surface starts from (PLAN.md Step 7). */
+export const DEFAULT_MODEL_ID: string;
+
+export interface ModelMigration {
+  modelId: string;
+  /** True only when a saved id moved, so the caller can say so once. */
+  changed: boolean;
+  from: string | null;
+  via: 'kept' | 'successor' | 'default';
+}
 export const THINKING_MODES: ThinkingMode[];
 export const ESTIMATE_METHODS: EstimateMethod[];
 /** EcoLogits constants, ported from genai-impact/ecologits at `commit`. */

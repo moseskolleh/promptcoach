@@ -8,7 +8,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { ImpactEngine } = require('../src/calculator');
+const { ImpactEngine, DEFAULT_MODEL_ID } = require('../src/calculator');
 const modelsData = require('../src/data/models.json');
 const grids = require('../src/data/grids.json');
 const { snapshot } = require('./fixtures/make-reference-snapshot');
@@ -38,7 +38,7 @@ function engineWith(models) {
 }
 
 test('models.json follows the catalog rules', () => {
-  assert.deepStrictEqual(catalogProblems(modelsData, { denyList: loadDenyList() }), []);
+  assert.deepStrictEqual(catalogProblems(modelsData, { denyList: loadDenyList(), defaultModelId: DEFAULT_MODEL_ID }), []);
 });
 
 test('the schema rules catch each way a current entry can break them', () => {
@@ -159,6 +159,60 @@ test('every superseded_by chain ends at a current model or an explicit null', ()
 
   // Before any current model exists, reference entries need not say yet.
   assert.deepStrictEqual(catalogProblems({ models: [ref('lonely')] }), []);
+});
+
+test('the default model must be a current entry', () => {
+  const ref = (id) => entry(id, { status: 'reference', released: '2025-03-01', superseded_by: 'new' });
+  const catalog = { models: [entry('new'), ref('old')] };
+  assert.deepStrictEqual(catalogProblems(catalog, { defaultModelId: 'new' }), []);
+  assert.match(catalogProblems(catalog, { defaultModelId: 'old' })[0], /^old: the default model .* must be a current entry/);
+  assert.match(catalogProblems(catalog, { defaultModelId: 'gone' })[0], /^gone: the default model/);
+});
+
+test('a saved model id follows superseded_by to a current model', () => {
+  const ref = (id, extra = {}) => entry(id, { status: 'reference', released: '2025-03-01', ...extra });
+  const engine = engineWith([
+    entry('new'),
+    entry(DEFAULT_MODEL_ID),
+    ref('old', { superseded_by: 'renamed' }),
+    ref('renamed', { superseded_by: 'new' }),
+    ref('ended', { superseded_by: null }),
+    ref('loop-a', { superseded_by: 'loop-b' }),
+    ref('loop-b', { superseded_by: 'loop-a' })
+  ]);
+  assert.strictEqual(engine.currentSuccessor('new'), 'new');
+  assert.strictEqual(engine.currentSuccessor('old'), 'new');
+  assert.strictEqual(engine.currentSuccessor('ended'), null);
+  assert.strictEqual(engine.currentSuccessor('loop-a'), null);
+  assert.strictEqual(engine.currentSuccessor('nope'), null);
+  assert.deepStrictEqual(engine.migrateModelId('new'), { modelId: 'new', changed: false, from: 'new', via: 'kept' });
+  assert.deepStrictEqual(engine.migrateModelId('old'), { modelId: 'new', changed: true, from: 'old', via: 'successor' });
+  // A line that ended, or an id the catalog doesn't know, takes the default.
+  assert.deepStrictEqual(engine.migrateModelId('ended'), { modelId: DEFAULT_MODEL_ID, changed: true, from: 'ended', via: 'default' });
+  assert.deepStrictEqual(engine.migrateModelId('nope'), { modelId: DEFAULT_MODEL_ID, changed: true, from: 'nope', via: 'default' });
+  // Nothing saved is not a change.
+  for (const none of [undefined, null, '']) {
+    assert.deepStrictEqual(engine.migrateModelId(none), { modelId: DEFAULT_MODEL_ID, changed: false, from: null, via: 'default' });
+  }
+  // The real catalog: every reference id lands on a current model.
+  const real = new ImpactEngine({ models: modelsData, grids });
+  for (const m of real.listModels({ includeReference: true })) {
+    const { modelId } = real.migrateModelId(m.id);
+    assert.strictEqual(real.getModel(modelId).status, 'current', `${m.id} -> ${modelId}`);
+  }
+  assert.strictEqual(real.migrateModelId('gpt-4o').modelId, 'gpt-6.1-sol');
+  assert.strictEqual(real.migrateModelId('claude-4.5-sonnet').modelId, 'claude-sonnet-5-5');
+  assert.strictEqual(real.getModel(DEFAULT_MODEL_ID).status, 'current');
+});
+
+test('an id that names something inherited is not a model', () => {
+  const engine = new ImpactEngine({ models: modelsData, grids });
+  for (const id of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    assert.strictEqual(engine.getModel(id), null, id);
+    assert.strictEqual(engine.estimateImpact({ modelId: id, inputTokens: 100, outputTokens: 300 }), null, id);
+    assert.strictEqual(engine.currentSuccessor(id), null, id);
+  }
+  assert.strictEqual(engine.getModel(undefined), null);
 });
 
 test('the apps check finds hard-coded model ids, and only those', () => {

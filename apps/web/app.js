@@ -149,8 +149,8 @@ const state = {
   conv: null,
   modelsRaw: null, // parsed models.json (for provider anchors)
 
-  // Coach
-  modelId: 'gpt-6-luna',
+  // Coach: the one default model, defined in core (PLAN.md Step 7)
+  modelId: EcoPromptCore.DEFAULT_MODEL_ID,
   regionKey: 'default',
   reasoningEffort: 'standard',
   outputTokens: 300,
@@ -356,22 +356,65 @@ function populateModelSelect() {
     if (!groups.has(m.provider)) groups.set(m.provider, []);
     groups.get(m.provider).push(m);
   }
+  const option = (m) => {
+    const impact = shortQueryImpact(m.id);
+    const desc = impact ? describeImpact(impact) : null;
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = `${(desc && GRADE_DOTS[impact.grade.grade]) || '⚪'} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
+      `${m.isReasoning ? ' · reasoning' : ''}${desc && desc.estimated ? ' · estimated' : ''}`;
+    return opt;
+  };
   for (const [provider, list] of groups) {
     const og = document.createElement('optgroup');
     og.label = provider;
-    for (const m of list) {
-      const impact = shortQueryImpact(m.id);
-      const desc = impact ? describeImpact(impact) : null;
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = `${(desc && GRADE_DOTS[impact.grade.grade]) || '⚪'} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
-        `${m.isReasoning ? ' · reasoning' : ''}${desc && desc.estimated ? ' · estimated' : ''}`;
-      og.appendChild(opt);
-    }
+    for (const m of list) og.appendChild(option(m));
     select.appendChild(og);
   }
   if (!state.engine.getModel(state.modelId)) state.modelId = models[0].id;
+  // A shared link can open an older model, so its number reproduces
+  // (PLAN.md Step 7): it gets a group of its own, never the current list.
+  const active = state.engine.getModel(state.modelId);
+  if (active.status !== 'current') {
+    const og = document.createElement('optgroup');
+    og.label = 'Older model, from a shared link';
+    og.appendChild(option(active));
+    select.appendChild(og);
+  }
   select.value = state.modelId;
+  syncSuccessorBanner();
+}
+
+/** Under an older model, name its current successor and offer to compare. */
+function syncSuccessorBanner() {
+  const banner = $('successor-banner');
+  const model = state.engine.getModel(state.modelId);
+  if (!model || model.status === 'current') {
+    banner.classList.add('hidden');
+    return;
+  }
+  const successorId = state.engine.currentSuccessor(model.id);
+  const successor = successorId && state.engine.getModel(successorId);
+  $('successor-text').textContent = successor
+    ? `${model.name} is an older model, kept so this shared number reproduces. Its current successor is ${successor.name}.`
+    : `${model.name} is an older model, kept so this shared number reproduces. The catalog has no current successor for it.`;
+  const btn = $('successor-compare-btn');
+  btn.classList.toggle('hidden', !successor);
+  if (successor) {
+    btn.textContent = `⚖️ Compare with ${successor.name}`;
+    btn.dataset.successorId = successor.id;
+  }
+  banner.classList.remove('hidden');
+}
+
+/** Compare the open older model with its successor, in one click. */
+function compareWithSuccessor() {
+  const successorId = $('successor-compare-btn').dataset.successorId;
+  if (!successorId) return;
+  state.compareIds = [state.modelId, successorId];
+  renderCompareChips();
+  renderCompare();
+  $('compare').scrollIntoView({ behavior: 'smooth' });
 }
 
 function populateRegionSelect() {
@@ -739,8 +782,10 @@ function applySharedLink() {
   $('prompt-input').value = p;
   const m = params.get('m');
   if (m && state.engine.getModel(m)) {
+    // An older id opens as that model, so the shared number reproduces;
+    // the picker lists it and a banner names its successor.
     state.modelId = m;
-    $('model-select').value = m;
+    populateModelSelect();
   }
   const r = params.get('r');
   if (r && state.engine.getRegionCif(r) !== null) {
@@ -766,8 +811,10 @@ function initCoach() {
   $('model-select').addEventListener('change', (e) => {
     state.modelId = e.target.value;
     syncReasoningControl();
+    syncSuccessorBanner();
     updateCoach();
   });
+  $('successor-compare-btn').addEventListener('click', compareWithSuccessor);
 
   $('region-select').addEventListener('change', (e) => {
     state.regionKey = e.target.value;
@@ -895,8 +942,12 @@ function syncCompareChipStates() {
 function renderCompareChips() {
   const wrap = $('compare-chips');
   clearChildren(wrap);
-  for (const m of state.engine.listModels()) {
-    const chip = el('button', 'chip', m.name);
+  // Current models, plus an older one being compared with its successor.
+  const older = state.compareIds
+    .map((id) => state.engine.getModel(id))
+    .filter((m) => m && m.status !== 'current');
+  for (const m of [...state.engine.listModels(), ...older]) {
+    const chip = el('button', 'chip', m.status === 'current' ? m.name : `${m.name} (older)`);
     chip.type = 'button';
     chip.dataset.modelId = m.id;
     chip.setAttribute('aria-pressed', String(state.compareIds.includes(m.id)));
@@ -1407,7 +1458,11 @@ function renderLibrary() {
 
     const model = state.engine.getModel(it.modelId);
     const meta = el('div', 'library-item-meta');
-    meta.appendChild(el('span', null, model ? model.name : (it.modelId || 'unknown model')));
+    // An older model keeps its own name: the saved figures are its own.
+    const modelLabel = model
+      ? (model.status === 'current' ? model.name : `${model.name} (older model)`)
+      : (it.modelId || 'unknown model');
+    meta.appendChild(el('span', null, modelLabel));
     if (saved) {
       meta.appendChild(el('span', null, `⚡ ${saved.rangeText} · ${saved.methodChip}`));
     } else if (typeof it.energyWh === 'number') {

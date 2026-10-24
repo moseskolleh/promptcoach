@@ -5,6 +5,31 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Migration: nothing breaks for existing users (PLAN.md Step 7)
+
+- **One default model, defined once in core:** GPT-6.1 Sol
+  (`DEFAULT_MODEL_ID`). The web coach, the extension and mobile all read
+  it. The web coach used to start on GPT-6 Luna.
+- **Saved settings move to a current model.** A default model that is now
+  an older entry follows its successor chain, for example GPT-4o to
+  GPT-6.1 Sol. The extension writes the move back once, and the popup or
+  options page says so once. A model with no successor (DeepSeek V3)
+  takes the default and says so.
+- **Old share links still reproduce their number.** They open the older
+  model, list it in the picker, and offer *Compare with* its current
+  successor in one click.
+- **History and library entries keep their own model**, by name, marked
+  "(older model)" in the library. Every model id any release has shipped
+  still resolves; a test fixture lists all 46.
+- **New engine methods:** `currentSuccessor()` and `migrateModelId()`.
+- **New gates:** the catalog check requires the default model to be
+  current, and the apps check refuses an app that defines a default model
+  of its own.
+- Fix: `getModel()` no longer returns inherited properties, so a share link
+  naming `constructor` opens the default model instead of breaking the
+  coach.
+- The summarization tip names current small models instead of 2025 ones.
+
 ### Detection for 2026 pickers (PLAN.md Step 6)
 
 - **The model pickers people see today are read correctly.** All 23 labels

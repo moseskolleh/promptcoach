@@ -53,8 +53,8 @@
         "https://www.meta.ai/*"
       ],
       "js": [
-        "shared/defaults.js",
         "vendor/calculator.js",
+        "shared/defaults.js",
         "vendor/analyzer.js",
         "vendor/conversions.js",
         "content.js"

@@ -52,10 +52,11 @@
     return res.json();
   }
 
+  /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
   function loadSettings() {
     return new Promise((resolve) => {
       chrome.storage.sync.get('eco_settings', (data) => {
-        resolve({ ...DEFAULT_SETTINGS, ...(data && data.eco_settings) });
+        resolve((data && data.eco_settings) || {});
       });
     });
   }
@@ -638,7 +639,7 @@
   // --------------------------------------------------------------------------
 
   async function init() {
-    const [models, grids, equivalents, settings, session] = await Promise.all([
+    const [models, grids, equivalents, saved, session] = await Promise.all([
       fetchJson('vendor/data/models.json'),
       fetchJson('vendor/data/grids.json'),
       fetchJson('vendor/data/equivalents.json'),
@@ -646,8 +647,10 @@
       loadSession()
     ]);
 
-    state.settings = settings;
     state.engine = new Core.ImpactEngine({ models, grids, equivalents });
+    const settings = globalThis.EcoPromptSettings.resolve(saved, state.engine);
+    state.settings = settings;
+    globalThis.EcoPromptSettings.showNotice($('model-notice'));
     state.conv = Core.createConverters(equivalents);
     state.models = state.engine.listModels();
 
@@ -669,15 +672,19 @@
 
     // Restore session / settings defaults
     const modelSelect = $('model-select');
-    const wanted = session.modelId || settings.defaultModel;
+    // A model kept from before an update moves to its current successor.
+    const wanted = state.engine.migrateModelId(session.modelId || settings.defaultModel).modelId;
     if (state.models.some((m) => m.id === wanted)) modelSelect.value = wanted;
     $('effort-select').value = session.effort || settings.reasoningEffort;
     if (session.prompt) {
       state.prompt = session.prompt;
       $('prompt-input').value = session.prompt;
     }
-    if (Array.isArray(session.compareIds) && session.compareIds.length) {
-      state.compareIds = session.compareIds.slice(0, 4);
+    const kept = Array.isArray(session.compareIds)
+      ? [...new Set(session.compareIds.map((id) => state.engine.currentSuccessor(id)).filter(Boolean))]
+      : [];
+    if (kept.length) {
+      state.compareIds = kept.slice(0, 4);
       populateChecklist();
     } else {
       // Sensible default comparison: current model + an efficient small model.

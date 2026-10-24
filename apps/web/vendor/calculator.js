@@ -279,6 +279,12 @@ const INPUT_FIT_EXTRAPOLATION_LIMIT = 5;
 // re-score ('reference'). Reference ids always resolve; they are only listed
 // on request. See _metadata.notes.status_field in models.json.
 const MODEL_STATUSES = ['current', 'reference'];
+
+// The one default model every surface starts from: the web coach, the
+// extension and mobile all read it here (PLAN.md Step 7). The catalog gate
+// requires it to be a current entry. GPT-6.1 Sol, because the methodology
+// rounds up when unsure, and ChatGPT's paid plans serve Sol.
+const DEFAULT_MODEL_ID = 'gpt-6.1-sol';
 const THINKING_MODES = ['always', 'adaptive', 'optional', 'none'];
 
 const QUERY_CATEGORIES = [
@@ -622,6 +628,7 @@ class ImpactEngine {
         params: m.params || null,
         tier: m.tier || null,
         thinkingPairOf: m.thinking_pair_of || null,
+        supersededBy: m.superseded_by || null,
         estimate: null
       };
       // Estimated entries are filled in below, once the benchmarked ones
@@ -693,7 +700,43 @@ class ImpactEngine {
   }
 
   getModel(modelId) {
-    return this.models[modelId] || null;
+    // Own entries only: an id such as "constructor" from a share link is
+    // not a model.
+    return typeof modelId === 'string' && hasOwn(this.models, modelId) ? this.models[modelId] : null;
+  }
+
+  /**
+   * The current model that replaced this one, following superseded_by
+   * (PLAN.md Step 7): the id itself when it is current, null when its line
+   * ended (superseded_by: null) or the id is unknown.
+   */
+  currentSuccessor(modelId) {
+    const seen = new Set();
+    let m = this.getModel(modelId);
+    while (m && m.status !== 'current') {
+      if (seen.has(m.id) || !m.supersededBy) return null;
+      seen.add(m.id);
+      m = this.getModel(m.supersededBy);
+    }
+    return m ? m.id : null;
+  }
+
+  /**
+   * A saved model choice brought up to date (PLAN.md Step 7). A current id
+   * stays; a reference id moves to its current successor; one whose line
+   * ended, or that the catalog doesn't know, moves to DEFAULT_MODEL_ID.
+   * `changed` is true only when a saved id moved, so the caller can say so
+   * once; nothing saved is not a change.
+   *
+   * @returns {{ modelId: string, changed: boolean, from: string|null, via: 'kept'|'successor'|'default' }}
+   */
+  migrateModelId(modelId) {
+    const saved = typeof modelId === 'string' && modelId ? modelId : null;
+    const successor = saved ? this.currentSuccessor(saved) : null;
+    if (successor) {
+      return { modelId: successor, changed: successor !== saved, from: saved, via: successor === saved ? 'kept' : 'successor' };
+    }
+    return { modelId: DEFAULT_MODEL_ID, changed: saved !== null, from: saved, via: 'default' };
   }
 
   getCategory(inputTokens, outputTokens) {
@@ -742,7 +785,7 @@ class ImpactEngine {
    * @returns {Object|null}
    */
   estimateImpact({ modelId, inputTokens, outputTokens, options = {} }) {
-    const model = this.models[modelId];
+    const model = this.getModel(modelId);
     if (!model) return null;
     const infra = this.grids.providers[model.hostKey];
     if (!infra) return null;
@@ -1458,6 +1501,7 @@ const CalculatorModule = {
   GRADE_BANDS,
   INPUT_FIT_EXTRAPOLATION_LIMIT,
   MODEL_STATUSES,
+  DEFAULT_MODEL_ID,
   THINKING_MODES,
   ECOLOGITS,
   PRECISION_BITS,

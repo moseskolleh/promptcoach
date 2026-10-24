@@ -143,3 +143,16 @@ input:focus {
 .foot a:hover {
   text-decoration: underline;
 }
+
+/* A one-time note that the saved default model moved (PLAN.md Step 7) */
+.model-notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--primary);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.model-notice[hidden] { display: none; }

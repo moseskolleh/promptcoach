@@ -66,10 +66,11 @@
     return res.json();
   }
 
+  /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
   function loadSettings() {
     return new Promise((resolve) => {
       chrome.storage.sync.get('eco_settings', (data) => {
-        resolve({ ...DEFAULT_SETTINGS, ...(data && data.eco_settings) });
+        resolve((data && data.eco_settings) || {});
       });
     });
   }
@@ -605,14 +606,14 @@
   // --------------------------------------------------------------------------
 
   async function init() {
-    const [models, grids, equivalents, loaded] = await Promise.all([
+    const [models, grids, equivalents, saved] = await Promise.all([
       fetchJson('vendor/data/models.json'),
       fetchJson('vendor/data/grids.json'),
       fetchJson('vendor/data/equivalents.json'),
       loadSettings()
     ]);
-    settings = loaded;
     engine = new Core.ImpactEngine({ models, grids, equivalents });
+    settings = globalThis.EcoPromptSettings.resolve(saved, engine);
     conv = Core.createConverters(equivalents);
     catalogIds = engine.listModels({ includeReference: true }).map((m) => m.id);
     resolveModel();
@@ -624,7 +625,7 @@
     // Live settings updates from the options page.
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'sync' && changes.eco_settings) {
-        settings = { ...DEFAULT_SETTINGS, ...(changes.eco_settings.newValue || {}) };
+        settings = globalThis.EcoPromptSettings.resolve(changes.eco_settings.newValue, engine);
         resolveModel();
         applyPillVisibility();
         analyzeDraft();

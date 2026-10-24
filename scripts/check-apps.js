@@ -11,6 +11,8 @@
 //      ($('foo') / getElementById('foo') -> id="foo")
 //   6. two classic scripts sharing one global scope (a page's <script> tags,
 //      or a worker and its importScripts) declaring the same top-level name
+//   7. a model id written into an app or core that models.json doesn't have
+//   8. an app defining a default model of its own instead of core's
 //
 // Run:  node scripts/check-apps.js      (also part of `npm test`)
 'use strict';
@@ -244,6 +246,23 @@ for (const file of idSources) {
       fail(`${rel(file)}:${line}: model id "${id}" is not in models.json — use a catalog id, or add the entry`);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// 8. One default model (PLAN.md Step 7): core's DEFAULT_MODEL_ID. No app
+//    defines one of its own, or repeats core's id where it would read it.
+// ---------------------------------------------------------------------------
+const { DEFAULT_MODEL_ID } = require('../packages/core/src/calculator');
+const OWN_DEFAULT = /\bdefault\w*Model\w*\s*[:=]\s*['"`]/i;
+const appSources = idSources.filter((f) => f.startsWith(path.join(root, 'apps') + path.sep));
+for (const file of appSources) {
+  checks++;
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  lines.forEach((text, i) => {
+    if (OWN_DEFAULT.test(text) || modelIdsIn(text).some((m) => m.id === DEFAULT_MODEL_ID)) {
+      fail(`${rel(file)}:${i + 1}: the default model is defined once, in core — read EcoPromptCore.DEFAULT_MODEL_ID`);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
