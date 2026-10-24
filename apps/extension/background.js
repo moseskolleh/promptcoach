@@ -14,8 +14,9 @@
 // `const { GRADE_BANDS } = …` collided with core's own GRADE_BANDS, threw
 // "Identifier has already been declared" during importScripts, and aborted
 // the worker on every startup — the badge never rendered.
-importScripts('vendor/calculator.js');
+importScripts('vendor/calculator.js', 'shared/days.js');
 const Core = globalThis.EcoPromptCore;
+const Days = globalThis.EcoPromptDays;
 
 const GRADE_COLORS = {
   A: '#10B981',
@@ -29,15 +30,9 @@ function gradeForWh(wh) {
   return Core.GRADE_BANDS.find((b) => wh <= b.maxWh).grade;
 }
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
 function renderBadge(history) {
   const entries = Array.isArray(history) ? history : [];
-  const since = startOfToday();
+  const since = Days.startOfDay(Date.now());
   const today = entries.filter((e) => e && e.ts >= since);
 
   if (today.length === 0) {
@@ -70,6 +65,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+// The badge counts today's queries, so it must reset at local midnight even
+// when nothing is recorded that day (PLAN.md Step 10). An alarm survives the
+// worker being shut down between events; one created again replaces it.
+function scheduleMidnightRefresh() {
+  chrome.alarms.create('midnight', { when: Days.nextMidnight(Date.now()) + 1000 });
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== 'midnight') return;
+  updateBadge();
+  scheduleMidnightRefresh();
+});
+
 chrome.runtime.onInstalled.addListener(updateBadge);
 chrome.runtime.onStartup.addListener(updateBadge);
 updateBadge();
+scheduleMidnightRefresh();

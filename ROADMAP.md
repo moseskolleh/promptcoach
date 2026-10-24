@@ -175,8 +175,8 @@ into ten AI chat sites. Without it, submission is rejected.
 The good news is that the policy is genuinely strong and easy to write:
 `docs/ARCHITECTURE.md §5` establishes that everything runs client-side, prompts
 never leave the device, and history lives in `chrome.storage.local`. Say
-exactly that, name the `storage` and `activeTab` permissions and why each is
-needed, and state that there is no analytics, no network call, and no account.
+exactly that, name the `storage`, `activeTab` and `alarms` permissions and why
+each is needed (`alarms` resets the badge's daily count at midnight), and state that there is no analytics, no network call, and no account.
 
 That is a better privacy story than almost anything else in this category. It
 is worth stating loudly rather than burying in an architecture doc.
@@ -192,8 +192,8 @@ The manifest requests content-script access to ten AI hosts plus
 `moseskolleh.github.io`, `localhost` and `127.0.0.1`. The last three are
 development conveniences and reviewers treat broad host permissions as the
 main risk signal. Ship the store build without `localhost`/`127.0.0.1`, or be
-ready to explain them. Keep `activeTab` and `storage` — both are easy to
-defend.
+ready to explain them. Keep `activeTab`, `storage` and `alarms` — all three
+are easy to defend.
 
 ### 2.4 🔧 Submit to Firefox and Edge too
 MV3 is broadly portable and both stores are less crowded. Firefox needs a

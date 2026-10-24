@@ -919,8 +919,9 @@ without.
 **Done when:** no UI path shows a current model's number without its range
 and method label, and no old model name appears in any app's UI copy.
 
-> **Status (2026-10-19): built, except the README example.** METHODOLOGY
-> §2.5.8 documents it.
+> **Status (2026-10-19): built.** METHODOLOGY §2.5.8 documents it. The
+> README example followed with the roster in Step 5 (GPT-6 Luna and Claude
+> Opus 5.5).
 > - **One labelling function.** Core `describeImpact()` gives the range,
 >   the method chip, the grade range, and the floor. Web coach, sticky pill,
 >   Compare (cards, table, chart), explorer and library use it. So do the
@@ -940,8 +941,8 @@ and method label, and no old model name appears in any app's UI copy.
 >   - Library entries keep their range.
 > - **Old-model copy.** The hero facts and Compare's opening trio are now
 >   picked from the catalog, so they name 2026 models once Step 5 lands.
->   The README example still names GPT-4o and DeepSeek-R1, because no
->   current model exists to put there; Step 5 replaces it.
+>   The README example waited for a current model to name, and Step 5
+>   replaced it.
 > - **Checked** with core tests and in a browser against a copy of the
 >   catalog holding synthetic estimated models: web, popup, and the
 >   content script on a test page.
@@ -1033,6 +1034,45 @@ Web app:
 
 **Done when:** each bug has a regression test. Unit tests land now; the
 DOM-level bugs get Playwright tests when Step 16's harness lands.
+
+> **Status (2026-10-24): built.** Unit tests for what runs outside the
+> DOM; every fix checked in a browser.
+> - **Extension.**
+>   - The `keydown` listener is removed with `capture: true`, as it was
+>     added, so a detached composer no longer records sends.
+>   - The pill hides while no composer is attached.
+>   - The popup restores the effort select before computing its quick
+>     grades, and recomputes them when the effort changes. *Standard* is
+>     `selected` in the HTML.
+>   - **Calendar days.** `shared/days.js` builds day buckets from dates, so
+>     a daylight-saving change can't move their edges. The popup's week
+>     chart, today and week totals, and streak use it, and so does the
+>     badge. `extension-days.test.js` covers both 2026 changes in
+>     Amsterdam. Before, the 24-hour offsets put the edges at 01:00 or
+>     23:00.
+>   - **Midnight badge.** A `chrome.alarms` alarm refreshes the badge just
+>     after local midnight and re-arms itself (new `alarms` permission).
+>     `extension-badge.test.js` runs `background.js` with a stub `chrome`.
+> - **Web app.**
+>   - Compare passes the coach prompt's task multiplier, and re-renders
+>     when it changes. The coach and Compare now give the same Wh for the
+>     same model.
+>   - **No clamp on the output estimate.** The three token sliders are
+>     logarithmic: answer length 5–20,000, Compare input 10–100,000. "Yes
+>     or no" reads 8 tokens and "in 2000 words" 2,667. Compare mirrors the
+>     coach's tokens unclamped, and screen readers hear "8 tokens", not
+>     the knob position.
+>   - Compare re-renders when the region or effort changes.
+>   - Share links carry a manually set answer length (`o=`). A link opened
+>     on a loaded page applies on `hashchange`, and takes its region,
+>     effort and length from the link, or their defaults.
+> - **DOM checks for Step 16's harness to codify:**
+>   - pill hidden with no composer;
+>   - no send recorded from a detached composer;
+>   - popup grades at the restored effort;
+>   - the week chart across a daylight-saving change;
+>   - Compare's options after a task, region or effort change;
+>   - the share link round trip and `hashchange`.
 
 ### Step 11 — History v2: record inputs, not just results · M
 - New entry shape: `{v:2, ts, host, modelId, modelSource, effort, taskType,

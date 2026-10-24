@@ -567,9 +567,12 @@
     if (inputEl === el) return;
     if (inputEl) {
       inputEl.removeEventListener('input', scheduleAnalyze);
-      inputEl.removeEventListener('keydown', onKeyDown);
+      // Removed with the flag it was added with, or it stays attached and a
+      // detached composer keeps recording sends (PLAN.md Step 10).
+      inputEl.removeEventListener('keydown', onKeyDown, true);
     }
     inputEl = el;
+    applyPillVisibility();
     if (!inputEl) return;
     inputEl.addEventListener('input', scheduleAnalyze);
     inputEl.addEventListener('keydown', onKeyDown, true);
@@ -593,7 +596,9 @@
   }
 
   function applyPillVisibility() {
-    const show = settings.showPill !== false;
+    if (!pill) return;
+    // No composer, no pill: a grade with nothing to grade misleads.
+    const show = settings.showPill !== false && !!inputEl;
     pill.style.display = show ? '' : 'none';
     if (!show) {
       cardOpen = false;
