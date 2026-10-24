@@ -597,3 +597,16 @@ body {
   .select-effort { width: 100%; }
   .period-grid, .stat-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* A one-time note that the saved default model moved (PLAN.md Step 7) */
+.model-notice {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.model-notice[hidden] { display: none; }

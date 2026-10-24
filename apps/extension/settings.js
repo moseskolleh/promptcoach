@@ -13,10 +13,11 @@ async function fetchJson(path) {
   return res.json();
 }
 
+/** The saved settings as stored; EcoPromptSettings.resolve applies them. */
 function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.sync.get('eco_settings', (data) => {
-      resolve({ ...DEFAULT_SETTINGS, ...(data && data.eco_settings) });
+      resolve((data && data.eco_settings) || {});
     });
   });
 }
@@ -44,7 +45,7 @@ function readForm() {
 }
 
 async function init() {
-  const [models, grids, equivalents, settings] = await Promise.all([
+  const [models, grids, equivalents, saved] = await Promise.all([
     fetchJson('vendor/data/models.json'),
     fetchJson('vendor/data/grids.json'),
     fetchJson('vendor/data/equivalents.json'),
@@ -52,6 +53,8 @@ async function init() {
   ]);
 
   const engine = new EcoPromptCore.ImpactEngine({ models, grids, equivalents });
+  const settings = globalThis.EcoPromptSettings.resolve(saved, engine);
+  globalThis.EcoPromptSettings.showNotice($('model-notice'));
 
   // Model select, grouped by provider.
   const modelSelect = $('default-model');

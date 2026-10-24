@@ -852,6 +852,52 @@ every provider's 2026 labels.
 entries loads with no errors and no "unknown model", and the default model
 is defined in exactly one place.
 
+> **Status (2026-10-24): built.** `packages/core/test/migration.test.js`
+> loads `test/fixtures/v1-user-data.json`.
+> - **One default model:** `DEFAULT_MODEL_ID` in `calculator.js`, GPT-6.1
+>   Sol. The web coach, the extension (`shared/defaults.js`) and mobile
+>   (`storage.ts`) read it.
+>   - The web coach used to start on GPT-6 Luna. One default means one
+>     model, and Sol is the choice that errs high.
+>   - Two gates keep it single. `check-catalog` requires it to be a
+>     current entry. `check-apps` refuses an app that defines a default
+>     model of its own.
+> - **The engine follows `superseded_by`.**
+>   - `currentSuccessor(id)` returns the current model at the end of the
+>     chain, or null when the line ended.
+>   - `migrateModelId(id)` keeps a current id, moves a reference id to its
+>     successor, and moves an ended line or an unknown id to the default.
+> - **Extension settings.** A saved default model that is no longer current
+>   moves on load and is written back once. The popup or the options page
+>   then says so once, for example: *"Your default model was updated from
+>   GPT-4o to GPT-6.1 Sol, its current successor."*
+>   - A line with no successor (DeepSeek V3, Llama 3.2 1B) says it has none
+>     and takes the default.
+>   - The popup's remembered model and comparison list move the same way.
+> - **Mobile settings** move the same way. The notice waits for the
+>   settings screen, which is still a stub.
+> - **History** keeps its stored figures. All 46 model ids any release has
+>   shipped still resolve, and the fixture lists them, so none can quietly
+>   stop resolving.
+> - **Share links.** An old id opens as that model, so the shared number
+>   reproduces.
+>   - The picker lists it in a group of its own ("Older model, from a
+>     shared link").
+>   - A banner names its successor and offers *Compare with GPT-6.1 Sol*.
+>     One click puts both in Compare.
+>   - An id such as `constructor` is no longer read as a model:
+>     `getModel` takes own entries only.
+> - **Library** entries name their own model, marked "(older model)".
+> - **Checked in a browser:**
+>   - the web app with a v1 library and old share links (GPT-4o, DeepSeek V3,
+>     `constructor`);
+>   - the popup and the options page with old saved settings.
+>
+>   No console errors, and no "unknown model".
+> - Also: the summarization tip named 2025 models (Gemini Flash, GPT-4o
+>   mini, Claude Haiku). It now names Gemini 3.5 Flash-Lite, GPT-6 Luna and
+>   Claude Haiku 5.5.
+
 ### Step 8 — Honest labels for a catalog of estimates · S
 After the refresh, no model a user can pick is measured, benchmarked or
 anchored (finding 5). The UI must stop showing single confident numbers.
@@ -1637,7 +1683,7 @@ measured on 2026-10-18 and the rest on 2026-09-25.
 | Models in pickers that aren't current (2025 or earlier, or superseded) | 22 of 22 | 0 | 1, 5 |
 | Current picker labels resolved correctly | 0 of 23 | 23 of 23 | 6 |
 | Labels silently resolved to an older sibling | 6 of 23 | 0, with a generated test for every family | 6 |
-| Places that define the default model | 4, with 3 different ids | 1 | 7 |
+| Places that define the default model | 4, with 3 different ids | 1 (done) | 7 |
 | Current-model numbers shown without a range | all | none | 8 |
 | `analyzePrompt` on an 86k-char paste | 25.8 ms | ≤ 8 ms | 3 |
 | Protected-span scans per analysis | up to 5 | 1 | 3 |

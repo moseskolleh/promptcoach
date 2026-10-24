@@ -27,7 +27,12 @@ export const compareModels = (req: {
   inputTokens: number;
   outputTokens: number;
 }) => engine.compareModels(req);
-export const aggregate = (impacts: unknown[]) => engine.aggregate(impacts);
+export const aggregate = (impacts: Parameters<typeof engine.aggregate>[0]) => engine.aggregate(impacts);
+
+// The one default model, and how a saved one is brought up to date
+// (PLAN.md Step 7).
+export const DEFAULT_MODEL_ID = core.DEFAULT_MODEL_ID;
+export const migrateModelId = (modelId: string | null | undefined) => engine.migrateModelId(modelId);
 
 export const analyzePrompt = (text: string) => core.analyzePrompt(text);
 export const generateOptimizedPrompt = (text: string) => core.generateOptimizedPrompt(text);
