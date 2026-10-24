@@ -48,7 +48,9 @@
         "https://chat.deepseek.com/*",
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
-        "https://grok.com/*"
+        "https://grok.com/*",
+        "https://meta.ai/*",
+        "https://www.meta.ai/*"
       ],
       "js": [
         "shared/defaults.js",
@@ -79,7 +81,9 @@
         "https://chat.deepseek.com/*",
         "https://www.perplexity.ai/*",
         "https://poe.com/*",
-        "https://grok.com/*"
+        "https://grok.com/*",
+        "https://meta.ai/*",
+        "https://www.meta.ai/*"
       ]
     }
   ],

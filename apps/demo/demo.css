@@ -1,7 +1,8 @@
-/* EcoPrompt Coach demo — shared chat layout + three provider-style skins.
+/* EcoPrompt Coach demo — shared chat layout + five provider-style skins.
    Skins are body classes: .skin-chatgpt (dark), .skin-claude (warm cream),
-   .skin-gemini (Google light). Purely visual mimicry for testing — every
-   skin uses a different composer DOM shape on purpose. */
+   .skin-gemini (Google light), .skin-meta (light, blue) and .skin-grok
+   (black). Purely visual mimicry for testing — the skins vary the composer
+   DOM shape on purpose. */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -330,6 +331,47 @@ textarea.demo-composer::placeholder {
   color: transparent;
 }
 .skin-gemini .demo-composer-row { border-radius: 32px; border-color: transparent; box-shadow: none; }
+
+/* --- meta.ai-style: light, Meta blue, soft gradient greeting ----- */
+.skin-meta {
+  --bg: #ffffff;
+  --ink: #1c2b33;
+  --muted: #65737e;
+  --line: #e2e7eb;
+  --hover: #f1f4f7;
+  --accent: #0064e0;
+  --user-accent: #7a3ff2;
+  --composer-bg: #f1f4f7;
+  --drawer-bg: #f8fafb;
+  background: var(--bg);
+  color: var(--ink);
+}
+.skin-meta .demo-greeting h1 {
+  background: linear-gradient(90deg, #0064e0, #7a3ff2, #e0306c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.skin-meta .demo-composer-row { border-radius: 24px; border-color: transparent; box-shadow: none; }
+
+/* --- Grok-style: black, white type, grey accent ------------------- */
+.skin-grok {
+  --bg: #000000;
+  --ink: #f5f5f5;
+  --muted: #8b8b8b;
+  --line: #2a2a2a;
+  --hover: #1a1a1a;
+  --accent: #e7e7e7;
+  --user-accent: #3a3a3a;
+  --composer-bg: #141414;
+  --drawer-bg: #0b0b0b;
+  background: var(--bg);
+  color: var(--ink);
+}
+.skin-grok .demo-composer-row { border-radius: 24px; box-shadow: none; }
+.skin-grok .demo-send,
+.skin-grok .demo-avatar { color: #000; }
+.skin-grok .demo-msg-user .demo-avatar { color: #fff; }
 
 /* ----------------------------------------------------- model switcher */
 

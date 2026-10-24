@@ -37,8 +37,14 @@
   let engine = null;
   let conv = null;
   let settings = { ...DEFAULT_SETTINGS };
+  // Null when the site's current models are not in the catalog yet: then no
+  // estimate is shown, rather than another lab's model.
   let modelId = DEFAULT_SETTINGS.defaultModel;
-  let modelSource = 'default'; // 'picker' | 'host' | 'meta' | 'settings' | 'default'
+  // 'picker' | 'mode' | 'host' | 'routed' | 'newer' | 'missing' | 'meta' | 'settings' | 'default'
+  let modelSource = 'default';
+  let detectedEffort = null; // an effort or mode read off the page
+  let detectedMultiAgent = false; // several agents at once (Grok Heavy)
+  let catalogIds = []; // every catalog id, for detection's fail-closed check
 
   let inputEl = null; // the chat prompt input we're attached to
   let pill = null;
@@ -71,10 +77,12 @@
   // --------------------------------------------------------------------------
   // Which model is this page using?
   //
-  // Priority: the model the user picked in the page's model switcher (read
-  // from its label — the difference between "GPT-5" and "GPT-5 Thinking" is
-  // ~30× in energy), then the host's default model, then a demo page's
-  // <meta name="ecoprompt-model"> hint, then the user's settings.
+  // Priority: the model and effort the page's switcher shows (read from its
+  // label — ChatGPT's "Extra High" is many times its "Instant"), then the
+  // host's default model, shown as assumed, then a demo page's
+  // <meta name="ecoprompt-model"> hint, then the user's settings. A label
+  // from a generation newer than the catalog keeps the site default and says
+  // so; it never reads as an older model of its line.
   // --------------------------------------------------------------------------
 
   // Tried in order: elements that *say* they are the model picker first,
@@ -132,42 +140,76 @@
     return meta && meta.content ? meta.content.trim() : null;
   }
 
-  function pickerModel() {
+  /** The model and effort the page's picker shows, or null. */
+  function pickerDetection() {
     const family = pageModelFamily();
     if (!family) return null;
     for (const selectors of PICKER_SELECTOR_GROUPS) {
-      const hit = Core.detectModelFromLabels(location.hostname, collectModelLabels(selectors), { family });
-      if (hit && engine.getModel(hit.modelId)) return hit.modelId;
+      const hit = Core.detectModelFromLabels(location.hostname, collectModelLabels(selectors), { family, modelIds: catalogIds });
+      // A newer generation stops here: the looser group below could read an
+      // unrelated label as an older model (PLAN.md Step 10).
+      if (hit && hit.unknownGeneration) return hit;
+      if (hit && (hit.effort || (hit.modelId && engine.getModel(hit.modelId)))) return hit;
     }
     return null;
   }
 
-  /** Re-resolve the model; returns true when it changed. */
+  /** Re-resolve the model and effort; returns true when either changed. */
   function resolveModel() {
-    const picked = pickerModel();
-    let candidate = picked;
-    let source = 'picker';
-    if (!candidate) {
-      candidate = Core.autoDetectModel(location.hostname);
-      source = 'host';
+    const hit = pickerDetection();
+    const site = Core.hostDefault(location.hostname);
+    let candidate = hit && hit.modelId && engine.getModel(hit.modelId) ? hit.modelId : null;
+    let source = candidate ? (hit.source === 'mode' ? 'mode' : 'picker') : null;
+    if (!candidate && site.known) {
+      // A supported site: its documented default, shown as an assumption.
+      // Its models may not be in the catalog yet (DeepSeek V4): then nothing.
+      candidate = site.modelId;
+      source = candidate ? (site.routed ? 'routed' : 'host') : 'missing';
     }
-    if (!candidate) {
+    if (!candidate && source !== 'missing') {
       candidate = metaModelHint();
       source = 'meta';
+      if (!candidate) {
+        candidate = settings.defaultModel;
+        source = 'settings';
+      }
+      if (!candidate || !engine.getModel(candidate)) {
+        candidate = DEFAULT_SETTINGS.defaultModel;
+        source = 'default';
+      }
     }
-    if (!candidate) {
-      candidate = settings.defaultModel;
-      source = 'settings';
-    }
-    if (!candidate || !engine.getModel(candidate)) {
-      candidate = DEFAULT_SETTINGS.defaultModel;
-      source = 'default';
-    }
-    const changed = candidate !== modelId;
+    // The page names a model the catalog doesn't have yet: say so over
+    // whichever default stands in for it.
+    if (hit && hit.unknownGeneration && candidate) source = 'newer';
+    const effort = hit ? hit.effort : null;
+    const multiAgent = hit ? hit.multiAgent : false;
+    const changed = candidate !== modelId || source !== modelSource ||
+      effort !== detectedEffort || multiAgent !== detectedMultiAgent;
     modelId = candidate;
     modelSource = source;
+    detectedEffort = effort;
+    detectedMultiAgent = multiAgent;
     return changed;
   }
+
+  // How the card says where the model came from (PLAN.md Step 6).
+  const SOURCE_NOTES = {
+    picker: ' (detected on page)',
+    mode: ' (mode detected on page)',
+    host: ' (assumed: site default)',
+    routed: ' (router: model not visible, showing site default)',
+    newer: ' (newer model on page, not in catalog yet: showing site default)'
+  };
+
+  // How the card names an effort read off the page.
+  const EFFORT_NOTES = {
+    none: 'no thinking',
+    low: 'low effort',
+    standard: 'standard effort',
+    high: 'high effort',
+    xhigh: 'extra-high effort',
+    max: 'max effort'
+  };
 
   function metaModelHint() {
     const meta = document.querySelector('meta[name="ecoprompt-model"]');
@@ -177,7 +219,11 @@
 
   function impactOptions(extra = {}) {
     return {
-      reasoningEffort: settings.reasoningEffort,
+      // An effort read off the page beats the saved setting.
+      reasoningEffort: detectedEffort || settings.reasoningEffort,
+      // A thinking mode read off the page means thinking is on.
+      thinkingOn: !!detectedEffort && detectedEffort !== 'none',
+      multiAgent: detectedMultiAgent,
       regionKey: settings.regionKey,
       includeEmbodied: settings.includeEmbodied,
       ...extra
@@ -295,6 +341,14 @@
 
   function renderCard() {
     card.textContent = '';
+    if (!modelId && lastAnalysis) {
+      const p = document.createElement('p');
+      p.className = 'epc-card-empty';
+      p.textContent =
+        "This site's current models aren't in EcoPrompt's catalog yet, so no estimate is shown rather than another model's.";
+      card.appendChild(p);
+      return;
+    }
     if (!lastImpact || !lastAnalysis) {
       const p = document.createElement('p');
       p.className = 'epc-card-empty';
@@ -312,8 +366,11 @@
     grade.title = desc.gradeLabel;
     const title = document.createElement('span');
     title.className = 'epc-card-title';
+    const effortNote = detectedEffort
+      ? ` · ${EFFORT_NOTES[detectedEffort] || detectedEffort}${detectedMultiAgent ? ', several agents' : ''}`
+      : '';
     title.textContent =
-      `${lastImpact.model.name}${modelSource === 'picker' ? ' (detected on page)' : ''} · ${lastAnalysis.tokens} tokens`;
+      `${lastImpact.model.name}${SOURCE_NOTES[modelSource] || ''}${effortNote} · ${lastAnalysis.tokens} tokens`;
     head.append(grade, title);
     card.appendChild(head);
     if (desc.estimated) {
@@ -412,6 +469,16 @@
       return;
     }
     lastAnalysis = Core.analyzePrompt(text);
+    if (!modelId) {
+      lastImpact = null;
+      pillGrade.textContent = '–';
+      pillGrade.style.background = '#64748B';
+      pillGrade.title = '';
+      pillText.textContent = 'model not in catalog yet';
+      pillEst.hidden = true;
+      if (cardOpen) renderCard();
+      return;
+    }
     lastImpact = engine.estimateImpact({
       modelId,
       inputTokens: lastAnalysis.tokens,
@@ -547,6 +614,7 @@
     settings = loaded;
     engine = new Core.ImpactEngine({ models, grids, equivalents });
     conv = Core.createConverters(equivalents);
+    catalogIds = engine.listModels({ includeReference: true }).map((m) => m.id);
     resolveModel();
 
     buildUi();
