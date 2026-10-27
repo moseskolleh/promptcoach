@@ -65,6 +65,33 @@ function paintSlider(input) {
   input.style.setProperty('--fill', `${pct}%`);
 }
 
+/* Token sliders are logarithmic, so a "yes or no" answer (8 tokens) and a
+   pasted report (30,000) both sit on them and no estimate is clamped to fit
+   (PLAN.md Step 10). The slider holds a position from 0 to 1000; state holds
+   tokens, and a count past either end keeps its value with the knob at the
+   end. */
+const TOKEN_SCALES = {
+  'output-slider': [5, 20000],
+  'compare-input-slider': [10, 100000],
+  'compare-output-slider': [5, 20000]
+};
+
+function sliderToTokens(id, position) {
+  const [lo, hi] = TOKEN_SCALES[id];
+  const tokens = Math.round(lo * Math.pow(hi / lo, Number(position) / 1000));
+  // Assistive tech reads the token count, not the knob position.
+  $(id).setAttribute('aria-valuetext', `${tokens} tokens`);
+  return tokens;
+}
+
+function setTokenSlider(id, tokens) {
+  const [lo, hi] = TOKEN_SCALES[id];
+  const slider = $(id);
+  slider.value = Math.round((1000 * Math.log(clamp(tokens, lo, hi) / lo)) / Math.log(hi / lo));
+  slider.setAttribute('aria-valuetext', `${tokens} tokens`);
+  paintSlider(slider);
+}
+
 const GRADE_DOTS = { A: '🟢', B: '🟢', C: '🟡', D: '🟠', E: '🔴' };
 
 /**
@@ -163,6 +190,7 @@ const state = {
   compareTouched: false, // user moved compare sliders manually
   compareInput: 100,
   compareOutput: 300,
+  compareTaskMultiplier: 1, // the coach prompt's task type, so both agree
 
   // Library
   librarySearch: '',
@@ -621,14 +649,12 @@ function updateCoach() {
     analysis.taskTypeRaw !== 'GENERAL' ? `Detected: ${analysis.taskType}` : '';
 
   // Default expected output from the analyzer, unless the user took over.
-  const slider = $('output-slider');
   if (!state.outputTouched) {
-    // Floor matches the slider min — low enough that an explicit output
-    // budget in the prompt ("in 50 words", "yes or no") visibly lowers it.
-    state.outputTokens = clamp(analysis.outputEstimate.estimated, 25, 2000);
-    slider.value = state.outputTokens;
+    // The analyzer's estimate as it is: "yes or no" is 8 tokens and "in
+    // 2000 words" is 2,667 (PLAN.md Step 10).
+    state.outputTokens = Math.max(1, Math.round(analysis.outputEstimate.estimated));
+    setTokenSlider('output-slider', state.outputTokens);
     $('output-slider-value').textContent = String(state.outputTokens);
-    paintSlider(slider);
   }
 
   const impact = state.engine.estimateImpact({
@@ -696,18 +722,22 @@ function updateCoach() {
     'hidden', analysis.politeWords.totalTokensSaved === 0
   );
 
-  // Mirror tokens into Compare unless the user took over those sliders.
-  // Skip the (full-section) rebuild when the clamped values didn't change.
+  // Compare prices the same task as the coach (PLAN.md Step 10), and
+  // mirrors its tokens unless the user took over those sliders. Skip the
+  // (full-section) rebuild when nothing it shows changed.
+  let compareStale = analysis.energyMultiplier !== state.compareTaskMultiplier;
+  state.compareTaskMultiplier = analysis.energyMultiplier;
   if (!state.compareTouched) {
-    const nextInput = clamp(analysis.tokens, 50, 10000);
+    const nextInput = analysis.tokens;
     const nextOutput = state.outputTokens;
     if (nextInput !== state.compareInput || nextOutput !== state.compareOutput) {
       state.compareInput = nextInput;
       state.compareOutput = nextOutput;
       syncCompareSliders();
-      renderCompare();
+      compareStale = true;
     }
   }
+  if (compareStale) renderCompare();
 }
 
 const updateCoachDebounced = debounce(updateCoach, 220);
@@ -771,6 +801,8 @@ function buildShareLink() {
   params.set('m', state.modelId);
   if (state.regionKey !== 'default') params.set('r', state.regionKey);
   if (state.reasoningEffort !== 'standard') params.set('e', state.reasoningEffort);
+  // An answer length the user set is part of the number being shared.
+  if (state.outputTouched) params.set('o', String(state.outputTokens));
   return `${location.origin}${location.pathname}#share?${params.toString()}`;
 }
 
@@ -787,15 +819,23 @@ function applySharedLink() {
     state.modelId = m;
     populateModelSelect();
   }
+  // Everything else comes from the link too, or its default: a second link
+  // opened on the same page (hashchange) must not inherit the first's.
   const r = params.get('r');
-  if (r && state.engine.getRegionCif(r) !== null) {
-    state.regionKey = r;
-    $('region-select').value = r;
-  }
+  state.regionKey = r && state.engine.getRegionCif(r) !== null ? r : 'default';
+  $('region-select').value = state.regionKey;
   const e = params.get('e');
-  if (e === 'low' || e === 'high') state.reasoningEffort = e;
+  state.reasoningEffort = e === 'low' || e === 'high' ? e : 'standard';
+  const o = Number(params.get('o'));
+  state.outputTouched = Number.isInteger(o) && o > 0 && o <= 200000;
+  if (state.outputTouched) {
+    state.outputTokens = o;
+    setTokenSlider('output-slider', o);
+    $('output-slider-value').textContent = String(o);
+  }
   syncReasoningControl();
   updateCoach();
+  renderCompare();
   requestAnimationFrame(() => $('coach').scrollIntoView());
   return true;
 }
@@ -804,7 +844,7 @@ function initCoach() {
   populateModelSelect();
   populateRegionSelect();
   syncReasoningControl();
-  paintSlider($('output-slider'));
+  setTokenSlider('output-slider', state.outputTokens);
 
   $('prompt-input').addEventListener('input', updateCoachDebounced);
 
@@ -816,9 +856,11 @@ function initCoach() {
   });
   $('successor-compare-btn').addEventListener('click', compareWithSuccessor);
 
+  // Compare uses the same region and effort, so it re-renders with them.
   $('region-select').addEventListener('change', (e) => {
     state.regionKey = e.target.value;
     updateCoach();
+    renderCompare();
   });
 
   $('reasoning-control').addEventListener('click', (e) => {
@@ -827,13 +869,14 @@ function initCoach() {
     state.reasoningEffort = btn.dataset.effort;
     syncReasoningControl();
     updateCoach();
+    renderCompare();
   });
 
   const slider = $('output-slider');
   slider.addEventListener('input', () => {
     state.outputTouched = true;
-    state.outputTokens = Number(slider.value);
-    $('output-slider-value').textContent = slider.value;
+    state.outputTokens = sliderToTokens('output-slider', slider.value);
+    $('output-slider-value').textContent = String(state.outputTokens);
     paintSlider(slider);
     updateCoachDebounced();
   });
@@ -894,14 +937,10 @@ async function copyToClipboard(text) {
 /* ============================ 7. Compare ============================ */
 
 function syncCompareSliders() {
-  const inSlider = $('compare-input-slider');
-  const outSlider = $('compare-output-slider');
-  inSlider.value = state.compareInput;
-  outSlider.value = state.compareOutput;
+  setTokenSlider('compare-input-slider', state.compareInput);
+  setTokenSlider('compare-output-slider', state.compareOutput);
   $('compare-input-value').textContent = String(state.compareInput);
   $('compare-output-value').textContent = String(state.compareOutput);
-  paintSlider(inSlider);
-  paintSlider(outSlider);
 }
 
 /**
@@ -972,6 +1011,7 @@ function renderCompare() {
     inputTokens: state.compareInput,
     outputTokens: state.compareOutput,
     options: {
+      taskMultiplier: state.compareTaskMultiplier,
       reasoningEffort: state.reasoningEffort,
       regionKey: state.regionKey === 'default' ? undefined : state.regionKey
     }
@@ -1196,15 +1236,15 @@ function initCompare() {
   const onSlide = debounce(renderCompare, 150);
   inSlider.addEventListener('input', () => {
     state.compareTouched = true;
-    state.compareInput = Number(inSlider.value);
-    $('compare-input-value').textContent = inSlider.value;
+    state.compareInput = sliderToTokens('compare-input-slider', inSlider.value);
+    $('compare-input-value').textContent = String(state.compareInput);
     paintSlider(inSlider);
     onSlide();
   });
   outSlider.addEventListener('input', () => {
     state.compareTouched = true;
-    state.compareOutput = Number(outSlider.value);
-    $('compare-output-value').textContent = outSlider.value;
+    state.compareOutput = sliderToTokens('compare-output-slider', outSlider.value);
+    $('compare-output-value').textContent = String(state.compareOutput);
     paintSlider(outSlider);
     onSlide();
   });
@@ -1688,6 +1728,10 @@ function init() {
   initNav();
   initModal();
   $('retry-load').addEventListener('click', boot);
+  // A share link opened on a page that is already loaded applies too.
+  window.addEventListener('hashchange', () => {
+    if (state.engine) applySharedLink();
+  });
   boot();
 }
 

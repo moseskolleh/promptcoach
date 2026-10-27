@@ -26,6 +26,7 @@
   }
 
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
+  const Days = globalThis.EcoPromptDays;
 
   // Shared popup state (Coach <-> Compare share prompt/token inputs).
   const state = {
@@ -121,6 +122,19 @@
   // --------------------------------------------------------------------------
   // Coach tab
   // --------------------------------------------------------------------------
+
+  /** Quick grade per model (typical short query: 100 in / 300 out), at the selected effort. */
+  function refreshQuickGrades() {
+    for (const m of state.models) {
+      const impact = state.engine.estimateImpact({
+        modelId: m.id,
+        inputTokens: 100,
+        outputTokens: 300,
+        options: impactOptions()
+      });
+      if (impact) state.modelDescs[m.id] = Core.describeImpact(impact);
+    }
+  }
 
   function populateModelSelect() {
     const select = $('model-select');
@@ -465,12 +479,6 @@
     });
   }
 
-  function startOfDay(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }
-
   async function renderImpact() {
     const history = await loadHistory();
     const empty = $('impact-empty');
@@ -484,10 +492,12 @@
     empty.classList.add('hidden');
     dash.classList.remove('hidden');
 
-    const today0 = startOfDay(Date.now());
-    const week0 = today0 - 6 * 86400000; // rolling 7 days including today
+    // Calendar days, so a daylight-saving change can't shift the edges.
+    const now = Date.now();
+    const week = Days.lastDays(now, 7);
+    const today0 = week[6].start;
     const todayEntries = history.filter((e) => e.ts >= today0);
-    const weekEntries = history.filter((e) => e.ts >= week0);
+    const weekEntries = history.filter((e) => e.ts >= week[0].start);
 
     const todayTotals = state.engine.aggregate(todayEntries);
     const weekTotals = state.engine.aggregate(weekEntries);
@@ -519,23 +529,22 @@
     $('stat-carbon').textContent = t.carbon.primary;
     $('stat-carbon-sub').textContent = t.carbon.secondary;
 
-    renderWeekChart(history, today0);
+    renderWeekChart(history, week);
     renderStreak(history, today0, todayTotals);
   }
 
-  function renderWeekChart(history, today0) {
+  function renderWeekChart(history, week) {
     const chart = $('week-chart');
     chart.textContent = '';
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const dayStart = today0 - i * 86400000;
-      const entries = history.filter((e) => e.ts >= dayStart && e.ts < dayStart + 86400000);
-      days.push({
-        dayStart,
+    const today0 = week[week.length - 1].start;
+    const days = week.map(({ start, end }) => {
+      const entries = history.filter((e) => e.ts >= start && e.ts < end);
+      return {
+        dayStart: start,
         energyWh: entries.reduce((sum, e) => sum + (e.energyWh || 0), 0),
         queries: entries.length
-      });
-    }
+      };
+    });
     const maxWh = Math.max(...days.map((d) => d.energyWh), 0.001);
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     for (const day of days) {
@@ -562,15 +571,17 @@
     // Streak: consecutive days (ending today, or yesterday if today is quiet
     // so far) whose average per-query energy earns grade A.
     let streak = 0;
-    let dayStart = today0;
-    if (!todayTotals.queries) dayStart -= 86400000;
+    // Walk back one calendar day at a time: each day ends where the later
+    // one starts.
+    let dayEnd = todayTotals.queries ? Days.nextMidnight(today0) : today0;
     for (let i = 0; i < 365; i++) {
-      const entries = history.filter((e) => e.ts >= dayStart && e.ts < dayStart + 86400000);
+      const dayStart = Days.startOfDay(dayEnd - 1);
+      const entries = history.filter((e) => e.ts >= dayStart && e.ts < dayEnd);
       if (!entries.length) break;
       const avgWh = entries.reduce((s, e) => s + (e.energyWh || 0), 0) / entries.length;
       if (state.engine.gradeFor(avgWh).grade !== 'A') break;
       streak += 1;
-      dayStart -= 86400000;
+      dayEnd = dayStart;
     }
     $('streak-value').textContent = `${streak}-day streak`;
   }
@@ -654,18 +665,11 @@
     state.conv = Core.createConverters(equivalents);
     state.models = state.engine.listModels();
 
-    // Quick grade per model (typical short query: 100 in / 300 out), at the
-    // saved effort: the effort select is not restored yet, so its value
-    // would be its first option.
-    for (const m of state.models) {
-      const impact = state.engine.estimateImpact({
-        modelId: m.id,
-        inputTokens: 100,
-        outputTokens: 300,
-        options: impactOptions({ reasoningEffort: settings.reasoningEffort })
-      });
-      if (impact) state.modelDescs[m.id] = Core.describeImpact(impact);
-    }
+    // Restore the effort first: the quick grades below are computed at the
+    // effort the select shows (PLAN.md Step 10).
+    $('effort-select').value = session.effort || settings.reasoningEffort;
+    if (!$('effort-select').value) $('effort-select').value = 'standard';
+    refreshQuickGrades();
 
     populateModelSelect();
     populateChecklist();
@@ -675,7 +679,6 @@
     // A model kept from before an update moves to its current successor.
     const wanted = state.engine.migrateModelId(session.modelId || settings.defaultModel).modelId;
     if (state.models.some((m) => m.id === wanted)) modelSelect.value = wanted;
-    $('effort-select').value = session.effort || settings.reasoningEffort;
     if (session.prompt) {
       state.prompt = session.prompt;
       $('prompt-input').value = session.prompt;
@@ -700,8 +703,13 @@
     $('prompt-input').addEventListener('input', onPromptInput);
     $('model-select').addEventListener('change', onModelChange);
     $('effort-select').addEventListener('change', () => {
-      renderCoach();
-      saveSession();
+      // The quick grades follow the effort, in the picker and the checklist.
+      const selected = $('model-select').value;
+      refreshQuickGrades();
+      populateModelSelect();
+      $('model-select').value = selected;
+      populateChecklist();
+      onModelChange();
     });
     $('trim-btn').addEventListener('click', onTrimClick);
     $('compare-in').addEventListener('input', onTokensInput);

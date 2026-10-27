@@ -5,6 +5,28 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Fixes for the verified bugs (PLAN.md Step 10)
+
+- **Extension**
+  - A composer the page replaced no longer records sends: its `keydown`
+    listener is removed with the flag it was added with.
+  - The pill hides while there is no composer, instead of showing a green
+    "A" for nothing.
+  - The popup's quick grades follow the effort shown, including after it is
+    restored or changed.
+  - **Days are calendar days.** The week chart, the today and week totals,
+    the streak and the badge no longer shift by an hour across a
+    daylight-saving change.
+  - The badge resets at local midnight, using a `chrome.alarms` alarm (new
+    `alarms` permission).
+- **Web app**
+  - **Compare and the coach agree:** Compare prices the prompt's task type
+    too, and re-renders when the region or effort changes.
+  - **No clamp on the answer length.** "Yes or no" is 8 tokens and "in
+    2000 words" is 2,667. The token sliders are logarithmic, so both fit.
+  - Share links keep a manually set answer length, and a link opened on an
+    already-loaded page applies.
+
 ### Migration: nothing breaks for existing users (PLAN.md Step 7)
 
 - **One default model, defined once in core:** GPT-6.1 Sol
