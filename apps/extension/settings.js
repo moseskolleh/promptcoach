@@ -34,14 +34,43 @@ function save(settings) {
   });
 }
 
+// Saved settings this page has no control for (paused sites) ride along.
+let current = { ...DEFAULT_SETTINGS };
+
 function readForm() {
   return {
+    ...current,
     defaultModel: $('default-model').value,
     regionKey: $('region').value,
     reasoningEffort: $('effort').value,
     showPill: $('show-pill').checked,
-    includeEmbodied: $('include-embodied').checked
+    includeEmbodied: $('include-embodied').checked,
+    recordHistory: $('record-history').checked,
+    historyRetentionDays: Number($('retention').value) || 0
   };
+}
+
+/** The paused sites, each with a button that resumes it. */
+function renderPausedSites() {
+  const list = $('paused-list');
+  list.textContent = '';
+  const sites = Array.isArray(current.pausedSites) ? current.pausedSites : [];
+  $('paused-empty').hidden = sites.length > 0;
+  for (const site of sites) {
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = site;
+    const resume = document.createElement('button');
+    resume.type = 'button';
+    resume.textContent = 'Resume';
+    resume.addEventListener('click', () => {
+      current = { ...current, pausedSites: sites.filter((s) => s !== site) };
+      save(current);
+      renderPausedSites();
+    });
+    item.append(name, resume);
+    list.appendChild(item);
+  }
 }
 
 async function init() {
@@ -92,9 +121,17 @@ async function init() {
   $('effort').value = settings.reasoningEffort;
   $('show-pill').checked = !!settings.showPill;
   $('include-embodied').checked = !!settings.includeEmbodied;
+  $('record-history').checked = settings.recordHistory !== false;
+  $('retention').value = String(settings.historyRetentionDays || 0);
+  if (!$('retention').value) $('retention').value = '0';
+  current = settings;
+  renderPausedSites();
 
-  for (const id of ['default-model', 'region', 'effort', 'show-pill', 'include-embodied']) {
-    $(id).addEventListener('change', () => save(readForm()));
+  for (const id of ['default-model', 'region', 'effort', 'show-pill', 'include-embodied', 'record-history', 'retention']) {
+    $(id).addEventListener('change', () => {
+      current = readForm();
+      save(current);
+    });
   }
 }
 

@@ -19,16 +19,22 @@ export interface HistoryEntry {
   highWh?: number | null;
 }
 
+/**
+ * A saved prompt, as the web library stores it since v2 (PLAN.md Step 11):
+ * the inputs it is priced from, re-estimated with the current catalog when
+ * shown, never frozen figures.
+ */
 export interface LibraryEntry {
+  v: 2;
   id: string;
   title: string;
   text: string;
   modelId: string;
-  tokens: number;
-  energyWh: number;
-  grade: string;
-  /** An estimate's range, as the web library saves it. */
-  range?: { lowWh: number; highWh: number | null; rangeOnly: boolean; method: string | null };
+  /** A grid key from grids.json, or 'default' for the model host's. */
+  region: string;
+  effort: 'low' | 'standard' | 'high';
+  /** An answer length set by hand; null means the analyzer's estimate. */
+  outTokens: number | null;
   ts: number;
 }
 

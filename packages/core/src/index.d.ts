@@ -336,7 +336,8 @@ export class ImpactEngine {
   gradeFor(energyWh: number): GradeResult;
   /** Omitting modelIds compares what listModels() would list. */
   compareModels(request: { modelIds?: string[]; includeReference?: boolean; inputTokens: number; outputTokens: number; options?: ImpactOptions }): Comparison;
-  aggregate(impacts: Array<Impact | HistoryLike | null | undefined> | null | undefined): Totals;
+  /** Totals over impacts, history records, or earlier totals (a day's summary). */
+  aggregate(impacts: Array<Impact | HistoryLike | Totals | null | undefined> | null | undefined): Totals;
 }
 
 export function fitCoefficients(bench: BenchPoint[]): Coefficients;
@@ -384,6 +385,8 @@ export function effortLevel(key: unknown): EffortLevel | null;
 export function effortFromLabel(vocab: string, label: string): { level: EffortLevel; multiAgent: boolean } | null;
 export const GRADE_BANDS: Array<{ grade: Grade; maxWh: number }>;
 export const MODEL_STATUSES: ModelStatus[];
+/** engine.aggregate without an engine: it needs no catalog. */
+export function aggregateImpacts(impacts: Array<Impact | HistoryLike | Totals | null | undefined> | null | undefined): Totals;
 /** The one default model every surface starts from (PLAN.md Step 7). */
 export const DEFAULT_MODEL_ID: string;
 

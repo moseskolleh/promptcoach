@@ -13,7 +13,13 @@
     regionKey: 'default',
     reasoningEffort: 'standard',
     showPill: true,
-    includeEmbodied: true
+    includeEmbodied: true,
+    // History (PLAN.md Step 11): record sends at all, sites paused
+    // entirely, and how many days of individual rows to keep (0: all).
+    // Daily totals are always kept.
+    recordHistory: true,
+    pausedSites: Object.freeze([]),
+    historyRetentionDays: 0
   });
 
   // Where a moved default model is noted until the popup or the options
@@ -59,6 +65,13 @@
       return notice.via === 'successor'
         ? `Your default model was updated from ${notice.from} to ${notice.to}, its current successor.`
         : `Your default model, ${notice.from}, has no current successor, so it is now ${notice.to}.`;
+    },
+
+    /** True when EcoPrompt is paused on this host, or on a domain above it. */
+    isSitePaused(settings, host) {
+      const sites = Array.isArray(settings && settings.pausedSites) ? settings.pausedSites : [];
+      const h = String(host || '').toLowerCase();
+      return sites.some((s) => typeof s === 'string' && s && (h === s || h.endsWith(`.${s}`)));
     },
 
     /** Show a pending notice once in the given element, then clear it. */

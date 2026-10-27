@@ -14,8 +14,10 @@ immediately.
   the extension and web app is plain CommonJS with zero dependencies, so the
   mobile app imports it directly through the npm workspace
   (`packages/core`). One source of truth for all numbers on every platform.
-- **AsyncStorage** for history + prompt library (same shapes as the
-  extension's `chrome.storage` records, enabling future sync).
+- **AsyncStorage** for history + prompt library. The library uses the web
+  app's v2 shape (inputs, re-estimated when shown); history still uses the
+  extension's v1 record shape, not its v2 rows (PLAN.md Step 11), until the
+  app gets real screens.
 - **React Navigation** bottom tabs: Coach · Compare · Impact · Library ·
   Settings.
 

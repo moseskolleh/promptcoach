@@ -5,6 +5,29 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### History v2: record inputs, not just results (PLAN.md Step 11)
+
+- **Each recorded query keeps what it was priced from:** model, effort,
+  task type, token counts and region, plus the figures, never the text. A
+  salted hash groups queries by conversation without storing the address.
+- **Re-score history** in the popup re-estimates stored queries with
+  today's catalog. Queries recorded before this version keep their saved
+  figures.
+- **No lost sends.** The service worker is the only writer, so several tabs
+  sending at once can't overwrite each other. Queries are stored one key
+  per day, with daily totals, and the Impact tab reads only the totals.
+- **New switches:**
+  - *Record my queries*;
+  - *Pause on this site*, from the popup (no pill, nothing recorded);
+  - *Keep individual queries for* 30 days to forever. Daily totals are
+    always kept.
+- **Your existing history moves over** on update, once.
+- **The web library stores inputs, not frozen figures.** Each saved prompt
+  is re-estimated with today's catalog, keeps its region and effort, and
+  has *Open in coach*.
+- Core's `aggregate` adds day totals as well as single queries
+  (`aggregateImpacts`).
+
 ### Fixes for the verified bugs (PLAN.md Step 10)
 
 - **Extension**

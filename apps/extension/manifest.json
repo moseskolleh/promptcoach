@@ -58,6 +58,7 @@
         "shared/defaults.js",
         "vendor/analyzer.js",
         "vendor/conversions.js",
+        "shared/history.js",
         "content.js"
       ],
       "css": [

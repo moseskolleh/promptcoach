@@ -156,3 +156,27 @@ input:focus {
   line-height: 1.5;
 }
 .model-notice[hidden] { display: none; }
+
+/* Paused sites (PLAN.md Step 11) */
+.paused-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.paused-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.paused-list button {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+#paused-empty[hidden] { display: none; }

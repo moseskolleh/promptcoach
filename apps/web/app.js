@@ -657,15 +657,11 @@ function updateCoach() {
     $('output-slider-value').textContent = String(state.outputTokens);
   }
 
-  const impact = state.engine.estimateImpact({
+  const impact = coachImpact(analysis, {
     modelId: state.modelId,
-    inputTokens: analysis.tokens,
-    outputTokens: state.outputTokens,
-    options: {
-      taskMultiplier: analysis.energyMultiplier,
-      reasoningEffort: state.reasoningEffort,
-      regionKey: state.regionKey === 'default' ? undefined : state.regionKey
-    }
+    region: state.regionKey,
+    effort: state.reasoningEffort,
+    outTokens: state.outputTokens
   });
   state.impact = impact;
   if (!impact) return;
@@ -806,37 +802,74 @@ function buildShareLink() {
   return `${location.origin}${location.pathname}#share?${params.toString()}`;
 }
 
-function applySharedLink() {
-  if (!location.hash.startsWith('#share?')) return false;
-  const params = new URLSearchParams(location.hash.slice('#share?'.length));
-  const p = params.get('p');
-  if (!p) return false;
-  $('prompt-input').value = p;
-  const m = params.get('m');
-  if (m && state.engine.getModel(m)) {
+/**
+ * The coach's estimate for a prompt's analysis and its inputs. The coach, a
+ * share link and the library all price a prompt with it, so the same inputs
+ * give the same number everywhere.
+ */
+function coachImpact(analysis, { modelId, region, effort, outTokens }) {
+  return state.engine.estimateImpact({
+    modelId,
+    inputTokens: analysis.tokens,
+    outputTokens: outTokens,
+    options: {
+      taskMultiplier: analysis.energyMultiplier,
+      reasoningEffort: effort,
+      regionKey: region === 'default' ? undefined : region
+    }
+  });
+}
+
+/** Valid coach inputs, or their defaults: a bad value never reaches the engine. */
+function cleanCoachInputs({ modelId, region, effort, outTokens }) {
+  return {
+    modelId: typeof modelId === 'string' && state.engine.getModel(modelId) ? modelId : null,
+    region: typeof region === 'string' && state.engine.getRegionCif(region) !== null ? region : 'default',
+    effort: effort === 'low' || effort === 'high' ? effort : 'standard',
+    outTokens: Number.isInteger(outTokens) && outTokens > 0 && outTokens <= 200000 ? outTokens : null
+  };
+}
+
+/**
+ * Load a prompt and its inputs into the coach: a share link and the
+ * library's Open in coach both do. Every input comes from the caller or its
+ * default, so a second prompt doesn't inherit the first's.
+ */
+function openInCoach(text, inputs) {
+  const clean = cleanCoachInputs(inputs);
+  $('prompt-input').value = text;
+  if (clean.modelId) {
     // An older id opens as that model, so the shared number reproduces;
     // the picker lists it and a banner names its successor.
-    state.modelId = m;
+    state.modelId = clean.modelId;
     populateModelSelect();
   }
-  // Everything else comes from the link too, or its default: a second link
-  // opened on the same page (hashchange) must not inherit the first's.
-  const r = params.get('r');
-  state.regionKey = r && state.engine.getRegionCif(r) !== null ? r : 'default';
+  state.regionKey = clean.region;
   $('region-select').value = state.regionKey;
-  const e = params.get('e');
-  state.reasoningEffort = e === 'low' || e === 'high' ? e : 'standard';
-  const o = Number(params.get('o'));
-  state.outputTouched = Number.isInteger(o) && o > 0 && o <= 200000;
+  state.reasoningEffort = clean.effort;
+  state.outputTouched = clean.outTokens !== null;
   if (state.outputTouched) {
-    state.outputTokens = o;
-    setTokenSlider('output-slider', o);
-    $('output-slider-value').textContent = String(o);
+    state.outputTokens = clean.outTokens;
+    setTokenSlider('output-slider', clean.outTokens);
+    $('output-slider-value').textContent = String(clean.outTokens);
   }
   syncReasoningControl();
   updateCoach();
   renderCompare();
   requestAnimationFrame(() => $('coach').scrollIntoView());
+}
+
+function applySharedLink() {
+  if (!location.hash.startsWith('#share?')) return false;
+  const params = new URLSearchParams(location.hash.slice('#share?'.length));
+  const p = params.get('p');
+  if (!p) return false;
+  openInCoach(p, {
+    modelId: params.get('m'),
+    region: params.get('r'),
+    effort: params.get('e'),
+    outTokens: Number(params.get('o'))
+  });
   return true;
 }
 
@@ -1394,54 +1427,45 @@ function writeLibrary(items) {
   }
 }
 
-function savedRange(impact) {
-  const r = impact.energy.range;
-  return { lowWh: r.lowWh, highWh: r.highWh, rangeOnly: r.rangeOnly, method: impact.estimate.method };
-}
-
-/** A saved entry's range, sanitised; null for one saved without a range. */
-function cleanRange(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const lowWh = Number(raw.lowWh);
-  if (!Number.isFinite(lowWh) || lowWh < 0) return null;
-  const highWh = raw.highWh === null ? null : Number(raw.highWh);
-  if (highWh !== null && !(Number.isFinite(highWh) && highWh >= lowWh)) return null;
-  return {
-    lowWh,
-    highWh,
-    rangeOnly: raw.rangeOnly === true || highWh === null,
-    method: Object.prototype.hasOwnProperty.call(EcoPromptCore.METHOD_CHIPS, raw.method) ? raw.method : null
-  };
-}
-
-/** describeImpact for a saved entry; null for one saved without a range. */
-function describeSaved(it) {
-  const r = cleanRange(it.range);
-  if (!r) return null;
-  const gradeOf = (wh) => state.engine.gradeFor(wh).grade;
-  return describeImpact({
-    grade: { grade: it.grade, range: { low: gradeOf(r.lowWh), high: r.highWh === null ? null : gradeOf(r.highWh) } },
-    energy: { wh: Number(it.energyWh) || r.lowWh, range: { lowWh: r.lowWh, highWh: r.highWh, rangeOnly: r.rangeOnly, floor: r.highWh === null } },
-    estimate: { method: r.method, thinkingTokens: null }
+/**
+ * A library entry's inputs. A saved prompt keeps what it was priced from
+ * (model, region, effort, the answer length if set by hand), never frozen
+ * figures, so it is re-estimated with today's catalog every time it is shown
+ * (PLAN.md Step 11). Entries saved before v2 kept no region or effort: they
+ * read as the defaults, with the answer length they were saved at.
+ */
+function libraryInputs(it) {
+  const legacyOut = it.tokens && typeof it.tokens === 'object' ? Number(it.tokens.output) : NaN;
+  return cleanCoachInputs({
+    modelId: it.modelId,
+    region: it.region,
+    effort: it.effort,
+    outTokens: it.v === 2 ? it.outTokens : Math.round(legacyOut)
   });
+}
+
+/** An entry's estimate today: { inputs, impact }, impact null when it can't be priced. */
+function libraryEstimate(it) {
+  const inputs = libraryInputs(it);
+  const analysis = typeof it.text === 'string' ? EcoPromptCore.analyzePrompt(it.text) : null;
+  const impact = inputs.modelId && analysis
+    ? coachImpact(analysis, { ...inputs, outTokens: inputs.outTokens || analysis.outputEstimate.estimated })
+    : null;
+  return { inputs, impact };
 }
 
 function saveLibraryEntry(title) {
   const items = readLibrary();
   items.push({
+    v: 2,
     id: `epc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: title || 'Untitled prompt',
     text: $('prompt-input').value,
     modelId: state.modelId,
-    tokens: {
-      input: state.analysis ? state.analysis.tokens : 0,
-      output: state.outputTokens
-    },
-    energyWh: state.impact ? state.impact.energy.wh : 0,
-    grade: state.impact ? state.impact.grade.grade : '?',
-    // An estimate keeps its range, so the library never shows its centre
-    // as if it were a measurement.
-    range: state.impact && state.impact.energy.range ? savedRange(state.impact) : undefined,
+    region: state.regionKey,
+    effort: state.reasoningEffort,
+    // Only a length set by hand: otherwise the analyzer's estimate, then.
+    outTokens: state.outputTouched ? state.outputTokens : null,
     ts: Date.now()
   });
   writeLibrary(items);
@@ -1454,43 +1478,40 @@ function renderLibrary() {
   const emptyEl = $('library-empty');
   clearChildren(listEl);
 
-  let items = readLibrary();
+  const all = readLibrary();
+  emptyEl.classList.toggle('hidden', all.length > 0);
 
   const q = state.librarySearch.trim().toLowerCase();
-  if (q) {
-    items = items.filter((it) =>
+  const items = all
+    .filter((it) => !q ||
       String(it.title || '').toLowerCase().includes(q) ||
-      String(it.text || '').toLowerCase().includes(q));
-  }
+      String(it.text || '').toLowerCase().includes(q))
+    .map((it) => ({ it, ...libraryEstimate(it) }));
 
+  const wh = (x) => (x.impact ? x.impact.energy.wh : Infinity);
   const sorters = {
-    'date-desc': (a, b) => (b.ts || 0) - (a.ts || 0),
-    'date-asc': (a, b) => (a.ts || 0) - (b.ts || 0),
-    'energy-asc': (a, b) => (a.energyWh || 0) - (b.energyWh || 0),
-    'energy-desc': (a, b) => (b.energyWh || 0) - (a.energyWh || 0)
+    'date-desc': (a, b) => (b.it.ts || 0) - (a.it.ts || 0),
+    'date-asc': (a, b) => (a.it.ts || 0) - (b.it.ts || 0),
+    'energy-asc': (a, b) => wh(a) - wh(b),
+    'energy-desc': (a, b) => wh(b) - wh(a)
   };
   items.sort(sorters[state.librarySort] || sorters['date-desc']);
 
-  const all = readLibrary();
-  emptyEl.classList.toggle('hidden', all.length > 0);
   if (!items.length && all.length > 0) {
     const none = el('p', 'explorer-note', 'No saved prompts match your search.');
     listEl.appendChild(none);
     return;
   }
 
-  for (const it of items) {
+  for (const { it, inputs, impact } of items) {
     const card = el('article', 'library-item');
+    const desc = impact ? describeImpact(impact) : null;
 
     const head = el('div', 'library-item-head');
     head.appendChild(el('span', 'library-item-title', it.title || 'Untitled prompt'));
-    const saved = describeSaved(it);
-    const pill = el('span', 'grade-pill', it.grade || '?');
-    if (saved) paintGrade(pill, saved);
-    else {
-      if (it.grade) pill.dataset.grade = it.grade;
-      pill.setAttribute('aria-label', `Eco-grade ${it.grade || 'unknown'}`);
-    }
+    const pill = el('span', 'grade-pill', desc ? desc.gradeText : '?');
+    if (desc) paintGrade(pill, desc);
+    else pill.setAttribute('aria-label', 'Eco-grade unknown');
     head.appendChild(pill);
     card.appendChild(head);
 
@@ -1498,19 +1519,22 @@ function renderLibrary() {
 
     const model = state.engine.getModel(it.modelId);
     const meta = el('div', 'library-item-meta');
-    // An older model keeps its own name: the saved figures are its own.
+    // An older model keeps its own name: the estimate is its own.
     const modelLabel = model
       ? (model.status === 'current' ? model.name : `${model.name} (older model)`)
-      : (it.modelId || 'unknown model');
+      : (it.modelId ? `${it.modelId} (not in the catalog)` : 'no model');
     meta.appendChild(el('span', null, modelLabel));
-    if (saved) {
-      meta.appendChild(el('span', null, `⚡ ${saved.rangeText} · ${saved.methodChip}`));
-    } else if (typeof it.energyWh === 'number') {
-      meta.appendChild(el('span', null, `⚡ ${formatWh(it.energyWh)}`));
+    if (desc) {
+      const span = el('span', null, `⚡ ${desc.estimated ? `${desc.rangeText} · ${desc.methodChip}` : formatWh(impact.energy.wh)}`);
+      span.title = "Re-estimated with today's model catalog";
+      meta.appendChild(span);
     }
-    if (it.tokens) {
-      meta.appendChild(el('span', null,
-        `${it.tokens.input || 0} in / ${it.tokens.output || 0} out tokens`));
+    if (inputs.region !== 'default') meta.appendChild(el('span', null, `grid: ${inputs.region}`));
+    if (impact && impact.model.isReasoning && inputs.effort !== 'standard') {
+      meta.appendChild(el('span', null, `${inputs.effort} effort`));
+    }
+    if (impact) {
+      meta.appendChild(el('span', null, `${impact.tokens.input} in / ${impact.tokens.output} out tokens`));
     }
     if (it.ts) {
       meta.appendChild(el('span', null, new Date(it.ts).toLocaleDateString(undefined, {
@@ -1520,6 +1544,12 @@ function renderLibrary() {
     card.appendChild(meta);
 
     const actions = el('div', 'library-item-actions');
+    const openBtn = el('button', 'icon-btn', '↩️ Open in coach');
+    openBtn.type = 'button';
+    openBtn.addEventListener('click', () => {
+      openInCoach(it.text || '', inputs);
+      showToast('Opened in the coach');
+    });
     const copyBtn = el('button', 'icon-btn', '📋 Copy');
     copyBtn.type = 'button';
     copyBtn.addEventListener('click', async () => {
@@ -1533,6 +1563,7 @@ function renderLibrary() {
       renderLibrary();
       showToast('Prompt deleted');
     });
+    actions.appendChild(openBtn);
     actions.appendChild(copyBtn);
     actions.appendChild(delBtn);
     card.appendChild(actions);
@@ -1570,19 +1601,19 @@ function importLibrary(file) {
       let added = 0;
       for (const it of incoming) {
         if (!it || typeof it !== 'object' || typeof it.text !== 'string') continue;
+        // Stored as v2 inputs, whichever version the file holds.
+        const inputs = libraryInputs(it);
         const entry = {
+          v: 2,
           id: typeof it.id === 'string' && !seen.has(it.id)
             ? it.id
             : `epc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           title: typeof it.title === 'string' ? it.title.slice(0, 80) : 'Imported prompt',
           text: it.text,
-          modelId: typeof it.modelId === 'string' ? it.modelId : '',
-          tokens: it.tokens && typeof it.tokens === 'object'
-            ? { input: Number(it.tokens.input) || 0, output: Number(it.tokens.output) || 0 }
-            : { input: 0, output: 0 },
-          energyWh: Number(it.energyWh) || 0,
-          grade: typeof it.grade === 'string' ? it.grade.slice(0, 1) : '?',
-          range: cleanRange(it.range) || undefined,
+          modelId: inputs.modelId || (typeof it.modelId === 'string' ? it.modelId.slice(0, 80) : ''),
+          region: inputs.region,
+          effort: inputs.effort,
+          outTokens: inputs.outTokens,
           ts: Number(it.ts) || Date.now()
         };
         seen.add(entry.id);
