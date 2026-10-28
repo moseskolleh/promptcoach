@@ -1082,42 +1082,69 @@ class ImpactEngine {
    * Aggregate a list of impacts (e.g. a day's or week's history) into totals.
    */
   aggregate(impacts) {
-    const totals = { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 };
-    // Estimates sum as ranges: lows with lows, highs with highs. A measured
-    // entry adds its own figure to both ends, and one floor makes the whole
-    // total a floor. `range` appears only when some entry had one
-    // (PLAN.md Step 8).
-    const sum = { lowWh: 0, highWh: 0, lowMl: 0, highMl: 0, lowG: 0, highG: 0 };
-    let anyRange = false;
-    for (const i of Array.isArray(impacts) ? impacts : []) {
-      if (!i || typeof i !== 'object') continue;
-      const wh = finiteOrZero(i.energy ? i.energy.wh : i.energyWh);
-      const ml = finiteOrZero(i.water ? i.water.ml : i.waterMl);
-      const g = finiteOrZero(i.carbon ? i.carbon.gCO2e : i.carbonG);
-      totals.queries += 1;
-      totals.energyWh += wh;
-      totals.waterMl += ml;
-      totals.carbonG += g;
-      const r = entryRange(i);
-      if (r) anyRange = true;
-      // Water and carbon scale with energy for one query on one host, as
-      // estimateImpact's own ranges do.
-      const lowShare = r && wh > 0 ? r.lowWh / wh : 1;
-      const highShare = r ? (r.highWh === null ? null : wh > 0 ? r.highWh / wh : 1) : 1;
-      sum.lowWh += r ? r.lowWh : wh;
-      sum.lowMl += ml * lowShare;
-      sum.lowG += g * lowShare;
-      if (highShare === null || sum.highWh === null) {
-        sum.highWh = sum.highMl = sum.highG = null;
-      } else {
-        sum.highWh += r ? r.highWh : wh;
-        sum.highMl += ml * highShare;
-        sum.highG += g * highShare;
-      }
-    }
-    if (anyRange) totals.range = sum;
-    return totals;
+    return aggregateImpacts(impacts);
   }
+}
+
+/**
+ * Totals over impacts, stored history records, or earlier totals (one day's
+ * summary): a record with a numeric `queries` adds the queries it holds and
+ * its range as it is, so day summaries add up to a week without the rows
+ * (PLAN.md Step 11). Needs no catalog, so the service worker can use it
+ * before any data loads.
+ */
+function aggregateImpacts(impacts) {
+  const totals = { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 };
+  // Estimates sum as ranges: lows with lows, highs with highs. A measured
+  // entry adds its own figure to both ends, and one floor makes the whole
+  // total a floor. `range` appears only when some entry had one
+  // (PLAN.md Step 8).
+  const sum = { lowWh: 0, highWh: 0, lowMl: 0, highMl: 0, lowG: 0, highG: 0 };
+  let anyRange = false;
+  const addHigh = (wh, ml, g) => {
+    if (wh === null || sum.highWh === null) {
+      sum.highWh = sum.highMl = sum.highG = null;
+    } else {
+      sum.highWh += wh;
+      sum.highMl += ml;
+      sum.highG += g;
+    }
+  };
+  for (const i of Array.isArray(impacts) ? impacts : []) {
+    if (!i || typeof i !== 'object') continue;
+    const wh = finiteOrZero(i.energy ? i.energy.wh : i.energyWh);
+    const ml = finiteOrZero(i.water ? i.water.ml : i.waterMl);
+    const g = finiteOrZero(i.carbon ? i.carbon.gCO2e : i.carbonG);
+    totals.energyWh += wh;
+    totals.waterMl += ml;
+    totals.carbonG += g;
+    if (!i.energy && typeof i.queries === 'number') {
+      // Earlier totals: their range ends add as they are.
+      totals.queries += finiteOrZero(i.queries);
+      const r = i.range && typeof i.range === 'object' && Number.isFinite(i.range.lowWh) ? i.range : null;
+      if (r) anyRange = true;
+      sum.lowWh += r ? r.lowWh : wh;
+      sum.lowMl += r ? finiteOrZero(r.lowMl) : ml;
+      sum.lowG += r ? finiteOrZero(r.lowG) : g;
+      if (r && r.highWh === null) addHigh(null);
+      else addHigh(r ? r.highWh : wh, r ? finiteOrZero(r.highMl) : ml, r ? finiteOrZero(r.highG) : g);
+      continue;
+    }
+    totals.queries += 1;
+    const r = entryRange(i);
+    if (r) anyRange = true;
+    // Water and carbon scale with energy for one query on one host, as
+    // estimateImpact's own ranges do.
+    const lowShare = r && wh > 0 ? r.lowWh / wh : 1;
+    const highShare = r ? (r.highWh === null ? null : wh > 0 ? r.highWh / wh : 1) : 1;
+    sum.lowWh += r ? r.lowWh : wh;
+    sum.lowMl += ml * lowShare;
+    sum.lowG += g * lowShare;
+    if (highShare === null) addHigh(null);
+    else addHigh(r ? r.highWh : wh, ml * highShare, g * highShare);
+  }
+  if (anyRange) totals.range = sum;
+  return totals;
 }
 
 // ----------------------------------------------------------------------------
@@ -1503,6 +1530,7 @@ const CalculatorModule = {
   MODEL_STATUSES,
   DEFAULT_MODEL_ID,
   THINKING_MODES,
+  aggregateImpacts,
   ECOLOGITS,
   PRECISION_BITS,
   ESTIMATE_METHODS,

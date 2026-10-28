@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 
 const {
-  ImpactEngine, createConverters, describeImpact, savingClaim, formatWh, formatWhRange, METHOD_CHIPS
+  ImpactEngine, createConverters, describeImpact, savingClaim, formatWh, formatWhRange, METHOD_CHIPS, aggregateImpacts
 } = require('../src/index');
 const modelsData = require('../src/data/models.json');
 const grids = require('../src/data/grids.json');
@@ -213,4 +213,29 @@ test('totals that include an estimate are a range; one floor makes them a floor'
 
   const ranged = conv.forTotals(totals, 'today');
   assert.strictEqual(ranged.energy.secondary, conv.energyRange(totals.range.lowWh, totals.range.highWh).secondary);
+});
+
+test('day totals add up to what their rows add up to', () => {
+  const ref = at('gpt-4o');
+  const est = at('adaptive');
+  const plain = at('plain', 100, 300);
+  const floor = at('always', 150, 400, { multiAgent: true });
+  const close = (a, b, key) => {
+    if (a === null || b === null) return assert.strictEqual(a, b, key);
+    assert.ok(Math.abs(a - b) < 1e-9 * Math.max(1, Math.abs(b)), `${key}: ${a} vs ${b}`);
+  };
+  const same = (got, want) => {
+    for (const k of ['queries', 'energyWh', 'waterMl', 'carbonG']) close(got[k], want[k], k);
+    assert.strictEqual(!!got.range, !!want.range);
+    if (want.range) for (const k of Object.keys(want.range)) close(got.range[k], want.range[k], k);
+  };
+  for (const [monday, tuesday] of [[[ref, ref], [ref]], [[ref, est], [plain]], [[est], [floor, ref]], [[floor], []]]) {
+    const days = [engine.aggregate(monday), engine.aggregate(tuesday)];
+    same(engine.aggregate(days), engine.aggregate([...monday, ...tuesday]));
+    // A day's total and one more row: how the extension adds a send.
+    same(engine.aggregate([days[0], ...tuesday]), engine.aggregate([...monday, ...tuesday]));
+  }
+  // It needs no catalog.
+  assert.deepStrictEqual(aggregateImpacts([ref, est]), engine.aggregate([ref, est]));
+  assert.deepStrictEqual(aggregateImpacts([]), { queries: 0, energyWh: 0, waterMl: 0, carbonG: 0 });
 });

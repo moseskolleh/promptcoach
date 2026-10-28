@@ -11,6 +11,10 @@
   <header class="header">
     <img class="header-icon" src="assets/leaf-icon.svg" alt="">
     <h1 class="header-title">EcoPrompt Coach</h1>
+    <label class="site-switch" id="site-switch-row" hidden>
+      <input type="checkbox" id="site-switch" checked>
+      <span>On <span id="site-switch-host"></span></span>
+    </label>
   </header>
 
   <!-- Tab bar (segmented control) -->
@@ -197,6 +201,10 @@
           <button class="btn btn-secondary" id="export-json-btn" title="Download every recorded query as JSON">Export JSON</button>
           <button class="btn btn-danger-outline" id="reset-btn">Reset data</button>
         </div>
+        <div class="rescore-row">
+          <button class="btn btn-secondary" id="rescore-btn" title="Re-estimate stored queries with today's model catalog">Re-score history</button>
+          <p class="rescore-status" id="rescore-status" role="status" aria-live="polite"></p>
+        </div>
       </div>
     </section>
   </main>
@@ -213,6 +221,7 @@
   <script src="vendor/calculator.js"></script>
   <script src="shared/defaults.js"></script>
   <script src="shared/days.js"></script>
+  <script src="shared/history.js"></script>
   <script src="vendor/analyzer.js"></script>
   <script src="vendor/conversions.js"></script>
   <script src="popup.js"></script>

@@ -39,9 +39,11 @@ Everything runs locally; prompts never leave your machine.
 | `manifest.json` | MV3 manifest |
 | `content.js` / `content.css` | on-page pill + detail card, send detection, history recording |
 | `popup.html/css/js` | Coach / Compare / Impact tabs |
-| `background.js` | badge service worker |
+| `background.js` | service worker: history's only writer, and the badge |
 | `settings.html/css/js` | options page |
-| `shared/defaults.js` | user-setting defaults shared by all three surfaces |
+| `shared/defaults.js` | user-setting defaults shared by all surfaces |
+| `shared/days.js` | calendar days for history buckets and the badge |
+| `shared/history.js` | history v2: row shape, day keys, daily totals, the single writer, re-scoring |
 | `vendor/` | synced copy of `packages/core` (engine + data) — **do not edit here** |
 | `assets/` | icons |
 

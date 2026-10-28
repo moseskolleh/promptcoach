@@ -27,6 +27,7 @@
 
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const Days = globalThis.EcoPromptDays;
+  const History = globalThis.EcoPromptHistory;
 
   // Shared popup state (Coach <-> Compare share prompt/token inputs).
   const state = {
@@ -468,23 +469,26 @@
   }
 
   // --------------------------------------------------------------------------
-  // Impact tab (dashboard from chrome.storage.local 'eco_history')
+  // Impact tab: from the daily totals ('agg:daily') alone. The rows are read
+  // only to export them (PLAN.md Step 11).
   // --------------------------------------------------------------------------
 
-  function loadHistory() {
+  function loadDailyTotals() {
     return new Promise((resolve) => {
-      chrome.storage.local.get('eco_history', (data) => {
-        resolve(Array.isArray(data && data.eco_history) ? data.eco_history : []);
+      chrome.storage.local.get(History.AGG_KEY, (data) => {
+        const agg = data && data[History.AGG_KEY];
+        resolve(agg && typeof agg === 'object' ? agg : {});
       });
     });
   }
 
   async function renderImpact() {
-    const history = await loadHistory();
+    const agg = await loadDailyTotals();
     const empty = $('impact-empty');
     const dash = $('impact-dashboard');
 
-    if (!history.length) {
+    const dates = Object.keys(agg).sort();
+    if (!dates.some((d) => agg[d] && agg[d].queries)) {
       empty.classList.remove('hidden');
       dash.classList.add('hidden');
       return;
@@ -493,15 +497,11 @@
     dash.classList.remove('hidden');
 
     // Calendar days, so a daylight-saving change can't shift the edges.
-    const now = Date.now();
-    const week = Days.lastDays(now, 7);
-    const today0 = week[6].start;
-    const todayEntries = history.filter((e) => e.ts >= today0);
-    const weekEntries = history.filter((e) => e.ts >= week[0].start);
-
-    const todayTotals = state.engine.aggregate(todayEntries);
-    const weekTotals = state.engine.aggregate(weekEntries);
-    const allTotals = state.engine.aggregate(history);
+    const week = Days.lastDays(Date.now(), 7).map((d) => ({ ...d, date: History.dateOf(d.start) }));
+    const today = week[6].date;
+    const todayTotals = History.totalsBetween(agg, today, today);
+    const weekTotals = History.totalsBetween(agg, week[0].date, today);
+    const allTotals = History.totalsBetween(agg, dates[0], dates[dates.length - 1]);
 
     // Period cards: query counts + short energy line
     // With an estimate among them, totals are a range.
@@ -529,20 +529,21 @@
     $('stat-carbon').textContent = t.carbon.primary;
     $('stat-carbon-sub').textContent = t.carbon.secondary;
 
-    renderWeekChart(history, week);
-    renderStreak(history, today0, todayTotals);
+    renderWeekChart(agg, week);
+    renderStreak(agg, week[6].start, todayTotals);
   }
 
-  function renderWeekChart(history, week) {
+  function renderWeekChart(agg, week) {
     const chart = $('week-chart');
     chart.textContent = '';
-    const today0 = week[week.length - 1].start;
-    const days = week.map(({ start, end }) => {
-      const entries = history.filter((e) => e.ts >= start && e.ts < end);
+    const today = week[week.length - 1].date;
+    const days = week.map(({ start, date }) => {
+      const totals = agg[date];
       return {
         dayStart: start,
-        energyWh: entries.reduce((sum, e) => sum + (e.energyWh || 0), 0),
-        queries: entries.length
+        today: date === today,
+        energyWh: (totals && totals.energyWh) || 0,
+        queries: (totals && totals.queries) || 0
       };
     });
     const maxWh = Math.max(...days.map((d) => d.energyWh), 0.001);
@@ -555,7 +556,7 @@
       const pct = Math.round((day.energyWh / maxWh) * 100);
       bar.style.height = `${Math.max(2, pct)}%`;
       if (!day.queries) bar.classList.add('is-empty');
-      if (day.dayStart === today0) bar.classList.add('is-today');
+      if (day.today) bar.classList.add('is-today');
       bar.title = day.queries
         ? `${day.queries} queries · ${day.energyWh.toFixed(2)} Wh`
         : 'No queries';
@@ -567,28 +568,47 @@
     }
   }
 
-  function renderStreak(history, today0, todayTotals) {
+  function renderStreak(agg, today0, todayTotals) {
     // Streak: consecutive days (ending today, or yesterday if today is quiet
     // so far) whose average per-query energy earns grade A.
     let streak = 0;
-    // Walk back one calendar day at a time: each day ends where the later
-    // one starts.
-    let dayEnd = todayTotals.queries ? Days.nextMidnight(today0) : today0;
-    for (let i = 0; i < 365; i++) {
-      const dayStart = Days.startOfDay(dayEnd - 1);
-      const entries = history.filter((e) => e.ts >= dayStart && e.ts < dayEnd);
-      if (!entries.length) break;
-      const avgWh = entries.reduce((s, e) => s + (e.energyWh || 0), 0) / entries.length;
-      if (state.engine.gradeFor(avgWh).grade !== 'A') break;
+    // Walk back one calendar day at a time.
+    let dayStart = todayTotals.queries ? today0 : Days.startOfDay(today0 - 1);
+    for (let i = 0; i < 3650; i++) {
+      const totals = agg[History.dateOf(dayStart)];
+      if (!totals || !totals.queries) break;
+      if (state.engine.gradeFor(totals.energyWh / totals.queries).grade !== 'A') break;
       streak += 1;
-      dayEnd = dayStart;
+      dayStart = Days.startOfDay(dayStart - 1);
     }
     $('streak-value').textContent = `${streak}-day streak`;
   }
 
+  /** Ask the service worker, history's only writer, to do something. */
+  function askWorker(type) {
+    return chrome.runtime.sendMessage({ type }).then((res) => {
+      if (!res || !res.ok) throw new Error((res && res.error) || 'no answer');
+      return res.result;
+    });
+  }
+
   function onResetClick() {
     if (!confirm('Delete all recorded query history? This cannot be undone.')) return;
-    chrome.storage.local.set({ eco_history: [] }, () => renderImpact());
+    askWorker('eco:clear').then(renderImpact, () => {});
+  }
+
+  /** Re-estimate stored queries from their inputs with the current catalog. */
+  async function onRescoreClick() {
+    const status = $('rescore-status');
+    status.textContent = 'Re-scoring…';
+    try {
+      const { rescored, kept } = await askWorker('eco:rescore');
+      status.textContent = `Re-scored ${rescored} ${rescored === 1 ? 'query' : 'queries'} with today's catalog.` +
+        (kept ? ` ${kept} older ${kept === 1 ? 'one keeps its' : 'ones keep their'} saved figures: no inputs were stored.` : '');
+      renderImpact();
+    } catch (err) {
+      status.textContent = 'Could not re-score: try again after reopening the popup.';
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -603,7 +623,9 @@
   }
 
   function historyToCsv(history) {
-    const header = ['timestamp_ms', 'datetime_iso', 'host', 'model_id', 'energy_wh', 'water_ml', 'carbon_g', 'grade'];
+    const header = ['timestamp_ms', 'datetime_iso', 'host', 'model_id', 'energy_wh', 'water_ml', 'carbon_g', 'grade',
+      'low_wh', 'high_wh', 'version', 'model_source', 'effort', 'task_type', 'input_tokens', 'output_tokens_est',
+      'region', 'conversation'];
     const rows = history.map((e) => [
       e.ts,
       Number.isFinite(e.ts) ? new Date(e.ts).toISOString() : '',
@@ -612,7 +634,17 @@
       Number(e.energyWh) || 0,
       Number(e.waterMl) || 0,
       Number(e.carbonG) || 0,
-      e.grade
+      e.grade,
+      e.lowWh,
+      e.highWh,
+      e.v,
+      e.modelSource,
+      e.effort,
+      e.taskType,
+      e.inTokens,
+      e.outTokensEst,
+      e.region,
+      e.convKey
     ].map(csvCell).join(','));
     return header.join(',') + '\n' + rows.join('\n') + '\n';
   }
@@ -629,7 +661,7 @@
   }
 
   async function exportHistory(format) {
-    const history = await loadHistory();
+    const history = await History.allRows(History.chromeStore(chrome.storage.local));
     if (!history.length) return;
     const date = new Date().toISOString().slice(0, 10);
     if (format === 'csv') {
@@ -643,6 +675,40 @@
       };
       downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), `ecoprompt-history-${date}.json`);
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // Pause on this site: no pill, nothing recorded (PLAN.md Step 11)
+  // --------------------------------------------------------------------------
+
+  function initSiteSwitch() {
+    if (!chrome.tabs || !chrome.tabs.query) return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      let host = null;
+      try {
+        const url = new URL((tabs && tabs[0] && tabs[0].url) || '');
+        if (url.protocol === 'https:' || url.protocol === 'http:') host = url.hostname.toLowerCase();
+      } catch (err) {
+        /* no page, or one the popup may not read */
+      }
+      // Only on a chat site the content script runs on.
+      if (!host || !Core.hostDefault(host).known) return;
+      const box = $('site-switch');
+      const sync = () => {
+        box.checked = !globalThis.EcoPromptSettings.isSitePaused(state.settings, host);
+      };
+      $('site-switch-host').textContent = host.replace(/^www\./, '');
+      $('site-switch-row').hidden = false;
+      sync();
+      box.addEventListener('change', () => {
+        const paused = (state.settings.pausedSites || []).filter((s) => s !== host && !host.endsWith(`.${s}`));
+        if (!box.checked) paused.push(host);
+        state.settings = { ...state.settings, pausedSites: paused };
+        chrome.storage.sync.get('eco_settings', (data) => {
+          chrome.storage.sync.set({ eco_settings: { ...((data && data.eco_settings) || {}), pausedSites: paused } });
+        });
+      });
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -715,6 +781,8 @@
     $('compare-in').addEventListener('input', onTokensInput);
     $('compare-out').addEventListener('input', onTokensInput);
     $('reset-btn').addEventListener('click', onResetClick);
+    $('rescore-btn').addEventListener('click', onRescoreClick);
+    initSiteSwitch();
     $('export-csv-btn').addEventListener('click', () => exportHistory('csv'));
     $('export-json-btn').addEventListener('click', () => exportHistory('json'));
     $('settings-link').addEventListener('click', (e) => {

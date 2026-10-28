@@ -1096,6 +1096,52 @@ DOM-level bugs get Playwright tests when Step 16's harness lands.
 after a catalog edit changes totals. The Impact tab reads `agg:daily` without
 scanning raw rows.
 
+> **Status (2026-10-27): built.** `extension-history.test.js` runs
+> `background.js` against a stand-in for `chrome.storage` whose calls
+> interleave.
+> - **Rows.** `shared/history.js` defines the v2 row: the shape above plus
+>   the figures it gave and the region and embodied-carbon setting it was
+>   priced at.
+>   - The writer keeps only known fields, so text can't ride along.
+>   - `convKey` is a SHA-256 of a per-install salt and the page's origin
+>     and path. The worker reads the address from the message's sender, and
+>     neither the address nor the salt leaves it.
+>   - `outTokensObs` waits for Step 18's response observer.
+> - **Storage.** One key per local calendar day (`h:2026-10-27`), and
+>   `agg:daily`.
+>   - Core's `aggregate` now adds earlier totals as well as rows, so day
+>     totals add up to a week.
+>   - Retention (forever, 1 year, 90 or 30 days) drops rows, never totals.
+> - **One writer.** Content scripts send each row to the service worker
+>   (`eco:record`), and one queue writes it. In the test, 10,000 sends from
+>   3 tabs keep all 10,000 rows. The same stand-in loses two of three sends
+>   when tabs write directly.
+> - **Re-score history** (popup). The content script and re-scoring price a
+>   send with the same request, so the same catalog changes nothing, and a
+>   catalog edit changes the totals.
+>   - v1 rows keep their figures.
+>   - So does a day whose rows retention dropped.
+> - **Migration.** The pre-v2 `eco_history` array moves into day keys as v1
+>   rows, once. A marker written with the rows means a crash can't add them
+>   twice.
+> - **The Impact tab reads `agg:daily` only.** A browser check confirmed it
+>   asks storage for nothing else. Export reads the rows.
+> - **Switches.**
+>   - *Record my queries* (settings).
+>   - *Pause on this site* (popup), which hides the pill and records
+>     nothing. The settings page lists paused sites with *Resume*.
+>   - *Keep individual queries for* (settings).
+> - **Web library.**
+>   - Entries store inputs: model, region, effort, and the answer length if
+>     set by hand.
+>   - Each entry is re-estimated with today's catalog when shown, through
+>     the coach's own estimate function.
+>   - *Open in coach* loads an entry's prompt and inputs.
+>   - Entries saved before v2 read as the defaults with their saved answer
+>     length. Import stores v2.
+> - **Not yet:** the mobile app keeps the v1 history shape until it gets
+>   real screens (Step 38 replaces it with a PWA).
+
 ### Step 12 — One analysis pass · M
 - Add a `PromptContext` built once per call: masked text, protected spans,
   token count. Pass it to `detectTaskType`, `detectPoliteWords`,

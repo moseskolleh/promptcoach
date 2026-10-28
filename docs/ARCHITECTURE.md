@@ -67,11 +67,17 @@
    as you type, detects the model from the page's model switcher (labels are
    mapped to catalog ids by `detectModelFromLabels` in core; the hostname
    default is the fallback), and renders the eco-grade pill.
-2. On send, it appends `{ts, host, modelId, energyWh, waterMl, carbonG,
-   grade}` to `eco_history` (capped at 5000 entries).
-3. `background.js` updates the action badge from today's history.
-4. `popup.js` reads the same history for the Impact tab (with CSV/JSON
-   export) and runs the full coach/compare flows on demand.
+2. On send, it messages `background.js` with a v2 history row: the send's
+   inputs (model, effort, task type, token counts, region) and the figures
+   they gave, never its text (`shared/history.js`).
+3. `background.js` is history's only writer. One queue appends each row to
+   that day's key (`h:2026-10-27`) and updates the day's totals in
+   `agg:daily`, so tabs can't overwrite each other's sends. It updates the
+   badge from today's totals, drops rows past the retention setting (totals
+   stay), and re-scores stored rows with the current catalog on request.
+4. `popup.js` reads `agg:daily` alone for the Impact tab, reads the rows only
+   to export them (CSV/JSON), and runs the full coach/compare flows on
+   demand.
 
 ## Startup roadmap (product view)
 

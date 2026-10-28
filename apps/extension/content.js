@@ -33,6 +33,12 @@
   }
 
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
+  const History = globalThis.EcoPromptHistory;
+
+  /** False on a site the user paused EcoPrompt on: no pill, nothing recorded. */
+  function siteOn() {
+    return !globalThis.EcoPromptSettings.isSitePaused(settings, location.hostname);
+  }
 
   let engine = null;
   let conv = null;
@@ -43,6 +49,7 @@
   // 'picker' | 'mode' | 'host' | 'routed' | 'newer' | 'missing' | 'meta' | 'settings' | 'default'
   let modelSource = 'default';
   let detectedEffort = null; // an effort or mode read off the page
+  let lastInputs = null; // what the current draft is priced from
   let detectedMultiAgent = false; // several agents at once (Grok Heavy)
   let catalogIds = []; // every catalog id, for detection's fail-closed check
 
@@ -218,16 +225,27 @@
     return hint && engine.getModel(hint) ? hint : null;
   }
 
-  function impactOptions(extra = {}) {
+  /**
+   * What a send is priced from: the history row keeps these, never the
+   * text, so it can be re-scored later (PLAN.md Step 11).
+   */
+  function sendInputs(analysis) {
     return {
+      host: location.hostname,
+      modelId,
+      modelSource,
       // An effort read off the page beats the saved setting.
-      reasoningEffort: detectedEffort || settings.reasoningEffort,
-      // A thinking mode read off the page means thinking is on.
-      thinkingOn: !!detectedEffort && detectedEffort !== 'none',
-      multiAgent: detectedMultiAgent,
-      regionKey: settings.regionKey,
-      includeEmbodied: settings.includeEmbodied,
-      ...extra
+      effort: detectedEffort || settings.reasoningEffort,
+      taskType: analysis.taskTypeRaw,
+      inTokens: analysis.tokens,
+      outTokensEst: analysis.outputEstimate.estimated,
+      flags: {
+        multiAgent: detectedMultiAgent,
+        // A thinking mode read off the page means thinking is on.
+        thinkingOn: !!detectedEffort && detectedEffort !== 'none'
+      },
+      region: settings.regionKey,
+      embodied: settings.includeEmbodied !== false
     };
   }
 
@@ -480,12 +498,8 @@
       if (cardOpen) renderCard();
       return;
     }
-    lastImpact = engine.estimateImpact({
-      modelId,
-      inputTokens: lastAnalysis.tokens,
-      outputTokens: lastAnalysis.outputEstimate.estimated,
-      options: impactOptions({ taskMultiplier: lastAnalysis.energyMultiplier })
-    });
+    lastInputs = sendInputs(lastAnalysis);
+    lastImpact = engine.estimateImpact(History.requestFor(lastInputs));
     if (!lastImpact) return;
     // An estimate shows its range, in everyday units, and says it is one.
     const desc = Core.describeImpact(lastImpact);
@@ -507,35 +521,23 @@
   // --------------------------------------------------------------------------
 
   function recordSend() {
+    if (settings.recordHistory === false || !siteOn()) return;
     const now = Date.now();
     if (now - lastRecordTs < 1000) return; // Enter + click double-fire guard
     // Recompute synchronously so we record the final draft, not a stale one.
     clearTimeout(analyzeTimer);
     analyzeDraft();
-    if (!lastImpact) return;
+    if (!lastImpact || !lastInputs) return;
     lastRecordTs = now;
 
-    const entry = {
-      ts: now,
-      host: location.hostname,
-      modelId,
-      energyWh: lastImpact.energy.wh,
-      waterMl: lastImpact.water.ml,
-      carbonG: lastImpact.carbon.gCO2e,
-      grade: lastImpact.grade.grade
-    };
-    // An estimate keeps its range, so totals can sum ranges (a null high
-    // end is a floor).
-    if (lastImpact.energy.range) {
-      entry.lowWh = lastImpact.energy.range.lowWh;
-      entry.highWh = lastImpact.energy.range.highWh;
+    // The service worker is the only writer (PLAN.md Step 11). The row holds
+    // the send's inputs and figures, never its text.
+    const entry = History.makeEntry({ ...lastInputs, ts: now }, lastImpact);
+    try {
+      chrome.runtime.sendMessage({ type: 'eco:record', entry }).catch(() => {});
+    } catch (err) {
+      /* the extension was reloaded: this page's script can't reach it */
     }
-    chrome.storage.local.get('eco_history', (data) => {
-      const history = Array.isArray(data && data.eco_history) ? data.eco_history : [];
-      history.push(entry);
-      // Cap history at 5000 entries (drop oldest).
-      chrome.storage.local.set({ eco_history: history.slice(-5000) });
-    });
   }
 
   function onKeyDown(event) {
@@ -598,7 +600,7 @@
   function applyPillVisibility() {
     if (!pill) return;
     // No composer, no pill: a grade with nothing to grade misleads.
-    const show = settings.showPill !== false && !!inputEl;
+    const show = settings.showPill !== false && siteOn() && !!inputEl;
     pill.style.display = show ? '' : 'none';
     if (!show) {
       cardOpen = false;
