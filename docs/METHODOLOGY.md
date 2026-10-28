@@ -610,6 +610,14 @@ An estimated model's grade is the grade of each end of its energy range:
    hosted models previously carried that label on the strength of an
    infrastructure-aware estimation framework; they are now `benchmarked`. No
    number changed — only the claim about where it came from.
+11. **A long prompt is read at its edges.** Past 12,000 characters, the task
+   type, output budget, zero-AI lookups and courtesy phrases are read from the
+   first and last 6,000 characters only. Task verbs sit at the start and
+   budgets ("…in 3 bullets") at the end; the middle of a long paste is
+   payload. Tokens are still counted on the whole prompt, so the energy
+   estimate is unaffected. Courtesy phrases in the middle aren't counted, so
+   the trimming tip can understate what *Copy trimmed* removes, never
+   overstate it (PLAN.md Step 12).
 
 ---
 
