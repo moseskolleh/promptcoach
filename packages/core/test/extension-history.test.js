@@ -107,14 +107,6 @@ test('rows keep inputs and figures, never text or addresses', async () => {
   assert.strictEqual(await w.send({ type: 'something-else' }, {}), undefined);
 });
 
-function catalogFetch(data) {
-  return (url) => {
-    const name = url.split('/').pop().replace('.json', '');
-    const body = name === 'models' ? data : core.data[name];
-    return Promise.resolve({ json: () => Promise.resolve(JSON.parse(JSON.stringify(body))) });
-  };
-}
-
 test('re-scoring after a catalog edit changes the totals; the same catalog changes nothing', async () => {
   const local = {
     eco_history: [
@@ -122,7 +114,7 @@ test('re-scoring after a catalog edit changes the totals; the same catalog chang
       { ts: START - 3 * DAY + 60000, host: 'claude.ai', modelId: 'claude-4.5-sonnet', energyWh: 1.1, waterMl: 3.2, carbonG: 0.4, grade: 'C' }
     ]
   };
-  const w = startWorker({ now: START, local, fetch: catalogFetch(modelsData) });
+  const w = startWorker({ now: START, local });
   await w.settle();
   for (let i = 0; i < 20; i++) {
     assert.ok((await w.send({ type: 'eco:record', entry: entryAt(i, START + i * DAY / 4) }, { tab: { id: 1 }, url: 'https://chatgpt.com/' })).ok);
@@ -138,7 +130,7 @@ test('re-scoring after a catalog edit changes the totals; the same catalog chang
   // A catalog edit: GPT-6 Luna moves from the small tier to the frontier one.
   const edited = JSON.parse(JSON.stringify(modelsData));
   edited.models.find((m) => m.model_id === 'gpt-6-luna').estimate.tier = 'frontier';
-  const w2 = startWorker({ now: START, local, fetch: catalogFetch(edited) });
+  const w2 = startWorker({ now: START, local, models: edited });
   await w2.settle();
   const legacyBefore = rowsIn(local).filter((r) => r.v === 1).map((r) => r.energyWh);
   const answer = await w2.send({ type: 'eco:rescore' }, {});
@@ -191,7 +183,7 @@ test('retention drops old rows and keeps every day\'s totals', async () => {
   assert.deepStrictEqual(dayKeys(local).map((k) => k.slice(2)).sort(), ['2026-08-10', '2026-08-20', '2026-08-30']);
   assert.strictEqual(JSON.stringify(local[History.AGG_KEY]), aggBefore);
   // Re-scoring leaves the dropped days' totals as they were.
-  const w3 = startWorker({ now, local, fetch: catalogFetch(modelsData) });
+  const w3 = startWorker({ now, local });
   await w3.settle();
   const answer = await w3.send({ type: 'eco:rescore' }, {});
   assert.deepStrictEqual(answer.result, { rescored: 3, kept: 0, daysWithoutRows: 4 });

@@ -1001,6 +1001,13 @@ runbook has been used once for real (the Mistral Large 4 weights).
 > - **The runbook** is `docs/CATALOG-REFRESH.md`. It hasn't been used for
 >   real yet: Mistral Large 4's weights are expected Oct 27–31, and
 >   mistral.ai and huggingface.co are still blocked from this environment.
+> - **Checked 2026-10-29.**
+>   - Mistral's own Vibe code (v3.0.x, F-SDK) now knows `mistral-large-4`:
+>     its thinking can be turned off, and it has a 1M context.
+>   - Its parameter counts, weights and release date still can't be read
+>     from a primary source here, and `mistralai/platform-docs-public` no
+>     longer clones.
+>   - So the entry still waits.
 
 ---
 
@@ -1211,6 +1218,36 @@ scanning raw rows.
 **Done when:** zero `fetch` calls and zero fits at start-up on every surface.
 No grade color or formatter is defined outside core. The sync gate in CI
 covers the bundle.
+
+> **Status (2026-10-29): the bootstrap half is built; the presentation layer
+> follows in its own PR.**
+> - **The bundle.** `scripts/sync-core.js` writes one
+>   `vendor/core.bundle.js` per app, which replaces the separate scripts and
+>   data files. It holds:
+>   - the core's three scripts;
+>   - the catalog inlined (as `JSON.parse` strings, which parse fastest);
+>   - the precomputed coefficients, and `createBundledEngine()`.
+> - **Precomputed coefficients.** `precompute(engine)` stores each model's
+>   coefficients, fitted or from Step 2's estimators, and the thinking pairs,
+>   in `data/precomputed.json`.
+>   - The engine takes them and fits nothing when they cover exactly the
+>     catalog's model ids. Anything else, and it fits as before.
+>   - `createDefaultEngine()` uses them, so mobile starts without fitting
+>     too.
+> - **Drift.** `bundle.test.js` holds the precomputed coefficients equal to
+>   a fresh fit, and a precomputed engine equal to a fitted one for every
+>   model at four shapes. The sync test holds each app's bundle equal to a
+>   fresh build. **0 fits and 0 estimates** at start-up, counted by
+>   `ENGINE_STATS`.
+> - **No fetch.**
+>   - The content script, popup, options page, service worker and web app
+>     build their engine from the bundle.
+>   - `check-apps` refuses an app script that calls `fetch(`.
+>   - `vendor/*` is no longer web-accessible.
+>   - The web app now works from `file://`. A browser check recorded no data
+>     requests on any surface.
+> - **Settings** loads the one bundle; the separate analyzer and conversions
+>   scripts are gone everywhere.
 
 ### Step 14 — A lighter runtime on every page · M
 Content script:

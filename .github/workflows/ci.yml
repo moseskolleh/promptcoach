@@ -1,4 +1,4 @@
-# Runs on every push and pull request: engine tests (incl. the vendored-copy
+# Runs on every push and pull request: engine tests (incl. the core-bundle
 # sync check), the catalog gates, and dependency-free static checks of the
 # browser apps.
 # The Pages deploy (deploy-pages.yml) runs the same `npm test` gate on main.
@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - name: Engine tests + vendored-copy sync check
+      - name: Engine tests + core-bundle sync check
         run: npm run test:core
 
       - name: Catalog gates (release dates, sources, deny-list, superseded_by)

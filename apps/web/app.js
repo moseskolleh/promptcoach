@@ -43,7 +43,7 @@ function debounce(fn, ms) {
 }
 
 // formatWh, describeImpact and savingClaim are top-level functions in
-// vendor/conversions.js, which shares this page's global scope.
+// the core bundle (vendor/core.bundle.js), which shares this page's global scope.
 
 function formatMl(ml) {
   return ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : `${ml.toFixed(1)} mL`;
@@ -227,21 +227,18 @@ const EXAMPLE_PROMPTS = [
 
 /* ============================ 4. Data loading ============================ */
 
+/**
+ * The engine over the bundled data. The bundle inlines the catalog and its
+ * precomputed coefficients, so nothing is fetched or fitted, and the page
+ * works from file:// (PLAN.md Step 13).
+ */
 async function loadData() {
-  const fetchJson = async (path) => {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-    return res.json();
-  };
-  const [models, grids, equivalents] = await Promise.all([
-    fetchJson('vendor/data/models.json'),
-    fetchJson('vendor/data/grids.json'),
-    fetchJson('vendor/data/equivalents.json')
-  ]);
-  state.modelsRaw = models;
+  if (!EcoPromptCore.createBundledEngine) throw new Error('vendor/core.bundle.js did not load');
+  const { engine, converters } = EcoPromptCore.createBundledEngine();
+  state.modelsRaw = EcoPromptCore.data.models;
   referenceImpactCache.clear();
-  state.engine = new EcoPromptCore.ImpactEngine({ models, grids, equivalents });
-  state.conv = EcoPromptCore.createConverters(equivalents);
+  state.engine = engine;
+  state.conv = converters;
 }
 
 function providerAnchor(modelId) {

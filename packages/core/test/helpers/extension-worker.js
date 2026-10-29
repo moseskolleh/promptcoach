@@ -50,9 +50,10 @@ function fakeArea(data, interleave) {
  * @param {Object} [opts.local]       initial chrome.storage.local
  * @param {Object} [opts.sync]        initial chrome.storage.sync
  * @param {boolean} [opts.interleave] random event-loop turns per storage call
- * @param {Function} [opts.fetch]     for the worker's catalog fetches
+ * @param {Object} [opts.models]      a catalog to ship in place of the bundle's
+ *        (an edited release): the engine then fits it fresh
  */
-function startWorker({ now, local = {}, sync = {}, interleave = false, fetch } = {}) {
+function startWorker({ now, local = {}, sync = {}, interleave = false, models } = {}) {
   const calls = { alarms: [], badgeText: [] };
   const listeners = {};
   const on = (name) => ({ addListener: (fn) => { listeners[name] = fn; } });
@@ -67,7 +68,6 @@ function startWorker({ now, local = {}, sync = {}, interleave = false, fetch } =
     TextEncoder,
     URL,
     setTimeout,
-    fetch: fetch || (() => Promise.reject(new Error('no fetch in this test'))),
     chrome: {
       alarms: { create: (name, info) => calls.alarms.push({ name, ...info }), onAlarm: on('alarm') },
       action: {
@@ -90,6 +90,10 @@ function startWorker({ now, local = {}, sync = {}, interleave = false, fetch } =
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(extDir, 'background.js'), 'utf8'), context, { filename: 'background.js' });
+  if (models) {
+    context.EcoPromptCore.data = { ...context.EcoPromptCore.data, models };
+    context.EcoPromptCore.precomputed = null;
+  }
 
   /** Deliver a runtime message as Chrome would, serialized both ways; resolves with the response. */
   const send = (msg, sender) => new Promise((resolve) => {

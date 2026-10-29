@@ -309,8 +309,28 @@ export interface Region {
   cif: number;
 }
 
+/**
+ * What an engine worked out from a catalog, ready to store (PLAN.md Step 13):
+ * each model's coefficients and the thinking pairs. scripts/sync-core.js
+ * writes it to data/precomputed.json and into each app's bundle.
+ */
+export interface Precomputed {
+  v: 1;
+  models: Record<string, {
+    coefficients: Coefficients;
+    benchMaxInput: number;
+    benchMaxOutput: number;
+    estimate: { method: EstimateMethod; band: { low: number; high: number } | null; members: string[] | null; inputs: unknown } | null;
+  }>;
+  pairs: Array<{ thinking: string; base: { id: string; coefficients: Coefficients; benchMaxInput: number } }>;
+}
+export function precompute(engine: ImpactEngine): Precomputed;
+/** How many fits and estimates have run, for the zero-at-start-up test. */
+export const ENGINE_STATS: { fits: number; estimates: number };
+
 export class ImpactEngine {
-  constructor(bundle: { models: ModelsData; grids: GridsData; equivalents?: EquivalentsData | null });
+  /** With `precomputed` for this same catalog, the engine starts without fitting. */
+  constructor(bundle: { models: ModelsData; grids: GridsData; equivalents?: EquivalentsData | null; precomputed?: Precomputed | null });
   meta: Record<string, unknown>;
   grids: GridsData;
   equivalents: EquivalentsData | null;
@@ -616,4 +636,5 @@ export const METHOD_CHIPS: Record<EstimateMethod, string>;
 // --------------------------------------------------------------------- entry
 
 export const data: { models: ModelsData; grids: GridsData; equivalents: EquivalentsData };
+/** Engine and converters over the bundled data, from the precomputed coefficients: no fitting. */
 export function createDefaultEngine(): { engine: ImpactEngine; converters: Converters };

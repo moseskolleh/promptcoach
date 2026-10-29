@@ -13,6 +13,7 @@
 //      or a worker and its importScripts) declaring the same top-level name
 //   7. a model id written into an app or core that models.json doesn't have
 //   8. an app defining a default model of its own instead of core's
+//   9. an app script calling fetch(): the core bundle carries the data
 //
 // Run:  node scripts/check-apps.js      (also part of `npm test`)
 'use strict';
@@ -261,6 +262,19 @@ for (const file of appSources) {
   lines.forEach((text, i) => {
     if (OWN_DEFAULT.test(text) || modelIdsIn(text).some((m) => m.id === DEFAULT_MODEL_ID)) {
       fail(`${rel(file)}:${i + 1}: the default model is defined once, in core — read EcoPromptCore.DEFAULT_MODEL_ID`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 9. No fetch at start-up (PLAN.md Step 13): vendor/core.bundle.js carries the
+//    catalog and its precomputed coefficients, so no app script fetches.
+// ---------------------------------------------------------------------------
+for (const file of appSources.filter((f) => /\.(js|ts|tsx)$/.test(f))) {
+  checks++;
+  fs.readFileSync(file, 'utf8').split('\n').forEach((text, i) => {
+    if (/(?<!\w)fetch\s*\(/.test(text.replace(/\/\/.*$/, ''))) {
+      fail(`${rel(file)}:${i + 1}: the core bundle carries the data; no app script fetches at start-up`);
     }
   });
 }

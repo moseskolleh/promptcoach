@@ -8,11 +8,6 @@ const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
 
 const $ = (id) => document.getElementById(id);
 
-async function fetchJson(path) {
-  const res = await fetch(chrome.runtime.getURL(path));
-  return res.json();
-}
-
 /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
 function loadSettings() {
   return new Promise((resolve) => {
@@ -74,14 +69,9 @@ function renderPausedSites() {
 }
 
 async function init() {
-  const [models, grids, equivalents, saved] = await Promise.all([
-    fetchJson('vendor/data/models.json'),
-    fetchJson('vendor/data/grids.json'),
-    fetchJson('vendor/data/equivalents.json'),
-    loadSettings()
-  ]);
-
-  const engine = new EcoPromptCore.ImpactEngine({ models, grids, equivalents });
+  const saved = await loadSettings();
+  // No fetch, no fitting: the bundle carries both (PLAN.md Step 13).
+  const { engine } = EcoPromptCore.createBundledEngine();
   const settings = globalThis.EcoPromptSettings.resolve(saved, engine);
   globalThis.EcoPromptSettings.showNotice($('model-notice'));
 

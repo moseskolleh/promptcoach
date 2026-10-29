@@ -71,7 +71,7 @@ npx serve apps/web          # or run locally: open http://localhost:3000
 # — hosted at https://moseskolleh.github.io/promptcoach/demo/
 npx serve apps/demo         # or run locally: open http://localhost:3000
 
-# After editing packages/core, re-sync the apps' vendored copies
+# After editing packages/core, rebuild the apps' core bundle
 node scripts/sync-core.js
 ```
 

@@ -217,13 +217,12 @@
        target="_blank" rel="noopener">Methodology</a>
   </footer>
 
-  <!-- Shared defaults + vendored core (attaches to window.EcoPromptCore) -->
-  <script src="vendor/calculator.js"></script>
+  <!-- The core bundle (engine, data, precomputed coefficients; attaches to
+       window.EcoPromptCore), then the shared extension helpers -->
+  <script src="vendor/core.bundle.js"></script>
   <script src="shared/defaults.js"></script>
   <script src="shared/days.js"></script>
   <script src="shared/history.js"></script>
-  <script src="vendor/analyzer.js"></script>
-  <script src="vendor/conversions.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

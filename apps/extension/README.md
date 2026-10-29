@@ -44,7 +44,7 @@ Everything runs locally; prompts never leave your machine.
 | `shared/defaults.js` | user-setting defaults shared by all surfaces |
 | `shared/days.js` | calendar days for history buckets and the badge |
 | `shared/history.js` | history v2: row shape, day keys, daily totals, the single writer, re-scoring |
-| `vendor/` | synced copy of `packages/core` (engine + data) — **do not edit here** |
+| `vendor/core.bundle.js` | generated from `packages/core`: engine, data and precomputed coefficients — **do not edit here** |
 | `assets/` | icons |
 
 ## Updating the engine or data
@@ -53,7 +53,7 @@ Edit `packages/core` at the repo root, run its tests, then re-sync:
 
 ```bash
 npm test                      # from repo root
-node scripts/sync-core.js     # refreshes vendor/ in extension and web app
+node scripts/sync-core.js     # rebuilds vendor/core.bundle.js in extension and web app
 ```
 
 ## Release vs dev manifest

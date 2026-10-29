@@ -7,7 +7,7 @@
 
 'use strict';
 
-// vendor/calculator.js attaches the engine to globalThis.EcoPromptCore, so
+// vendor/core.bundle.js attaches the engine to globalThis.EcoPromptCore, so
 // the badge uses the exact same grade bands as the popup and the pill — it
 // can never drift when the bands are recalibrated in core.
 //
@@ -16,7 +16,7 @@
 // `const { GRADE_BANDS } = …` collided with core's own GRADE_BANDS, threw
 // "Identifier has already been declared" during importScripts, and aborted
 // the worker on every startup — the badge never rendered.
-importScripts('vendor/calculator.js', 'vendor/analyzer.js', 'shared/defaults.js', 'shared/days.js', 'shared/history.js');
+importScripts('vendor/core.bundle.js', 'shared/defaults.js', 'shared/days.js', 'shared/history.js');
 const Core = globalThis.EcoPromptCore;
 const Days = globalThis.EcoPromptDays;
 const History = globalThis.EcoPromptHistory;
@@ -64,18 +64,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// Re-scoring needs the catalog, so the engine loads on first use.
-let enginePromise = null;
+// Re-scoring needs the engine, built on first use from the bundle's data.
+let bundledEngine = null;
 function loadEngine() {
-  if (!enginePromise) {
-    const json = (path) => fetch(chrome.runtime.getURL(path)).then((res) => res.json());
-    enginePromise = Promise.all(['models', 'grids', 'equivalents'].map((name) => json(`vendor/data/${name}.json`)))
-      .then(([models, grids, equivalents]) => new Core.ImpactEngine({ models, grids, equivalents }));
-    enginePromise.catch(() => {
-      enginePromise = null;
-    });
-  }
-  return enginePromise;
+  if (!bundledEngine) bundledEngine = Core.createBundledEngine().engine;
+  return bundledEngine;
 }
 
 // Content scripts record; only the extension's own pages (no tab) may
@@ -84,7 +77,7 @@ const HANDLERS = {
   'eco:record': (msg, sender) => (sender.tab ? writer.record(msg.entry, sender.url) : Promise.reject(new Error('not from a page'))),
   'eco:rescore': async (msg, sender) => {
     if (sender.tab) throw new Error('not from the extension');
-    return writer.rescore(await loadEngine());
+    return writer.rescore(loadEngine());
   },
   'eco:clear': (msg, sender) => (sender.tab ? Promise.reject(new Error('not from the extension')) : writer.clear())
 };

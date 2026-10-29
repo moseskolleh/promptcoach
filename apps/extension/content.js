@@ -68,11 +68,6 @@
   // Setup: data + settings
   // --------------------------------------------------------------------------
 
-  async function fetchJson(path) {
-    const res = await fetch(chrome.runtime.getURL(path));
-    return res.json();
-  }
-
   /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
   function loadSettings() {
     return new Promise((resolve) => {
@@ -613,15 +608,10 @@
   // --------------------------------------------------------------------------
 
   async function init() {
-    const [models, grids, equivalents, saved] = await Promise.all([
-      fetchJson('vendor/data/models.json'),
-      fetchJson('vendor/data/grids.json'),
-      fetchJson('vendor/data/equivalents.json'),
-      loadSettings()
-    ]);
-    engine = new Core.ImpactEngine({ models, grids, equivalents });
-    settings = globalThis.EcoPromptSettings.resolve(saved, engine);
-    conv = Core.createConverters(equivalents);
+    // The bundle carries the data and its precomputed coefficients: no
+    // fetch, no fitting at start-up (PLAN.md Step 13).
+    ({ engine, converters: conv } = Core.createBundledEngine());
+    settings = globalThis.EcoPromptSettings.resolve(await loadSettings(), engine);
     catalogIds = engine.listModels({ includeReference: true }).map((m) => m.id);
     resolveModel();
 

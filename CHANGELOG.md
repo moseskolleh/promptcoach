@@ -5,6 +5,21 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### One engine bootstrap (PLAN.md Step 13, first half)
+
+- **No fetch and no fitting at start-up, on every surface.**
+  - The extension and web app load one generated `vendor/core.bundle.js`:
+    the core's scripts, the catalog, and every model's coefficients worked
+    out in advance (`data/precomputed.json`).
+  - Node and mobile get the same coefficients through `createDefaultEngine()`.
+- **The web app works from `file://`.**
+- **Gates:**
+  - a test holds the precomputed coefficients equal to a fresh fit;
+  - the sync check covers the bundle;
+  - `check-apps` refuses `fetch(` in app scripts.
+- New engine API: `precompute()`, the `precomputed` constructor option, and
+  `ENGINE_STATS`.
+
 ### One analysis pass (PLAN.md Step 12)
 
 - **Prompt analysis is about 10× faster on long pastes:** an 86k-character

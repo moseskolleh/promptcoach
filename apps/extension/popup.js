@@ -49,11 +49,6 @@
   // Bootstrapping: data, settings, session state
   // --------------------------------------------------------------------------
 
-  async function fetchJson(path) {
-    const res = await fetch(chrome.runtime.getURL(path));
-    return res.json();
-  }
-
   /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
   function loadSettings() {
     return new Promise((resolve) => {
@@ -716,19 +711,15 @@
   // --------------------------------------------------------------------------
 
   async function init() {
-    const [models, grids, equivalents, saved, session] = await Promise.all([
-      fetchJson('vendor/data/models.json'),
-      fetchJson('vendor/data/grids.json'),
-      fetchJson('vendor/data/equivalents.json'),
-      loadSettings(),
-      loadSession()
-    ]);
+    const [saved, session] = await Promise.all([loadSettings(), loadSession()]);
 
-    state.engine = new Core.ImpactEngine({ models, grids, equivalents });
+    // No fetch, no fitting: the bundle carries both (PLAN.md Step 13).
+    const bundled = Core.createBundledEngine();
+    state.engine = bundled.engine;
     const settings = globalThis.EcoPromptSettings.resolve(saved, state.engine);
     state.settings = settings;
     globalThis.EcoPromptSettings.showNotice($('model-notice'));
-    state.conv = Core.createConverters(equivalents);
+    state.conv = bundled.converters;
     state.models = state.engine.listModels();
 
     // Restore the effort first: the quick grades below are computed at the

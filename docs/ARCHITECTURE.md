@@ -9,9 +9,10 @@
 │                  zero-AI alternatives, coaching tips        │
 │  conversions.js  relatable everyday equivalents             │
 │  data/           models.json · grids.json · equivalents.json│
+│                  precomputed.json (generated coefficients)  │
 │  test/           node --test (engine + analyzer)            │
 └──────────────┬───────────────┬───────────────┬──────────────┘
-               │ vendored copy │ vendored copy │ npm workspace
+               │ core bundle   │ core bundle   │ npm workspace
                ▼               ▼               ▼
       apps/extension       apps/web        apps/mobile
       Chrome MV3           static SPA      Expo RN (skeleton)
@@ -22,10 +23,14 @@
 ## Design decisions
 
 1. **One engine, three surfaces.** All numbers come from `packages/core`.
-   The extension and web app receive byte-identical vendored copies via
-   `node scripts/sync-core.js` (committed, so both work out of the box with
-   no build step); the future mobile app imports the package directly
-   through the npm workspace.
+   `node scripts/sync-core.js` builds one `vendor/core.bundle.js` for the
+   extension and the web app: the core's scripts, its data inlined, and each
+   model's coefficients precomputed (`data/precomputed.json`). It is
+   committed, so both work out of the box with no build step, and no surface
+   fetches data or fits a model at start-up (PLAN.md Step 13). The mobile
+   app imports the package directly through the npm workspace, and
+   `createDefaultEngine` starts from the same precomputed coefficients. CI
+   fails when the bundle or the coefficients are stale.
 
 2. **No build toolchain.** Core modules are plain scripts that attach to
    `window.EcoPromptCore` in browsers and export CommonJS in Node. This
