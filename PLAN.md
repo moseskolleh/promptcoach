@@ -1293,6 +1293,43 @@ Web app:
 shows no long tasks over 50 ms caused by the extension, and typing in the web
 coach triggers no Compare re-render unless its inputs changed.
 
+> **Status (2026-10-29): built.**
+> - **Content script** (`shared/watch.js`):
+>   - Once attached, it observes the composer's region and the picker's (the
+>     element its label came from, up to its header, toolbar or form). The
+>     body is observed only while no composer is attached.
+>   - A 2 s heartbeat in idle time catches a removed or hidden composer, a
+>     re-rendered picker and SPA navigation.
+>   - Mutations inside the draft itself are typing, not a re-render.
+>   - Scans and re-pricing use `idleDebounce`, `requestIdleCallback` with a
+>     max wait: 2 s for a scan, 1.2 s for re-pricing during continuous
+>     typing.
+>   - `watchMove` repositions the pill when the composer moves. It uses an
+>     IntersectionObserver inset to the composer's box, plus a
+>     ResizeObserver. The captured scroll listener is gone.
+>   - `boundedText` reads a picker label only up to 81 characters.
+> - **Trace** (Playwright + CDP profile, a 2,000-token reply streamed into
+>   the demo, before → after):
+>   - MutationObserver callbacks: 668 → 0;
+>   - layout reads by the extension: 169 → 7, the heartbeat's;
+>   - extension CPU: 72 ms → 3.5 ms at 6× throttling.
+>   - No long tasks over 50 ms in any run, with or without the extension.
+> - **Checked the behaviour too.** The pill re-prices during continuous
+>   typing and follows the demo's picker (Instant → Medium → Pro). It follows
+>   a moved composer, re-attaches after the composer or its whole region is
+>   replaced, and Enter still records the send.
+> - **Web app:**
+>   - Compare redraws only when its inputs change (`compareKey`) and only
+>     near the viewport. Typing 48 characters in the coach went from 13
+>     Compare rebuilds to at most 1, caused by the results panel opening.
+>   - Bars move from their last width.
+>   - Tips and library cards are keyed, so focus survives a re-render
+>     (Step 44).
+>   - The greener-model comparison runs once per set of coach inputs.
+>   - The library is parsed only when its stored text changes. Each entry is
+>     priced once: 6 search keystrokes over 60 entries took 4 ms in total,
+>     where 5 took 83 ms.
+
 ### Step 15 — Site adapters and attach health · M
 - Add `apps/extension/sites/<host>.json`, declarative per-site config:
   - `composer`

@@ -80,7 +80,11 @@
 1. `content.js` watches the chat input on supported sites, estimates tokens
    as you type, detects the model from the page's model switcher (labels are
    mapped to catalog ids by `detectModelFromLabels` in core; the hostname
-   default is the fallback), and renders the eco-grade pill.
+   default is the fallback), and renders the eco-grade pill. Once attached
+   it observes only the composer's region and the picker's, never the whole
+   page, so a streaming reply costs it nothing. It works in idle time with
+   a max wait, and repositions the pill only when the composer moves
+   (`shared/watch.js`, PLAN.md Step 14).
 2. On send, it messages `background.js` with a v2 history row: the send's
    inputs (model, effort, task type, token counts, region) and the figures
    they gave, never its text (`shared/history.js`).

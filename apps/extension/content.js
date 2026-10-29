@@ -17,6 +17,7 @@
 
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const History = globalThis.EcoPromptHistory;
+  const Watch = globalThis.EcoPromptWatch;
 
   /** False on a site the user paused EcoPrompt on: no pill, nothing recorded. */
   function siteOn() {
@@ -46,6 +47,7 @@
   let lastAnalysis = null;
   let lastImpact = null;
   let lastRecordTs = 0;
+  let pickerEl = null; // the element the picker's label was read from
 
   // --------------------------------------------------------------------------
   // Setup: data + settings
@@ -110,11 +112,19 @@
         el.getAttribute('aria-selected') === 'true' ||
         /(?:^|\s)(?:active|selected|checked|is-active|is-selected)(?:\s|$)/.test(String(el.className || ''));
       const aria = el.getAttribute('aria-label');
-      if (aria) labels.push({ text: aria, active });
-      const text = el.textContent || '';
-      if (text.trim() && text.length <= 80) labels.push({ text, active });
+      if (aria) labels.push({ text: aria, active, el });
+      // Only a short label is read: a large matched subtree is never
+      // serialized just to be thrown away (PLAN.md Step 14).
+      const text = Watch.boundedText(el, 80);
+      if (text && text.trim()) labels.push({ text, active, el });
     }
     return labels;
+  }
+
+  /** The element a detected label came from, for watching the picker. */
+  function labelElement(labels, matchedText) {
+    const hit = labels.find((l) => l.text.replace(/\s+/g, ' ').trim() === matchedText);
+    return hit ? hit.el : null;
   }
 
   function pageModelFamily() {
@@ -129,13 +139,17 @@
   /** The model and effort the page's picker shows, or null. */
   function pickerDetection() {
     const family = pageModelFamily();
+    pickerEl = null;
     if (!family) return null;
     for (const selectors of PICKER_SELECTOR_GROUPS) {
-      const hit = Core.detectModelFromLabels(location.hostname, collectModelLabels(selectors), { family, modelIds: catalogIds });
+      const labels = collectModelLabels(selectors);
+      const hit = Core.detectModelFromLabels(location.hostname, labels, { family, modelIds: catalogIds });
       // A newer generation stops here: the looser group below could read an
       // unrelated label as an older model (PLAN.md Step 10).
-      if (hit && hit.unknownGeneration) return hit;
-      if (hit && (hit.effort || (hit.modelId && engine.getModel(hit.modelId)))) return hit;
+      if (hit && (hit.unknownGeneration || hit.effort || (hit.modelId && engine.getModel(hit.modelId)))) {
+        pickerEl = labelElement(labels, hit.matchedText);
+        return hit;
+      }
     }
     return null;
   }
@@ -416,6 +430,18 @@
     }
   }
 
+  // One reposition per frame at most, and only when something moved or
+  // resized: no layout is read on scroll (PLAN.md Step 14).
+  let positionQueued = false;
+  function positionOnFrame() {
+    if (positionQueued) return;
+    positionQueued = true;
+    requestAnimationFrame(() => {
+      positionQueued = false;
+      positionUi();
+    });
+  }
+
   function positionUi() {
     if (!pill || !inputEl || !inputEl.isConnected) return;
     const rect = inputEl.getBoundingClientRect();
@@ -445,12 +471,9 @@
   // Live analysis
   // --------------------------------------------------------------------------
 
-  let analyzeTimer = null;
-
-  function scheduleAnalyze() {
-    clearTimeout(analyzeTimer);
-    analyzeTimer = setTimeout(analyzeDraft, 300);
-  }
+  // Re-priced in idle time once typing pauses, and at least every 1.2 s of
+  // continuous typing (PLAN.md Step 14).
+  const scheduleAnalyze = Watch.idleDebounce(() => analyzeDraft(), { delay: 300, maxWait: 1200 });
 
   function analyzeDraft() {
     const text = getDraftText(inputEl).trim();
@@ -503,7 +526,7 @@
     const now = Date.now();
     if (now - lastRecordTs < 1000) return; // Enter + click double-fire guard
     // Recompute synchronously so we record the final draft, not a stale one.
-    clearTimeout(analyzeTimer);
+    scheduleAnalyze.cancel();
     analyzeDraft();
     if (!lastImpact || !lastInputs) return;
     lastRecordTs = now;
@@ -543,6 +566,8 @@
   // Attachment + SPA survival
   // --------------------------------------------------------------------------
 
+  let stopMoveWatch = null;
+
   function attachTo(el) {
     if (inputEl === el) return;
     if (inputEl) {
@@ -551,28 +576,138 @@
       // detached composer keeps recording sends (PLAN.md Step 10).
       inputEl.removeEventListener('keydown', onKeyDown, true);
     }
+    if (stopMoveWatch) stopMoveWatch();
+    stopMoveWatch = null;
     inputEl = el;
     applyPillVisibility();
+    observeRegions();
     if (!inputEl) return;
     inputEl.addEventListener('input', scheduleAnalyze);
     inputEl.addEventListener('keydown', onKeyDown, true);
+    stopMoveWatch = Watch.watchMove(inputEl, positionOnFrame);
     analyzeDraft();
     positionUi();
   }
 
-  let scanTimer = null;
+  /** Find the composer if ours is gone or hidden, and re-read the picker. */
+  function scan() {
+    if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
+      attachTo(findPromptInput());
+    }
+    // The model switcher lives in the page chrome and re-renders on SPA
+    // navigation; re-read it whenever the DOM settles.
+    if (resolveModel() && inputEl) analyzeDraft();
+    observeRegions();
+    positionUi();
+  }
 
-  function scheduleScan() {
-    clearTimeout(scanTimer);
-    scanTimer = setTimeout(() => {
-      if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
-        attachTo(findPromptInput());
+  // In idle time, 500 ms after the page settles, and at least every 2 s
+  // while it doesn't: a streaming reply can no longer put a scan off for
+  // as long as it streams.
+  const scheduleScan = Watch.idleDebounce(scan, { delay: 500, maxWait: 2000 });
+  const scheduleResolve = Watch.idleDebounce(() => {
+    if (resolveModel() && inputEl) analyzeDraft();
+    observeRegions();
+  }, { delay: 300, maxWait: 1500 });
+
+  // --------------------------------------------------------------------------
+  // What is observed (PLAN.md Step 14)
+  //
+  // While a composer is attached, only its region and the model picker's are
+  // observed, so a reply streaming into the transcript costs nothing. The
+  // whole body is observed only while no composer is attached (page load, a
+  // view without one), and a heartbeat in idle time notices a composer that
+  // left with its region, a hidden one, and SPA navigation.
+  // --------------------------------------------------------------------------
+
+  let pageObserver = null;
+  let composerObserver = null;
+  let pickerObserver = null;
+  let composerRegion = null;
+  let pickerRegion = null;
+
+  /** el's nth ancestor, stopping below <body>: a region is never the page. */
+  function ancestor(el, n) {
+    let node = el;
+    for (let i = 0; i < n; i++) {
+      const up = node.parentElement;
+      if (!up || up === document.body || up === document.documentElement) break;
+      node = up;
+    }
+    return node;
+  }
+
+  /** The composer's surroundings: its form, else the nearest ancestor with the send button. */
+  function composerRegionOf(el) {
+    const form = el.closest('form');
+    if (form && form !== document.body) return form;
+    let node = el.parentElement;
+    for (let depth = 0; depth < 8 && node && node !== document.body; depth++, node = node.parentElement) {
+      if (findSendButton(node)) return node;
+    }
+    return ancestor(el, 3);
+  }
+
+  function pickerRegionOf(el) {
+    const bar = el.closest('header, nav, form, [role="toolbar"], [role="menubar"], [role="banner"]');
+    return bar && bar !== document.body ? bar : ancestor(el, 2);
+  }
+
+  // Typing changes the composer's own nodes; that is not a re-render.
+  const outsideDraft = (records) => records.some((r) => !inputEl || !inputEl.contains(r.target));
+
+  function observeRegions() {
+    const nextComposer = inputEl ? composerRegionOf(inputEl) : null;
+    if (nextComposer !== composerRegion) {
+      if (composerObserver) composerObserver.disconnect();
+      composerObserver = null;
+      composerRegion = nextComposer;
+      if (composerRegion) {
+        composerObserver = new MutationObserver((records) => { if (outsideDraft(records)) scheduleScan(); });
+        composerObserver.observe(composerRegion, { childList: true, subtree: true });
       }
-      // The model switcher lives in the page chrome and re-renders on SPA
-      // navigation; re-read it whenever the DOM settles.
-      if (resolveModel() && inputEl) analyzeDraft();
-      positionUi();
-    }, 500);
+    }
+    const nextPicker = pickerEl && pickerEl.isConnected ? pickerRegionOf(pickerEl) : null;
+    if (nextPicker !== pickerRegion) {
+      if (pickerObserver) pickerObserver.disconnect();
+      pickerObserver = null;
+      pickerRegion = nextPicker;
+      if (pickerRegion) {
+        pickerObserver = new MutationObserver((records) => { if (outsideDraft(records)) scheduleResolve(); });
+        pickerObserver.observe(pickerRegion, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+          attributes: true,
+          attributeFilter: ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-label', 'class']
+        });
+      }
+    }
+    if (inputEl && pageObserver) {
+      pageObserver.disconnect();
+      pageObserver = null;
+    } else if (!inputEl && !pageObserver && document.body) {
+      pageObserver = new MutationObserver(scheduleScan);
+      pageObserver.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  const HEARTBEAT_MS = 2000;
+  let lastHref = location.href;
+  const whenIdle = (fn) =>
+    (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 1000 }) : fn());
+
+  function heartbeat() {
+    whenIdle(() => {
+      const navigated = location.href !== lastHref;
+      lastHref = location.href;
+      if (navigated || !inputEl || !inputEl.isConnected || !isVisible(inputEl) || (pickerEl && !pickerEl.isConnected)) {
+        scheduleScan();
+      } else if (!pickerEl) {
+        scheduleResolve(); // a picker that renders after the composer
+      }
+      setTimeout(heartbeat, HEARTBEAT_MS);
+    });
   }
 
   function applyPillVisibility() {
@@ -612,25 +747,19 @@
       }
     });
 
-    // SPA navigation / re-rendered composers: re-scan on DOM mutations.
-    const observer = new MutationObserver(scheduleScan);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Chat pages auto-scroll continuously while responses stream; coalesce
-    // to one reposition per frame so we never thrash the host page's layout.
-    let positionQueued = false;
-    const positionOnFrame = () => {
-      if (positionQueued) return;
-      positionQueued = true;
-      requestAnimationFrame(() => {
-        positionQueued = false;
-        positionUi();
-      });
-    };
+    // SPA navigation and re-rendered composers: the regions above, and the
+    // heartbeat. The pill and card reposition when they resize, and when
+    // the composer moves (watchMove, set in attachTo).
+    observeRegions();
+    setTimeout(heartbeat, HEARTBEAT_MS);
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(positionOnFrame);
+      ro.observe(pill);
+      ro.observe(card);
+    }
     window.addEventListener('resize', positionOnFrame);
-    window.addEventListener('scroll', positionOnFrame, { capture: true, passive: true });
     document.addEventListener('click', onDocumentClick, true);
-    document.addEventListener('focusin', scheduleScan);
+    document.addEventListener('focusin', () => scheduleScan());
   }
 
   init().catch((err) => {

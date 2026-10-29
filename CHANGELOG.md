@@ -5,6 +5,37 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### A lighter runtime on every page (PLAN.md Step 14)
+
+- **The content script stays out of a streaming reply's way.**
+  - Once a composer is attached, it observes only the composer's region and
+    the model picker's, not the whole page. The page is observed only while
+    no composer is attached.
+  - A heartbeat in idle time notices a removed or hidden composer and SPA
+    navigation.
+  - The pill moves when the composer moves (an IntersectionObserver
+    inset to the composer's box, plus a ResizeObserver), with no layout read
+    on scroll.
+  - Scans and re-pricing run in idle time, with a max wait, so a reply
+    that never stops streaming can't put them off.
+  - Picker labels are read only when short.
+  - **Measured** during a 2,000-token streamed reply on the demo:
+    - observer callbacks went from 668 to 0;
+    - layout reads went from 169 to 7;
+    - the extension's CPU time went from 72 ms to 3.5 ms at 6× CPU
+      throttling.
+  - No long tasks in either run.
+- **The web app redraws only what changed.**
+  - Compare redraws only when its inputs change and only once it can be
+    seen. Typing in the coach no longer redraws it on every keystroke.
+  - A redraw moves the chart's bars from where they were instead of
+    replaying the intro.
+  - Tips and library cards are kept per tip or entry, so a focused button
+    keeps its focus.
+  - Each saved prompt is priced once, not on every search keystroke: a
+    library search keystroke went from about 17 ms to under 1 ms with 60
+    saved prompts.
+
 ### One presentation layer (PLAN.md Step 13, second half)
 
 - **New `packages/core/src/present.js`**, holding what was copied across

@@ -44,6 +44,7 @@ Everything runs locally; prompts never leave your machine.
 | `shared/defaults.js` | user-setting defaults shared by all surfaces |
 | `shared/days.js` | calendar days for history buckets and the badge |
 | `shared/history.js` | history v2: row shape, day keys, daily totals, the single writer, re-scoring |
+| `shared/watch.js` | cheap page watching for the content script: idle scheduling with a max wait, bounded text reads, a move watcher |
 | `vendor/core.bundle.js` | generated from `packages/core`: engine, data and precomputed coefficients — **do not edit here** |
 | `assets/` | icons |
 

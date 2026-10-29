@@ -57,6 +57,7 @@
         "vendor/core.bundle.js",
         "shared/defaults.js",
         "shared/history.js",
+        "shared/watch.js",
         "content.js"
       ],
       "css": [
