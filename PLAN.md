@@ -1158,6 +1158,31 @@ scanning raw rows.
 **Done when:** 1 span scan per analysis instead of 5; an 86k-char prompt takes
 ≤ 8 ms (from 25.8); every existing analyzer test still passes unchanged.
 
+> **Status (2026-10-28): built.** `packages/core/test/analyzer-pass.test.js`
+> covers it.
+> - **One pass.** `createPromptContext(text)` builds the shared context:
+>   - the text the detectors read;
+>   - its protected spans, found once;
+>   - the masked copy;
+>   - the full text's token count.
+>
+>   `analyzePrompt` builds one context and passes it to every detector and
+>   to the courtesy measurement. The test counts **1 span scan** per
+>   analysis, on a short prompt and on an 86k-character one. Each detector
+>   still takes plain text, so the public API is unchanged.
+> - **Size tiers.** Past 12,000 characters, the detectors read the first and
+>   last 6,000, with a blank line between them so nothing spans the cut.
+>   Tokens are counted on the full text. *Copy trimmed* still trims the
+>   whole prompt. METHODOLOGY §8 item 11 states the limitation.
+> - **Masking** builds the masked string one span slice at a time instead of
+>   character by character.
+> - **Speed.** An 86k-character prompt now takes **2.3 ms** (median, Node
+>   22), from 23 ms on this machine (25.8 ms in the plan's baseline). The
+>   perf test's gate is a generous 40 ms for CI.
+> - **No NUL bytes.** The five literal NUL bytes are now `\u0000` escapes, and
+>   a test keeps them out. `file` reads `analyzer.js` as text.
+> - The existing `analyzer.test.js` is untouched and passes.
+
 ### Step 13 — One engine bootstrap, one presentation layer · M
 - **Load once.** Every tab, the popup and the settings page each fetch three
   JSON files and re-fit coefficients for all 22 models
@@ -1771,8 +1796,8 @@ measured on 2026-10-18 and the rest on 2026-09-25.
 | Labels silently resolved to an older sibling | 6 of 23 | 0, with a generated test for every family | 6 |
 | Places that define the default model | 4, with 3 different ids | 1 (done) | 7 |
 | Current-model numbers shown without a range | all | none | 8 |
-| `analyzePrompt` on an 86k-char paste | 25.8 ms | ≤ 8 ms | 3 |
-| Protected-span scans per analysis | up to 5 | 1 | 3 |
+| `analyzePrompt` on an 86k-char paste | 25.8 ms | ≤ 8 ms (done: 2.3 ms) | 3 |
+| Protected-span scans per analysis | up to 5 | 1 (done) | 3 |
 | Start-up work per tab | 3 JSON fetches + 22 model fits | 0 fetches, 0 fits | 4 |
 | Web app first paint | blocked on 3 fetches; fails on `file://` | immediate; works offline | 4, 30 |
 | UI logic copied across surfaces | grade colors ×5, engine start-up ×4 | defined once, in core | 4 |

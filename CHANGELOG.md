@@ -5,6 +5,20 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### One analysis pass (PLAN.md Step 12)
+
+- **Prompt analysis is about 10× faster on long pastes:** an 86k-character
+  prompt now takes about 2 ms, from about 23 ms.
+- **One pass.** Each analysis builds a `PromptContext`
+  (`createPromptContext`) once and shares it between the detectors, so
+  quoted text and code are found once instead of five times. The detectors
+  still take plain text too.
+- **Long prompts are read at their edges.** Past 12,000 characters, the task
+  type, output budget and courtesy phrases come from the first and last
+  6,000 characters. Tokens are still counted on all of it (METHODOLOGY §8).
+- `analyzer.js` no longer contains literal NUL bytes, so `grep`, `file`
+  and diff viewers treat it as text.
+
 ### History v2: record inputs, not just results (PLAN.md Step 11)
 
 - **Each recorded query keeps what it was priced from:** model, effort,

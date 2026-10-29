@@ -506,20 +506,38 @@ export interface PromptAnalysis {
 }
 
 export function estimateTokens(text: string): number;
-export function detectTaskType(text: string): TaskTypeResult;
-export function detectSpecialQueryType(text: string): SpecialQuery | null;
-export function detectPoliteWords(text: string): PoliteWords;
-export function detectOutputBudget(text: string): OutputBudget | null;
+/**
+ * What the detectors share, built once per analysis (PLAN.md Step 12). On a
+ * prompt over 12k characters they read only its first and last 6k
+ * (`scanned`); `tokens` counts all of it.
+ */
+export interface PromptContext {
+  text: string;
+  scanned: string;
+  windowed: boolean;
+  spans: Array<{ start: number; end: number }>;
+  masked: string;
+  tokens: number;
+}
+export function createPromptContext(text: string): PromptContext;
+/** Each detector takes a prompt's text or its PromptContext. */
+export function detectTaskType(input: string | PromptContext): TaskTypeResult;
+export function detectSpecialQueryType(input: string | PromptContext): SpecialQuery | null;
+export function detectPoliteWords(input: string | PromptContext): PoliteWords;
+export function detectOutputBudget(input: string | PromptContext): OutputBudget | null;
 export function maskProtectedSpans(text: string): string;
+/** How many protected-span scans have run, for the one-scan test. */
+export const ANALYZER_STATS: { spanScans: number };
 export function estimateOutputTokens(taskType: TaskType | string, inputTokens: number, budget?: OutputBudget | null): OutputEstimate;
 export function getOptimizationTips(
   politeWords: PoliteWords,
   taskType: TaskTypeResult,
   tokens: number,
-  originalText?: string,
+  originalText?: string | PromptContext,
   outputBudget?: OutputBudget | null
 ): Tip[];
-export function generateOptimizedPrompt(text: string): string;
+/** The whole prompt with courtesy trimmed, from its text or its PromptContext. */
+export function generateOptimizedPrompt(input: string | PromptContext): string;
 export function analyzePrompt(text: string): PromptAnalysis | null;
 export const TASK_TYPES: Record<TaskType, TaskTypeConfig>;
 export const POLITE_PHRASES: Array<{ pattern: RegExp; word: string; tokens: number; anchored?: boolean }>;
