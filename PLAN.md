@@ -288,6 +288,7 @@ pill shows a confident grade for a model it cannot see.
   `shared/defaults.js`.
 - Grade colors are defined in five places. Engine start-up is written four
   times. The web formatters round differently from core's `conversions.js`.
+  *(Fixed in Step 13.)*
 - `analyzer.js` contains five literal NUL bytes (lines 111, 657, 692), so
   `grep` and `file` treat the engine's main source file as binary.
 
@@ -1001,6 +1002,13 @@ runbook has been used once for real (the Mistral Large 4 weights).
 > - **The runbook** is `docs/CATALOG-REFRESH.md`. It hasn't been used for
 >   real yet: Mistral Large 4's weights are expected Oct 27–31, and
 >   mistral.ai and huggingface.co are still blocked from this environment.
+> - **Checked 2026-10-29.**
+>   - Mistral's own Vibe code (v3.0.x, F-SDK) now knows `mistral-large-4`:
+>     its thinking can be turned off, and it has a 1M context.
+>   - Its parameter counts, weights and release date still can't be read
+>     from a primary source here, and `mistralai/platform-docs-public` no
+>     longer clones.
+>   - So the entry still waits.
 
 ---
 
@@ -1212,6 +1220,53 @@ scanning raw rows.
 No grade color or formatter is defined outside core. The sync gate in CI
 covers the bundle.
 
+> **Status (2026-10-29): built.** The bootstrap half and the presentation
+> layer shipped as separate PRs.
+> - **The bundle.** `scripts/sync-core.js` writes one
+>   `vendor/core.bundle.js` per app, which replaces the separate scripts and
+>   data files. It holds:
+>   - the core's three scripts;
+>   - the catalog inlined (as `JSON.parse` strings, which parse fastest);
+>   - the precomputed coefficients, and `createBundledEngine()`.
+> - **Precomputed coefficients.** `precompute(engine)` stores each model's
+>   coefficients, fitted or from Step 2's estimators, and the thinking pairs,
+>   in `data/precomputed.json`.
+>   - The engine takes them and fits nothing when they cover exactly the
+>     catalog's model ids. Anything else, and it fits as before.
+>   - `createDefaultEngine()` uses them, so mobile starts without fitting
+>     too.
+> - **Drift.** `bundle.test.js` holds the precomputed coefficients equal to
+>   a fresh fit, and a precomputed engine equal to a fitted one for every
+>   model at four shapes. The sync test holds each app's bundle equal to a
+>   fresh build. **0 fits and 0 estimates** at start-up, counted by
+>   `ENGINE_STATS`.
+> - **No fetch.**
+>   - The content script, popup, options page, service worker and web app
+>     build their engine from the bundle.
+>   - `check-apps` refuses an app script that calls `fetch(`.
+>   - `vendor/*` is no longer web-accessible.
+>   - The web app now works from `file://`. A browser check recorded no data
+>     requests on any surface.
+> - **Settings** loads the one bundle; the separate analyzer and conversions
+>   scripts are gone everywhere.
+> - **The presentation layer.** `packages/core/src/present.js` holds:
+>   - the grade palette, as colours, dots and `gradeBackground()`;
+>   - the formatters, with one rounding rule: three significant figures,
+>     at most three decimals. The relatable figures' technical numbers now
+>     use it too, where they rounded their own way;
+>   - `describeImpact()` and `savingClaim()`, moved from `conversions.js`,
+>     with a `chipText` for the method chip and the note together;
+>   - `impactRequest()`, used by the coach, the library, the popup, the pill
+>     and history re-scoring;
+>   - `quickGrades()` at `QUICK_QUERY`;
+>   - the web app's tip actions as `tipAction()`: trim, "≤100 words" and
+>     the greener-model switch, with `changeNote()` for their toasts.
+> - **Gate.** `check-apps` rule 10 refuses an app script that maps a grade
+>   to a colour or calls `toFixed()`. It also holds every CSS `--grade-a…e`
+>   equal to core's `GRADE_COLORS`, since CSS can't read the core.
+>   `present.test.js` holds the relatable figures to the formatters, the
+>   palette to the grade bands, and each tip action to its result.
+
 ### Step 14 — A lighter runtime on every page · M
 Content script:
 - **Observer scope.** Watch the composer region, the model picker and the
@@ -1238,6 +1293,43 @@ Web app:
 shows no long tasks over 50 ms caused by the extension, and typing in the web
 coach triggers no Compare re-render unless its inputs changed.
 
+> **Status (2026-10-29): built.**
+> - **Content script** (`shared/watch.js`):
+>   - Once attached, it observes the composer's region and the picker's (the
+>     element its label came from, up to its header, toolbar or form). The
+>     body is observed only while no composer is attached.
+>   - A 2 s heartbeat in idle time catches a removed or hidden composer, a
+>     re-rendered picker and SPA navigation.
+>   - Mutations inside the draft itself are typing, not a re-render.
+>   - Scans and re-pricing use `idleDebounce`, `requestIdleCallback` with a
+>     max wait: 2 s for a scan, 1.2 s for re-pricing during continuous
+>     typing.
+>   - `watchMove` repositions the pill when the composer moves. It uses an
+>     IntersectionObserver inset to the composer's box, plus a
+>     ResizeObserver. The captured scroll listener is gone.
+>   - `boundedText` reads a picker label only up to 81 characters.
+> - **Trace** (Playwright + CDP profile, a 2,000-token reply streamed into
+>   the demo, before → after):
+>   - MutationObserver callbacks: 668 → 0;
+>   - layout reads by the extension: 169 → 7, the heartbeat's;
+>   - extension CPU: 72 ms → 3.5 ms at 6× throttling.
+>   - No long tasks over 50 ms in any run, with or without the extension.
+> - **Checked the behaviour too.** The pill re-prices during continuous
+>   typing and follows the demo's picker (Instant → Medium → Pro). It follows
+>   a moved composer, re-attaches after the composer or its whole region is
+>   replaced, and Enter still records the send.
+> - **Web app:**
+>   - Compare redraws only when its inputs change (`compareKey`) and only
+>     near the viewport. Typing 48 characters in the coach went from 13
+>     Compare rebuilds to at most 1, caused by the results panel opening.
+>   - Bars move from their last width.
+>   - Tips and library cards are keyed, so focus survives a re-render
+>     (Step 44).
+>   - The greener-model comparison runs once per set of coach inputs.
+>   - The library is parsed only when its stored text changes. Each entry is
+>     priced once: 6 search keystrokes over 60 entries took 4 ms in total,
+>     where 5 took 83 ms.
+
 ### Step 15 — Site adapters and attach health · M
 - Add `apps/extension/sites/<host>.json`, declarative per-site config:
   - `composer`
@@ -1260,6 +1352,52 @@ coach triggers no Compare re-render unless its inputs changed.
 **Done when:** every supported host has an adapter file. A deliberately broken
 selector shows "Not attached" instead of silently failing. No false records
 from slash-menus, "Send feedback" or blocked sends in the demo tests.
+
+> **Status (2026-10-29): built; the real sites' adapters wait for a check
+> on the live sites.**
+> - **Adapters.**
+>   - `apps/extension/sites/<host>.json` covers all 12 hosts the manifest
+>     matches, in 10 adapters (chatgpt.com covers chat.openai.com, and
+>     meta.ai covers www.meta.ai), plus the demo.
+>   - Each names the site's `composer`, `sendButton`, `stopButton`,
+>     `userMessage`, `assistantMessage`, `picker`, `effortToggle`,
+>     `insertStrategy` (`value`, `insertText` or `paste`) and `lastVerified`.
+>     `userMessage` is added because confirming a send needs it.
+>   - `scripts/sync-sites.js` checks each adapter and builds
+>     `sites/adapters.js`; nothing is fetched.
+>   - The real sites' selectors come from what is publicly known of their
+>     pages: `lastVerified: null`. This container can't reach the sites.
+>     The demo adapter is verified by the demo tests.
+> - **Fallback.**
+>   - The adapter's composer is tried first, then the generic heuristic.
+>     The generic heuristic now matches every contenteditable that isn't
+>     `false`, `plaintext-only` included.
+>   - The adapter's picker and effort toggle are read before the generic
+>     picker groups.
+>   - A malformed selector matches nothing instead of throwing.
+> - **Confirmed sends** (`createSendConfirmer`).
+>   - Enter or a send button only makes a candidate. It is recorded once
+>     the composer cleared and the user-turn count rose, within 4 s.
+>   - An unverified turn selector counts only after it has matched on the
+>     page, so a wrong guess can't stop every send from being recorded.
+>   - "Send feedback", "Share", "Regenerate" and the like are no longer
+>     send buttons.
+> - **Popup.** It shows *Attached / Not attached on {host}*, from the content
+>   script's `eco:status` reply. It names the adapter and its
+>   `lastVerified`, says when the generic guess is in use, and asks for a
+>   reload when no script answers.
+> - **Demo tests** (Playwright):
+>   - A real send by Enter, by click, and by both together each records
+>     once.
+>   - Recorded nothing for: a send refused while the reply streams,
+>     `/summarize` (Enter picks the command), `/image` (the composer
+>     empties, no turn appears), and "Send feedback" with a draft present.
+>   - With a deliberately broken composer selector, the generic guess still
+>     prices and records. The status says "Not attached … found no chat box,
+>     so EcoPrompt is using a generic guess", and so does the popup.
+>   - Every adapter selector parses in Chromium.
+> - **To do on the live sites:** check each adapter, fix what doesn't match,
+>   and set `lastVerified`. `npm test` keeps the file and dates honest.
 
 ### Step 16 — A test harness that matches the product · M
 - **Playwright on `apps/demo`** in CI (ROADMAP 2.6): inject the content

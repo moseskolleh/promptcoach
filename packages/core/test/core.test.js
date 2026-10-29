@@ -197,26 +197,22 @@ test('analyzer: zero-AI alternatives detected', () => {
 test('vendored copies in the apps match core exactly (run scripts/sync-core.js)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  const coreSrc = path.join(__dirname, '..', 'src');
-  const apps = ['extension', 'web'];
-  const scripts = fs.readdirSync(coreSrc).filter((f) => f.endsWith('.js') && f !== 'index.js');
-  const dataFiles = fs.readdirSync(path.join(coreSrc, 'data')).filter((f) => f.endsWith('.json'));
-  for (const app of apps) {
-    const vendor = path.join(__dirname, '..', '..', '..', 'apps', app, 'vendor');
-    for (const f of scripts) {
-      assert.strictEqual(
-        fs.readFileSync(path.join(vendor, f), 'utf8'),
-        fs.readFileSync(path.join(coreSrc, f), 'utf8'),
-        `apps/${app}/vendor/${f} is stale — run node scripts/sync-core.js`
-      );
-    }
-    for (const f of dataFiles) {
-      assert.strictEqual(
-        fs.readFileSync(path.join(vendor, 'data', f), 'utf8'),
-        fs.readFileSync(path.join(coreSrc, 'data', f), 'utf8'),
-        `apps/${app}/vendor/data/${f} is stale — run node scripts/sync-core.js`
-      );
-    }
+  const sync = require('../../../scripts/sync-core');
+  // The precomputed coefficients are a fresh fit of today's catalog.
+  const precomputed = sync.buildPrecomputed();
+  assert.strictEqual(
+    fs.readFileSync(sync.PRECOMPUTED, 'utf8'), sync.precomputedText(precomputed),
+    'packages/core/src/data/precomputed.json is stale — run node scripts/sync-core.js'
+  );
+  // Each app ships exactly the bundle built from today's core.
+  const bundle = sync.buildBundle(precomputed);
+  for (const target of sync.targets) {
+    const rel = path.relative(path.join(__dirname, '..', '..', '..'), target);
+    assert.deepStrictEqual(fs.readdirSync(target), [sync.BUNDLE], `${rel} holds only the bundle`);
+    assert.strictEqual(
+      fs.readFileSync(path.join(target, sync.BUNDLE), 'utf8'), bundle,
+      `${rel}/${sync.BUNDLE} is stale — run node scripts/sync-core.js`
+    );
   }
 });
 

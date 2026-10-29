@@ -1,0 +1,16 @@
+{
+  "site": "Copilot",
+  "hosts": [
+    "copilot.microsoft.com"
+  ],
+  "composer": "textarea#userInput",
+  "sendButton": "button[aria-label='Submit message']",
+  "stopButton": null,
+  "userMessage": null,
+  "assistantMessage": null,
+  "picker": null,
+  "effortToggle": null,
+  "insertStrategy": "value",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

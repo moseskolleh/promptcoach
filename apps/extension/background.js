@@ -7,30 +7,22 @@
 
 'use strict';
 
-// vendor/calculator.js attaches the engine to globalThis.EcoPromptCore, so
-// the badge uses the exact same grade bands as the popup and the pill — it
-// can never drift when the bands are recalibrated in core.
+// vendor/core.bundle.js attaches the engine to globalThis.EcoPromptCore, so
+// the badge uses the exact same grade bands and colours as the popup and the
+// pill — it can never drift when they change in core.
 //
 // This worker and the imported scripts share ONE global scope, so nothing
 // here may redeclare a top-level name from them. A previous
 // `const { GRADE_BANDS } = …` collided with core's own GRADE_BANDS, threw
 // "Identifier has already been declared" during importScripts, and aborted
 // the worker on every startup — the badge never rendered.
-importScripts('vendor/calculator.js', 'vendor/analyzer.js', 'shared/defaults.js', 'shared/days.js', 'shared/history.js');
+importScripts('vendor/core.bundle.js', 'shared/defaults.js', 'shared/days.js', 'shared/history.js');
 const Core = globalThis.EcoPromptCore;
 const Days = globalThis.EcoPromptDays;
 const History = globalThis.EcoPromptHistory;
 
 const store = History.chromeStore(chrome.storage.local);
 const writer = History.createWriter(store);
-
-const GRADE_COLORS = {
-  A: '#10B981',
-  B: '#84CC16',
-  C: '#F59E0B',
-  D: '#F97316',
-  E: '#EF4444'
-};
 
 function gradeForWh(wh) {
   return Core.GRADE_BANDS.find((b) => wh <= b.maxWh).grade;
@@ -45,7 +37,7 @@ function renderBadge(agg) {
   }
   const grade = gradeForWh(today.energyWh / today.queries);
   chrome.action.setBadgeText({ text: String(today.queries) });
-  chrome.action.setBadgeBackgroundColor({ color: GRADE_COLORS[grade] });
+  chrome.action.setBadgeBackgroundColor({ color: Core.gradeColor(grade) });
   if (chrome.action.setBadgeTextColor) {
     chrome.action.setBadgeTextColor({ color: '#ffffff' });
   }
@@ -64,18 +56,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// Re-scoring needs the catalog, so the engine loads on first use.
-let enginePromise = null;
+// Re-scoring needs the engine, built on first use from the bundle's data.
+let bundledEngine = null;
 function loadEngine() {
-  if (!enginePromise) {
-    const json = (path) => fetch(chrome.runtime.getURL(path)).then((res) => res.json());
-    enginePromise = Promise.all(['models', 'grids', 'equivalents'].map((name) => json(`vendor/data/${name}.json`)))
-      .then(([models, grids, equivalents]) => new Core.ImpactEngine({ models, grids, equivalents }));
-    enginePromise.catch(() => {
-      enginePromise = null;
-    });
-  }
-  return enginePromise;
+  if (!bundledEngine) bundledEngine = Core.createBundledEngine().engine;
+  return bundledEngine;
 }
 
 // Content scripts record; only the extension's own pages (no tab) may
@@ -84,7 +69,7 @@ const HANDLERS = {
   'eco:record': (msg, sender) => (sender.tab ? writer.record(msg.entry, sender.url) : Promise.reject(new Error('not from a page'))),
   'eco:rescore': async (msg, sender) => {
     if (sender.tab) throw new Error('not from the extension');
-    return writer.rescore(await loadEngine());
+    return writer.rescore(loadEngine());
   },
   'eco:clear': (msg, sender) => (sender.tab ? Promise.reject(new Error('not from the extension')) : writer.clear())
 };

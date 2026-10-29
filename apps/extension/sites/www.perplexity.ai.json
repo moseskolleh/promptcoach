@@ -1,0 +1,17 @@
+{
+  "site": "Perplexity",
+  "hosts": [
+    "www.perplexity.ai",
+    "perplexity.ai"
+  ],
+  "composer": "#ask-input",
+  "sendButton": "button[aria-label='Submit']",
+  "stopButton": null,
+  "userMessage": null,
+  "assistantMessage": null,
+  "picker": null,
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

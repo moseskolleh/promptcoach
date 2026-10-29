@@ -611,6 +611,22 @@ body {
 }
 .model-notice[hidden] { display: none; }
 
+/* Attached / Not attached on this site (PLAN.md Step 15) */
+.attach-status {
+  margin: 8px 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.attach-status[hidden] { display: none; }
+.attach-status-text { font-weight: 600; color: var(--text); }
+.attach-status-text::before { content: '●'; margin-right: 4px; color: var(--amber); }
+.attach-status[data-state="attached"] .attach-status-text::before { color: var(--primary); }
+
 /* Pause on this site (PLAN.md Step 11) */
 .site-switch {
   margin-left: auto;

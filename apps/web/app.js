@@ -34,6 +34,24 @@ function clearChildren(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
+/**
+ * Make parent's children exactly `nodes`, in order, moving only what is out
+ * of place: a node that stays keeps its focus (PLAN.md Steps 14 and 44).
+ */
+function syncChildren(parent, nodes) {
+  const want = new Set(nodes);
+  for (const child of [...parent.children]) {
+    if (!want.has(child)) parent.removeChild(child);
+  }
+  nodes.forEach((node, i) => {
+    if (parent.children[i] !== node) parent.insertBefore(node, parent.children[i] || null);
+  });
+}
+
+function setText(node, text) {
+  if (node.textContent !== text) node.textContent = text;
+}
+
 function debounce(fn, ms) {
   let t = null;
   return function (...args) {
@@ -42,16 +60,10 @@ function debounce(fn, ms) {
   };
 }
 
-// formatWh, describeImpact and savingClaim are top-level functions in
-// vendor/conversions.js, which shares this page's global scope.
-
-function formatMl(ml) {
-  return ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : `${ml.toFixed(1)} mL`;
-}
-
-function formatG(g) {
-  return g >= 1000 ? `${(g / 1000).toFixed(2)} kg CO₂e` : `${g.toFixed(2)} g CO₂e`;
-}
+// formatWh, formatMl, formatG, describeImpact, savingClaim and savingPhrase
+// are top-level functions in the core bundle (vendor/core.bundle.js), which
+// shares this page's global scope. Every figure, grade colour and tip action
+// comes from there (PLAN.md Step 13).
 
 function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
@@ -92,8 +104,6 @@ function setTokenSlider(id, tokens) {
   paintSlider(slider);
 }
 
-const GRADE_DOTS = { A: '🟢', B: '🟢', C: '🟡', D: '🟠', E: '🔴' };
-
 /**
  * Paint a grade element for an impact: one letter for a measured model, a
  * range ("B–E") or a floor ("≥ C") for an estimate (PLAN.md Step 8). A range
@@ -128,14 +138,6 @@ function estimateChips(desc) {
   note.title = desc.noteReason;
   chips.push(note);
   return chips;
-}
-
-/**
- * A percentage saving that never claims more than the ranges allow:
- * "57% less energy" or "at least 54% less energy" (PLAN.md Step 27).
- */
-function savingPhrase(claim) {
-  return `${claim.atLeast ? 'at least ' : ''}${claim.percentage}% less energy`;
 }
 
 /* ============================ 2. Theme ============================ */
@@ -227,21 +229,18 @@ const EXAMPLE_PROMPTS = [
 
 /* ============================ 4. Data loading ============================ */
 
+/**
+ * The engine over the bundled data. The bundle inlines the catalog and its
+ * precomputed coefficients, so nothing is fetched or fitted, and the page
+ * works from file:// (PLAN.md Step 13).
+ */
 async function loadData() {
-  const fetchJson = async (path) => {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-    return res.json();
-  };
-  const [models, grids, equivalents] = await Promise.all([
-    fetchJson('vendor/data/models.json'),
-    fetchJson('vendor/data/grids.json'),
-    fetchJson('vendor/data/equivalents.json')
-  ]);
-  state.modelsRaw = models;
+  if (!EcoPromptCore.createBundledEngine) throw new Error('vendor/core.bundle.js did not load');
+  const { engine, converters } = EcoPromptCore.createBundledEngine();
+  state.modelsRaw = EcoPromptCore.data.models;
   referenceImpactCache.clear();
-  state.engine = new EcoPromptCore.ImpactEngine({ models, grids, equivalents });
-  state.conv = EcoPromptCore.createConverters(equivalents);
+  state.engine = engine;
+  state.conv = converters;
 }
 
 function providerAnchor(modelId) {
@@ -262,9 +261,10 @@ function referenceImpact(modelId, inputTokens, outputTokens) {
   return referenceImpactCache.get(key);
 }
 
-/** Grade at the standard short query (100 in / 300 out) — used for dots/cards. */
+/** Grade at the standard short query (core's QUICK_QUERY) — used for dots/cards. */
 function shortQueryImpact(modelId) {
-  return referenceImpact(modelId, 100, 300);
+  const q = EcoPromptCore.QUICK_QUERY;
+  return referenceImpact(modelId, q.inTokens, q.outTokens);
 }
 
 /* ============================ 5. Hero live demo ============================ */
@@ -303,7 +303,7 @@ function buildDemoFacts() {
   const engine = state.engine;
   const conv = state.conv;
   const facts = [];
-  const short = { inputTokens: 100, outputTokens: 300 };
+  const short = { inputTokens: EcoPromptCore.QUICK_QUERY.inTokens, outputTokens: EcoPromptCore.QUICK_QUERY.outTokens };
   const tag = (impact) => (impact.estimate ? ', estimated' : '');
 
   // Fact 1: a thinking model's answer, in everyday units (computed live).
@@ -389,7 +389,7 @@ function populateModelSelect() {
     const desc = impact ? describeImpact(impact) : null;
     const opt = document.createElement('option');
     opt.value = m.id;
-    opt.textContent = `${(desc && GRADE_DOTS[impact.grade.grade]) || '⚪'} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
+    opt.textContent = `${EcoPromptCore.gradeDot(desc && impact.grade.grade)} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
       `${m.isReasoning ? ' · reasoning' : ''}${desc && desc.estimated ? ' · estimated' : ''}`;
     return opt;
   };
@@ -458,7 +458,7 @@ function populateRegionSelect() {
   for (const r of regions) {
     const opt = document.createElement('option');
     opt.value = r.key;
-    opt.textContent = `${r.name} (${Math.round(r.cif * 1000)} g CO₂/kWh)`;
+    opt.textContent = `${r.name} (${EcoPromptCore.formatCif(r.cif)})`;
     select.appendChild(opt);
   }
   select.value = state.regionKey;
@@ -489,7 +489,7 @@ function setSegmentWidths(impact) {
   $('legend-input').textContent = label(inputWh);
   $('legend-output').textContent = label(outputWh);
   const thinking = impact.estimate && impact.estimate.rangeOnly ? impact.estimate.thinkingTokens : null;
-  const n = (x) => Math.round(x).toLocaleString('en-US');
+  const n = EcoPromptCore.formatCount;
   $('breakdown-note').textContent = thinking
     ? `visible answer only · thinking adds ${thinking.lowTokens > 0 ? `${n(thinking.lowTokens)}–` : 'up to '}${n(thinking.highTokens)} hidden tokens`
     : 'output tokens dominate';
@@ -505,23 +505,13 @@ function setSegmentWidths(impact) {
  */
 function applyPromptChange(newText, toastPrefix) {
   const prevText = $('prompt-input').value;
-  const beforeWh = state.impact ? state.impact.energy.wh : null;
-  const beforeGrade = state.impact ? describeImpact(state.impact).gradeText : null;
+  const before = state.impact;
 
   $('prompt-input').value = newText;
   state.outputTouched = false; // let the analyzer re-estimate the output
   updateCoach();
 
-  let msg = toastPrefix;
-  if (beforeWh && state.impact && state.impact.energy.wh < beforeWh) {
-    const pct = Math.round((1 - state.impact.energy.wh / beforeWh) * 100);
-    if (pct > 0) msg += ` — ${pct}% less energy`;
-    const afterGrade = describeImpact(state.impact).gradeText;
-    if (beforeGrade && afterGrade !== beforeGrade) {
-      msg += ` (${beforeGrade} → ${afterGrade})`;
-    }
-  }
-  showToast(msg, {
+  showToast(toastPrefix + EcoPromptCore.changeNote(before, state.impact), {
     label: 'Undo',
     onClick: () => {
       $('prompt-input').value = prevText;
@@ -532,96 +522,79 @@ function applyPromptChange(newText, toastPrefix) {
   });
 }
 
-function switchModelAction(bestModel, claim) {
-  state.modelId = bestModel.id;
-  $('model-select').value = bestModel.id;
+function switchModelAction(model, toast) {
+  state.modelId = model.id;
+  $('model-select').value = model.id;
   syncReasoningControl();
   updateCoach();
-  showToast(`🔁 Switched to ${bestModel.name} — ${savingPhrase(claim)} on this prompt`);
+  showToast(toast);
 }
 
 /**
- * Map a coach tip to a one-click action button, or null when the tip is
- * informational only.
+ * A coach tip's one-click button from core's tipAction, wired to the coach,
+ * or null when the tip is informational only.
  */
-function tipAction(tip, analysis) {
-  if (tip.kind === 'polite_words') {
-    return {
-      label: '✂️ Trim it for me',
-      onClick: () => applyPromptChange(
-        EcoPromptCore.generateOptimizedPrompt($('prompt-input').value),
-        '✂️ Courtesy phrases trimmed'
-      )
-    };
-  }
-  if (tip.kind === 'output_budget') {
-    return {
-      label: '➕ Add "≤100 words"',
-      onClick: () => {
-        const text = $('prompt-input').value.trim();
-        const sep = /[.!?]$/.test(text) ? ' ' : '. ';
-        applyPromptChange(`${text}${sep}Answer in ≤100 words.`, '📏 Output budget added');
-      }
-    };
-  }
-  if (tip.kind === 'model') {
-    // Offer a switch only when a meaningfully greener model exists. Nano-class
-    // models are excluded — "switch to a 1B model" isn't credible advice for
-    // general tasks; Small (Haiku/mini/Flash class) is the floor the tip text
-    // itself recommends. Thinking models count too: every 2026 model thinks,
-    // and savingClaim offers a switch only when the ranges don't overlap.
-    const candidates = state.engine.listModels()
-      .filter((m) => m.sizeClass !== 'Nano')
-      .map((m) => m.id);
-    if (!candidates.includes(state.modelId)) candidates.push(state.modelId);
-    const cmp = state.engine.compareModels({
-      modelIds: candidates,
-      inputTokens: analysis.tokens,
-      outputTokens: state.outputTokens,
-      options: {
-        taskMultiplier: analysis.energyMultiplier,
-        reasoningEffort: state.reasoningEffort,
-        regionKey: state.regionKey === 'default' ? undefined : state.regionKey
-      }
-    });
-    const best = cmp.best;
-    const current = cmp.results.find((r) => r.model.id === state.modelId);
-    if (!best || !current || best.model.id === state.modelId) return null;
-    // Only a saving the ranges support: never a percentage between
-    // overlapping estimates, and never a switch for "probably less".
-    const claim = savingClaim(best, current);
-    if (!claim || claim.claim !== 'percent' || claim.percentage < 15) return null;
-    return {
-      label: `🔁 Switch to ${best.model.name} (${claim.atLeast ? `at least ${claim.percentage}% less` : `−${claim.percentage}%`})`,
-      onClick: () => switchModelAction(best.model, claim)
-    };
-  }
-  return null;
+let lastTipAction = { key: null, action: null };
+
+function tipButton(tip, analysis) {
+  const inputs = coachInputs(analysis);
+  // The greener-model switch compares every model: once per set of inputs.
+  const key = tip.kind === 'model' ? JSON.stringify(inputs) : null;
+  const action = key !== null && key === lastTipAction.key
+    ? lastTipAction.action
+    : EcoPromptCore.tipAction(tip, { engine: state.engine, ...inputs });
+  if (key !== null) lastTipAction = { key, action };
+  if (!action) return null;
+  return {
+    label: action.label,
+    onClick: action.kind === 'model'
+      ? () => switchModelAction(action.model, action.toast)
+      : () => applyPromptChange(action.apply($('prompt-input').value), action.toast)
+  };
+}
+
+// Each tip's node, by kind: re-analysing the prompt updates a tip in place,
+// so a focused tip button keeps focus while you type (PLAN.md Step 14).
+const tipNodes = new Map();
+
+function tipNode() {
+  const node = {
+    item: el('div', 'tip'),
+    body: el('div', 'tip-body'),
+    head: el('p', 'tip-title'),
+    title: el('span'),
+    priority: el('span', 'tip-priority'),
+    desc: el('p', 'tip-desc'),
+    impact: el('p', 'tip-impact'),
+    btn: el('button', 'btn btn-secondary tip-action'),
+    onClick: null
+  };
+  node.btn.type = 'button';
+  node.btn.addEventListener('click', () => node.onClick && node.onClick());
+  node.head.append(node.title, node.priority);
+  node.item.appendChild(node.body);
+  return node;
 }
 
 function renderTips(analysis) {
-  const list = $('tips-list');
-  clearChildren(list);
-  for (const tip of analysis.tips) {
-    const item = el('div', 'tip');
-    item.dataset.priority = tip.priority || 'low';
-    const body = el('div', 'tip-body');
-    const title = el('p', 'tip-title');
-    title.appendChild(el('span', null, tip.title));
-    title.appendChild(el('span', 'tip-priority', tip.priority));
-    body.appendChild(title);
-    body.appendChild(el('p', 'tip-desc', tip.description));
-    if (tip.impact) body.appendChild(el('p', 'tip-impact', `→ ${tip.impact}`));
-    const action = tipAction(tip, analysis);
-    if (action) {
-      const btn = el('button', 'btn btn-secondary tip-action', action.label);
-      btn.type = 'button';
-      btn.addEventListener('click', action.onClick);
-      body.appendChild(btn);
-    }
-    item.appendChild(body);
-    list.appendChild(item);
-  }
+  const seen = {};
+  const items = analysis.tips.map((tip) => {
+    seen[tip.kind] = (seen[tip.kind] || 0) + 1;
+    const key = `${tip.kind}#${seen[tip.kind]}`;
+    if (!tipNodes.has(key)) tipNodes.set(key, tipNode());
+    const node = tipNodes.get(key);
+    node.item.dataset.priority = tip.priority || 'low';
+    setText(node.title, tip.title);
+    setText(node.priority, tip.priority || '');
+    setText(node.desc, tip.description);
+    setText(node.impact, tip.impact ? `→ ${tip.impact}` : '');
+    const action = tipButton(tip, analysis);
+    if (action) setText(node.btn, action.label);
+    node.onClick = action ? action.onClick : null;
+    syncChildren(node.body, [node.head, node.desc, ...(tip.impact ? [node.impact] : []), ...(action ? [node.btn] : [])]);
+    return node.item;
+  });
+  syncChildren($('tips-list'), items);
 }
 
 function updateCoach() {
@@ -690,8 +663,8 @@ function updateCoach() {
   $('energy-primary').textContent = rel.energy.primary;
   $('energy-secondary').textContent = rel.energy.secondary;
   $('energy-range').textContent = desc.estimated
-    ? `${desc.methodChip} · ${desc.note}`
-    : `range ${formatWh(impact.energy.confidence.minWh)} – ${formatWh(impact.energy.confidence.maxWh)}`;
+    ? desc.chipText
+    : `range ${EcoPromptCore.formatWhRange(impact.energy.confidence.minWh, impact.energy.confidence.maxWh)}`;
 
   $('water-primary').textContent = rel.water.primary;
   $('water-secondary').textContent = rel.water.secondary;
@@ -706,7 +679,7 @@ function updateCoach() {
   // A host with no published figures borrows another's, and says so.
   const proxy = impact.factors.hostProxyOf && state.engine.grids.providers[impact.factors.hostProxyOf];
   $('carbon-detail').textContent =
-    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied` +
+    `${EcoPromptCore.formatCif(impact.factors.cif)} · ${cifLabel} · incl. 15% embodied` +
     (proxy ? ` · borrowed from ${proxy.name} until ${impact.model.provider}'s own figures are read` : '');
 
   setSegmentWidths(impact);
@@ -719,9 +692,8 @@ function updateCoach() {
   );
 
   // Compare prices the same task as the coach (PLAN.md Step 10), and
-  // mirrors its tokens unless the user took over those sliders. Skip the
-  // (full-section) rebuild when nothing it shows changed.
-  let compareStale = analysis.energyMultiplier !== state.compareTaskMultiplier;
+  // mirrors its tokens unless the user took over those sliders. It redraws
+  // only when those inputs changed, and only once it can be seen.
   state.compareTaskMultiplier = analysis.energyMultiplier;
   if (!state.compareTouched) {
     const nextInput = analysis.tokens;
@@ -730,10 +702,9 @@ function updateCoach() {
       state.compareInput = nextInput;
       state.compareOutput = nextOutput;
       syncCompareSliders();
-      compareStale = true;
     }
   }
-  if (compareStale) renderCompare();
+  renderCompare();
 }
 
 const updateCoachDebounced = debounce(updateCoach, 220);
@@ -808,16 +779,26 @@ function buildShareLink() {
  * give the same number everywhere.
  */
 function coachImpact(analysis, { modelId, region, effort, outTokens }) {
-  return state.engine.estimateImpact({
+  return state.engine.estimateImpact(EcoPromptCore.impactRequest({
     modelId,
-    inputTokens: analysis.tokens,
-    outputTokens: outTokens,
-    options: {
-      taskMultiplier: analysis.energyMultiplier,
-      reasoningEffort: effort,
-      regionKey: region === 'default' ? undefined : region
-    }
-  });
+    inTokens: analysis.tokens,
+    outTokens,
+    taskMultiplier: analysis.energyMultiplier,
+    effort,
+    region
+  }));
+}
+
+/** The coach's current inputs, as core's impactRequest takes them. */
+function coachInputs(analysis) {
+  return {
+    modelId: state.modelId,
+    inTokens: analysis.tokens,
+    outTokens: state.outputTokens,
+    taskMultiplier: analysis.energyMultiplier,
+    effort: state.reasoningEffort,
+    region: state.regionKey
+  };
 }
 
 /** Valid coach inputs, or their defaults: a bad value never reaches the engine. */
@@ -1038,16 +1019,41 @@ function compareMetricRow(label, primary, tech) {
   return row;
 }
 
+// What Compare last drew, and whether it is on screen (PLAN.md Step 14).
+let compareDrawnKey = null;
+let compareInView = typeof IntersectionObserver !== 'function';
+
+/** Compare's inputs: it redraws only when these change. */
+function compareKey() {
+  return JSON.stringify([
+    state.compareIds, state.compareInput, state.compareOutput,
+    state.compareTaskMultiplier, state.reasoningEffort, state.regionKey
+  ]);
+}
+
+/**
+ * Draw Compare if its inputs changed since it was last drawn. Off screen it
+ * waits: typing in the coach mirrors new token counts into it on every
+ * keystroke, and it catches up when scrolled into view.
+ */
 function renderCompare() {
+  if (!compareInView) return;
+  const key = compareKey();
+  if (key === compareDrawnKey) return;
+  compareDrawnKey = key;
+  drawCompare();
+}
+
+function drawCompare() {
   const cmp = state.engine.compareModels({
     modelIds: state.compareIds,
     inputTokens: state.compareInput,
     outputTokens: state.compareOutput,
-    options: {
+    options: EcoPromptCore.impactOptions({
       taskMultiplier: state.compareTaskMultiplier,
-      reasoningEffort: state.reasoningEffort,
-      regionKey: state.regionKey === 'default' ? undefined : state.regionKey
-    }
+      effort: state.reasoningEffort,
+      region: state.regionKey
+    })
   });
 
   // Savings banner: only what the ranges support (PLAN.md Step 27).
@@ -1166,9 +1172,9 @@ function renderCompare() {
   renderCompareChart(cmp.results);
 }
 
-const GRADE_COLORS = {
-  A: '#10B981', B: '#84CC16', C: '#F59E0B', D: '#F97316', E: '#EF4444'
-};
+// Each model's last bar width, so a redraw moves a bar from where it was
+// instead of replaying the grow-in from zero.
+const chartBarWidths = new Map();
 
 function renderCompareChart(results) {
   const wrap = $('compare-chart');
@@ -1229,19 +1235,20 @@ function renderCompareChart(results) {
       rangeBar.setAttribute('height', String(barH));
       rangeBar.setAttribute('rx', '8');
       rangeBar.setAttribute('class', 'chart-span');
-      rangeBar.setAttribute('fill', GRADE_COLORS[d.gradeHigh || d.gradeLow] || '#10B981');
+      rangeBar.setAttribute('fill', EcoPromptCore.gradeColor(d.gradeHigh || d.gradeLow));
       svg.appendChild(rangeBar);
     }
     const bar = document.createElementNS(NS, 'rect');
     bar.setAttribute('x', '0');
     bar.setAttribute('y', String(y + labelH));
-    bar.setAttribute('width', '8');
+    bar.setAttribute('width', String(chartBarWidths.get(r.model.id) || 8));
     bar.setAttribute('height', String(barH));
     bar.setAttribute('rx', '8');
     bar.setAttribute('class', 'chart-bar');
-    bar.setAttribute('fill', GRADE_COLORS[d.gradeLow] || '#10B981');
+    bar.setAttribute('fill', EcoPromptCore.gradeColor(d.gradeLow));
     svg.appendChild(bar);
     bars.push({ bar, targetW, value: solidWh, y: y + labelH });
+    chartBarWidths.set(r.model.id, targetW);
 
     const value = document.createElementNS(NS, 'text');
     value.setAttribute('x', String(endW + 8));
@@ -1263,6 +1270,13 @@ function renderCompareChart(results) {
 function initCompare() {
   renderCompareChips();
   syncCompareSliders();
+  if (!compareInView) {
+    // Drawn a little before it scrolls into view.
+    new IntersectionObserver((entries) => {
+      compareInView = entries[entries.length - 1].isIntersecting;
+      renderCompare();
+    }, { rootMargin: '300px 0px' }).observe($('compare'));
+  }
 
   const inSlider = $('compare-input-slider');
   const outSlider = $('compare-output-slider');
@@ -1409,11 +1423,17 @@ function renderExplorer() {
 
 const LIBRARY_KEY = 'epc_library';
 
+// The library as last parsed: read again only when the stored text changed.
+let libraryParsed = { raw: null, items: [] };
+
 function readLibrary() {
   try {
     const raw = localStorage.getItem(LIBRARY_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    if (raw !== libraryParsed.raw) {
+      const parsed = raw ? JSON.parse(raw) : [];
+      libraryParsed = { raw, items: Array.isArray(parsed) ? parsed : [] };
+    }
+    return libraryParsed.items.slice();
   } catch (err) {
     return [];
   }
@@ -1473,20 +1493,114 @@ function saveLibraryEntry(title) {
   showToast('📚 Saved to your library');
 }
 
+// Each entry's card, analysed and priced once: a search keystroke only
+// shows, hides and orders cards (PLAN.md Step 14).
+const libraryCards = new Map(); // key -> { it, sig, impact, node }
+
+function buildLibraryCard(it, inputs, impact) {
+  const card = el('article', 'library-item');
+  const desc = impact ? describeImpact(impact) : null;
+
+  const head = el('div', 'library-item-head');
+  head.appendChild(el('span', 'library-item-title', it.title || 'Untitled prompt'));
+  const pill = el('span', 'grade-pill', desc ? desc.gradeText : '?');
+  if (desc) paintGrade(pill, desc);
+  else pill.setAttribute('aria-label', 'Eco-grade unknown');
+  head.appendChild(pill);
+  card.appendChild(head);
+
+  card.appendChild(el('p', 'library-item-text', it.text || ''));
+
+  const model = state.engine.getModel(it.modelId);
+  const meta = el('div', 'library-item-meta');
+  // An older model keeps its own name: the estimate is its own.
+  const modelLabel = model
+    ? (model.status === 'current' ? model.name : `${model.name} (older model)`)
+    : (it.modelId ? `${it.modelId} (not in the catalog)` : 'no model');
+  meta.appendChild(el('span', null, modelLabel));
+  if (desc) {
+    const span = el('span', null, `⚡ ${desc.estimated ? `${desc.rangeText} · ${desc.methodChip}` : formatWh(impact.energy.wh)}`);
+    span.title = "Re-estimated with today's model catalog";
+    meta.appendChild(span);
+  }
+  if (inputs.region !== 'default') meta.appendChild(el('span', null, `grid: ${inputs.region}`));
+  if (impact && impact.model.isReasoning && inputs.effort !== 'standard') {
+    meta.appendChild(el('span', null, `${inputs.effort} effort`));
+  }
+  if (impact) {
+    meta.appendChild(el('span', null, `${impact.tokens.input} in / ${impact.tokens.output} out tokens`));
+  }
+  if (it.ts) {
+    meta.appendChild(el('span', null, new Date(it.ts).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric'
+    })));
+  }
+  card.appendChild(meta);
+
+  const actions = el('div', 'library-item-actions');
+  const openBtn = el('button', 'icon-btn', '↩️ Open in coach');
+  openBtn.type = 'button';
+  openBtn.addEventListener('click', () => {
+    openInCoach(it.text || '', inputs);
+    showToast('Opened in the coach');
+  });
+  const copyBtn = el('button', 'icon-btn', '📋 Copy');
+  copyBtn.type = 'button';
+  copyBtn.addEventListener('click', async () => {
+    const ok = await copyToClipboard(it.text || '');
+    showToast(ok ? 'Prompt copied' : 'Copy failed — clipboard unavailable');
+  });
+  const delBtn = el('button', 'icon-btn danger', '🗑️ Delete');
+  delBtn.type = 'button';
+  delBtn.addEventListener('click', () => {
+    writeLibrary(readLibrary().filter((x) => x.id !== it.id));
+    renderLibrary();
+    showToast('Prompt deleted');
+  });
+  actions.appendChild(openBtn);
+  actions.appendChild(copyBtn);
+  actions.appendChild(delBtn);
+  card.appendChild(actions);
+
+  return card;
+}
+
+function libraryCard(it, key) {
+  const sig = JSON.stringify(it);
+  let entry = libraryCards.get(key);
+  if (!entry || entry.sig !== sig) {
+    const { inputs, impact } = libraryEstimate(it);
+    entry = { it, sig, impact, node: buildLibraryCard(it, inputs, impact) };
+    libraryCards.set(key, entry);
+  }
+  return entry;
+}
+
+let libraryNoMatch = null;
+
 function renderLibrary() {
   const listEl = $('library-list');
   const emptyEl = $('library-empty');
-  clearChildren(listEl);
 
   const all = readLibrary();
   emptyEl.classList.toggle('hidden', all.length > 0);
 
+  // Keyed by id; an entry without one by its contents.
+  const seen = new Map();
+  const cards = all.map((it) => {
+    const base = typeof it.id === 'string' ? it.id : JSON.stringify(it);
+    seen.set(base, (seen.get(base) || 0) + 1);
+    return libraryCard(it, `${base}#${seen.get(base)}`);
+  });
+  const live = new Set(cards);
+  for (const [key, entry] of libraryCards) {
+    if (!live.has(entry)) libraryCards.delete(key);
+  }
+
   const q = state.librarySearch.trim().toLowerCase();
-  const items = all
-    .filter((it) => !q ||
-      String(it.title || '').toLowerCase().includes(q) ||
-      String(it.text || '').toLowerCase().includes(q))
-    .map((it) => ({ it, ...libraryEstimate(it) }));
+  const items = cards.filter(({ it }) => !q ||
+    String(it.title || '').toLowerCase().includes(q) ||
+    String(it.text || '').toLowerCase().includes(q));
 
   const wh = (x) => (x.impact ? x.impact.energy.wh : Infinity);
   const sorters = {
@@ -1498,78 +1612,11 @@ function renderLibrary() {
   items.sort(sorters[state.librarySort] || sorters['date-desc']);
 
   if (!items.length && all.length > 0) {
-    const none = el('p', 'explorer-note', 'No saved prompts match your search.');
-    listEl.appendChild(none);
+    if (!libraryNoMatch) libraryNoMatch = el('p', 'explorer-note', 'No saved prompts match your search.');
+    syncChildren(listEl, [libraryNoMatch]);
     return;
   }
-
-  for (const { it, inputs, impact } of items) {
-    const card = el('article', 'library-item');
-    const desc = impact ? describeImpact(impact) : null;
-
-    const head = el('div', 'library-item-head');
-    head.appendChild(el('span', 'library-item-title', it.title || 'Untitled prompt'));
-    const pill = el('span', 'grade-pill', desc ? desc.gradeText : '?');
-    if (desc) paintGrade(pill, desc);
-    else pill.setAttribute('aria-label', 'Eco-grade unknown');
-    head.appendChild(pill);
-    card.appendChild(head);
-
-    card.appendChild(el('p', 'library-item-text', it.text || ''));
-
-    const model = state.engine.getModel(it.modelId);
-    const meta = el('div', 'library-item-meta');
-    // An older model keeps its own name: the estimate is its own.
-    const modelLabel = model
-      ? (model.status === 'current' ? model.name : `${model.name} (older model)`)
-      : (it.modelId ? `${it.modelId} (not in the catalog)` : 'no model');
-    meta.appendChild(el('span', null, modelLabel));
-    if (desc) {
-      const span = el('span', null, `⚡ ${desc.estimated ? `${desc.rangeText} · ${desc.methodChip}` : formatWh(impact.energy.wh)}`);
-      span.title = "Re-estimated with today's model catalog";
-      meta.appendChild(span);
-    }
-    if (inputs.region !== 'default') meta.appendChild(el('span', null, `grid: ${inputs.region}`));
-    if (impact && impact.model.isReasoning && inputs.effort !== 'standard') {
-      meta.appendChild(el('span', null, `${inputs.effort} effort`));
-    }
-    if (impact) {
-      meta.appendChild(el('span', null, `${impact.tokens.input} in / ${impact.tokens.output} out tokens`));
-    }
-    if (it.ts) {
-      meta.appendChild(el('span', null, new Date(it.ts).toLocaleDateString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric'
-      })));
-    }
-    card.appendChild(meta);
-
-    const actions = el('div', 'library-item-actions');
-    const openBtn = el('button', 'icon-btn', '↩️ Open in coach');
-    openBtn.type = 'button';
-    openBtn.addEventListener('click', () => {
-      openInCoach(it.text || '', inputs);
-      showToast('Opened in the coach');
-    });
-    const copyBtn = el('button', 'icon-btn', '📋 Copy');
-    copyBtn.type = 'button';
-    copyBtn.addEventListener('click', async () => {
-      const ok = await copyToClipboard(it.text || '');
-      showToast(ok ? 'Prompt copied' : 'Copy failed — clipboard unavailable');
-    });
-    const delBtn = el('button', 'icon-btn danger', '🗑️ Delete');
-    delBtn.type = 'button';
-    delBtn.addEventListener('click', () => {
-      writeLibrary(readLibrary().filter((x) => x.id !== it.id));
-      renderLibrary();
-      showToast('Prompt deleted');
-    });
-    actions.appendChild(openBtn);
-    actions.appendChild(copyBtn);
-    actions.appendChild(delBtn);
-    card.appendChild(actions);
-
-    listEl.appendChild(card);
-  }
+  syncChildren(listEl, items.map((x) => x.node));
 }
 
 function exportLibrary() {

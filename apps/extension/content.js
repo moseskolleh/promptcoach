@@ -15,25 +15,13 @@
   const Core = window.EcoPromptCore;
   if (!Core || !Core.ImpactEngine) return;
 
-  const GRADE_COLORS = {
-    A: '#10B981',
-    B: '#84CC16',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444'
-  };
-
-  // An estimate's grade range ("B–E") is coloured from its low grade to its
-  // high one (PLAN.md Step 8).
-  function gradeBackground(desc) {
-    const from = GRADE_COLORS[desc.gradeLow];
-    return desc.gradeHigh && desc.gradeHigh !== desc.gradeLow
-      ? `linear-gradient(135deg, ${from}, ${GRADE_COLORS[desc.gradeHigh]})`
-      : from;
-  }
-
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const History = globalThis.EcoPromptHistory;
+  const Watch = globalThis.EcoPromptWatch;
+  const Sites = globalThis.EcoPromptSites;
+  // Where this site keeps its composer, send button, turns and picker
+  // (sites/*.json, PLAN.md Step 15); null on a site without one.
+  const adapter = Sites.forHost(location.hostname);
 
   /** False on a site the user paused EcoPrompt on: no pill, nothing recorded. */
   function siteOn() {
@@ -54,6 +42,8 @@
   let catalogIds = []; // every catalog id, for detection's fail-closed check
 
   let inputEl = null; // the chat prompt input we're attached to
+  let inputVia = null; // 'adapter' | 'generic': how it was found
+  let turnsMissing = 0; // sends dropped because the adapter found no user turns
   let pill = null;
   let pillGrade = null;
   let pillText = null;
@@ -63,15 +53,11 @@
   let lastAnalysis = null;
   let lastImpact = null;
   let lastRecordTs = 0;
+  let pickerEl = null; // the element the picker's label was read from
 
   // --------------------------------------------------------------------------
   // Setup: data + settings
   // --------------------------------------------------------------------------
-
-  async function fetchJson(path) {
-    const res = await fetch(chrome.runtime.getURL(path));
-    return res.json();
-  }
 
   /** The saved settings as stored; EcoPromptSettings.resolve applies them. */
   function loadSettings() {
@@ -114,6 +100,11 @@
       'button[aria-selected="true"]'
     ].join(', ')
   ];
+  // The site adapter's picker and effort toggle are tried before either.
+  const PICKER_GROUPS = [
+    adapter ? [adapter.picker, adapter.effortToggle].filter(Boolean).join(', ') : '',
+    ...PICKER_SELECTOR_GROUPS
+  ].filter(Boolean);
 
   function collectModelLabels(selectors) {
     const labels = [];
@@ -132,11 +123,19 @@
         el.getAttribute('aria-selected') === 'true' ||
         /(?:^|\s)(?:active|selected|checked|is-active|is-selected)(?:\s|$)/.test(String(el.className || ''));
       const aria = el.getAttribute('aria-label');
-      if (aria) labels.push({ text: aria, active });
-      const text = el.textContent || '';
-      if (text.trim() && text.length <= 80) labels.push({ text, active });
+      if (aria) labels.push({ text: aria, active, el });
+      // Only a short label is read: a large matched subtree is never
+      // serialized just to be thrown away (PLAN.md Step 14).
+      const text = Watch.boundedText(el, 80);
+      if (text && text.trim()) labels.push({ text, active, el });
     }
     return labels;
+  }
+
+  /** The element a detected label came from, for watching the picker. */
+  function labelElement(labels, matchedText) {
+    const hit = labels.find((l) => l.text.replace(/\s+/g, ' ').trim() === matchedText);
+    return hit ? hit.el : null;
   }
 
   function pageModelFamily() {
@@ -151,13 +150,17 @@
   /** The model and effort the page's picker shows, or null. */
   function pickerDetection() {
     const family = pageModelFamily();
+    pickerEl = null;
     if (!family) return null;
-    for (const selectors of PICKER_SELECTOR_GROUPS) {
-      const hit = Core.detectModelFromLabels(location.hostname, collectModelLabels(selectors), { family, modelIds: catalogIds });
+    for (const selectors of PICKER_GROUPS) {
+      const labels = collectModelLabels(selectors);
+      const hit = Core.detectModelFromLabels(location.hostname, labels, { family, modelIds: catalogIds });
       // A newer generation stops here: the looser group below could read an
       // unrelated label as an older model (PLAN.md Step 10).
-      if (hit && hit.unknownGeneration) return hit;
-      if (hit && (hit.effort || (hit.modelId && engine.getModel(hit.modelId)))) return hit;
+      if (hit && (hit.unknownGeneration || hit.effort || (hit.modelId && engine.getModel(hit.modelId)))) {
+        pickerEl = labelElement(labels, hit.matchedText);
+        return hit;
+      }
     }
     return null;
   }
@@ -261,21 +264,39 @@
     return style.display !== 'none' && style.visibility !== 'hidden';
   }
 
+  const GENERIC_SEND = [
+    'button[type="submit"]',
+    'button[aria-label*="send" i]',
+    'button[aria-label*="submit" i]',
+    'button[data-testid*="send" i]',
+    '[role="button"][aria-label*="send" i]'
+  ].join(', ');
+
   function findSendButton(root) {
-    const selectors = [
-      'button[type="submit"]',
-      'button[aria-label*="send" i]',
-      'button[aria-label*="submit" i]',
-      'button[data-testid*="send" i]',
-      '[role="button"][aria-label*="send" i]'
-    ];
-    return root.querySelector(selectors.join(', '));
+    return (adapter && Sites.queryAll(root, adapter.sendButton)[0]) || root.querySelector(GENERIC_SEND);
   }
 
+  // Every editable element: textareas and contenteditable, "plaintext-only"
+  // included (PLAN.md Step 15).
+  const EDITABLE = 'textarea, [contenteditable]:not([contenteditable="false"])';
+
+  /** The composer the site's adapter names, when it is on the page and visible. */
+  function adapterComposer() {
+    return adapter ? bestComposer(Sites.queryAll(document, adapter.composer).filter(isVisible)) : null;
+  }
+
+  /**
+   * The composer to attach to and how it was found: the adapter's first,
+   * else the generic guess, which a site redesign can't break.
+   */
   function findPromptInput() {
-    const candidates = Array.from(
-      document.querySelectorAll('textarea, [contenteditable="true"]')
-    ).filter(isVisible);
+    const own = adapterComposer();
+    if (own) return { el: own, via: 'adapter' };
+    const guess = bestComposer(Array.from(document.querySelectorAll(EDITABLE)).filter(isVisible));
+    return { el: guess, via: guess ? 'generic' : null };
+  }
+
+  function bestComposer(candidates) {
     if (!candidates.length) return null;
 
     // Prefer the editable nearest (by ancestor distance) to a send button.
@@ -381,7 +402,7 @@
     const grade = document.createElement('span');
     grade.className = 'epc-card-grade';
     grade.textContent = desc.gradeText;
-    grade.style.background = gradeBackground(desc);
+    grade.style.background = Core.gradeBackground(desc);
     grade.title = desc.gradeLabel;
     const title = document.createElement('span');
     title.className = 'epc-card-title';
@@ -395,7 +416,7 @@
     if (desc.estimated) {
       const est = document.createElement('p');
       est.className = 'epc-card-est';
-      est.textContent = `${desc.methodChip} · ${desc.note}`;
+      est.textContent = desc.chipText;
       est.title = desc.noteReason;
       card.appendChild(est);
     }
@@ -438,6 +459,18 @@
     }
   }
 
+  // One reposition per frame at most, and only when something moved or
+  // resized: no layout is read on scroll (PLAN.md Step 14).
+  let positionQueued = false;
+  function positionOnFrame() {
+    if (positionQueued) return;
+    positionQueued = true;
+    requestAnimationFrame(() => {
+      positionQueued = false;
+      positionUi();
+    });
+  }
+
   function positionUi() {
     if (!pill || !inputEl || !inputEl.isConnected) return;
     const rect = inputEl.getBoundingClientRect();
@@ -467,12 +500,9 @@
   // Live analysis
   // --------------------------------------------------------------------------
 
-  let analyzeTimer = null;
-
-  function scheduleAnalyze() {
-    clearTimeout(analyzeTimer);
-    analyzeTimer = setTimeout(analyzeDraft, 300);
-  }
+  // Re-priced in idle time once typing pauses, and at least every 1.2 s of
+  // continuous typing (PLAN.md Step 14).
+  const scheduleAnalyze = Watch.idleDebounce(() => analyzeDraft(), { delay: 300, maxWait: 1200 });
 
   function analyzeDraft() {
     const text = getDraftText(inputEl).trim();
@@ -505,13 +535,13 @@
     const desc = Core.describeImpact(lastImpact);
     const range = lastImpact.energy.range;
     pillGrade.textContent = desc.gradeText;
-    pillGrade.style.background = gradeBackground(desc);
+    pillGrade.style.background = Core.gradeBackground(desc);
     pillGrade.title = desc.gradeLabel;
     pillText.textContent = range
       ? conv.energyRange(range.lowWh, range.highWh).primary
       : conv.energy(lastImpact.energy.wh).primary;
     pillEst.hidden = !desc.estimated;
-    pillEst.title = desc.estimated ? `${desc.methodChip} · ${desc.note}` : '';
+    pillEst.title = desc.chipText || '';
     if (cardOpen) renderCard();
     positionUi();
   }
@@ -520,19 +550,45 @@
   // Send detection + history recording
   // --------------------------------------------------------------------------
 
-  function recordSend() {
+  /** The composer is empty, or gone: a site may re-render it on send. */
+  function draftEmpty() {
+    return !inputEl || !inputEl.isConnected || !getDraftText(inputEl).trim();
+  }
+
+  /** The page's user turns, or null when this site's can't be counted. */
+  function userTurns() {
+    return adapter && adapter.userMessage ? Sites.queryAll(document, adapter.userMessage).length : null;
+  }
+
+  // A send is recorded only once it happened: the composer cleared and a
+  // new user turn appeared (PLAN.md Step 15). Enter in a slash menu, a send
+  // the page blocked while a reply streams and "Send feedback" do neither.
+  const sends = Sites.createSendConfirmer({
+    draftEmpty,
+    userTurns,
+    trusted: !!(adapter && adapter.lastVerified),
+    onConfirm: recordSend,
+    onDrop: (reason, snapshot, turns) => {
+      if (reason === 'no-new-turn' && turns === 0) turnsMissing++;
+    }
+  });
+
+  /** Enter or a send button: price the draft now, record it once the send is confirmed. */
+  function sendCandidate() {
     if (settings.recordHistory === false || !siteOn()) return;
-    const now = Date.now();
-    if (now - lastRecordTs < 1000) return; // Enter + click double-fire guard
     // Recompute synchronously so we record the final draft, not a stale one.
-    clearTimeout(analyzeTimer);
+    scheduleAnalyze.cancel();
     analyzeDraft();
     if (!lastImpact || !lastInputs) return;
-    lastRecordTs = now;
+    sends.candidate({ inputs: lastInputs, impact: lastImpact, ts: Date.now() });
+  }
 
+  function recordSend({ inputs, impact, ts }) {
+    if (ts - lastRecordTs < 1000) return; // Enter + click double-fire guard
+    lastRecordTs = ts;
     // The service worker is the only writer (PLAN.md Step 11). The row holds
     // the send's inputs and figures, never its text.
-    const entry = History.makeEntry({ ...lastInputs, ts: now }, lastImpact);
+    const entry = History.makeEntry({ ...inputs, ts }, impact);
     try {
       chrome.runtime.sendMessage({ type: 'eco:record', entry }).catch(() => {});
     } catch (err) {
@@ -542,7 +598,7 @@
 
   function onKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-      recordSend();
+      sendCandidate();
     }
   }
 
@@ -550,51 +606,181 @@
     const button = event.target && event.target.closest
       ? event.target.closest('button, [role="button"]')
       : null;
-    if (!button) return;
-    const label = (
-      (button.getAttribute('aria-label') || '') +
-      ' ' + (button.getAttribute('data-testid') || '') +
-      ' ' + (button.type === 'submit' ? 'submit' : '')
-    ).toLowerCase();
-    if (/send|submit/.test(label) && getDraftText(inputEl).trim()) {
-      recordSend();
+    if (Sites.isSendButton(button, adapter) && getDraftText(inputEl).trim()) {
+      sendCandidate();
     }
+  }
+
+  /** What the popup shows: attached or not, how, and the adapter's age (PLAN.md Step 15). */
+  function attachStatus() {
+    return {
+      host: location.hostname,
+      adapter: adapter ? { site: adapter.site, lastVerified: adapter.lastVerified } : null,
+      via: inputEl ? inputVia : null,
+      paused: !siteOn(),
+      turnsMissing
+    };
   }
 
   // --------------------------------------------------------------------------
   // Attachment + SPA survival
   // --------------------------------------------------------------------------
 
-  function attachTo(el) {
-    if (inputEl === el) return;
+  let stopMoveWatch = null;
+
+  function attachTo(el, via) {
+    if (inputEl === el) {
+      inputVia = el ? via : null;
+      return;
+    }
     if (inputEl) {
       inputEl.removeEventListener('input', scheduleAnalyze);
       // Removed with the flag it was added with, or it stays attached and a
       // detached composer keeps recording sends (PLAN.md Step 10).
       inputEl.removeEventListener('keydown', onKeyDown, true);
     }
+    if (stopMoveWatch) stopMoveWatch();
+    stopMoveWatch = null;
     inputEl = el;
+    inputVia = el ? via : null;
     applyPillVisibility();
+    observeRegions();
     if (!inputEl) return;
     inputEl.addEventListener('input', scheduleAnalyze);
     inputEl.addEventListener('keydown', onKeyDown, true);
+    stopMoveWatch = Watch.watchMove(inputEl, positionOnFrame);
     analyzeDraft();
     positionUi();
   }
 
-  let scanTimer = null;
+  /** Find the composer if ours is gone or hidden, and re-read the picker. */
+  function scan() {
+    if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
+      const found = findPromptInput();
+      attachTo(found.el, found.via);
+    } else if (adapter && inputVia !== 'adapter') {
+      // On a generic guess: the adapter's composer may have rendered since.
+      const own = adapterComposer();
+      if (own) attachTo(own, 'adapter');
+    }
+    // The model switcher lives in the page chrome and re-renders on SPA
+    // navigation; re-read it whenever the DOM settles.
+    if (resolveModel() && inputEl) analyzeDraft();
+    observeRegions();
+    positionUi();
+  }
 
-  function scheduleScan() {
-    clearTimeout(scanTimer);
-    scanTimer = setTimeout(() => {
-      if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
-        attachTo(findPromptInput());
+  // In idle time, 500 ms after the page settles, and at least every 2 s
+  // while it doesn't: a streaming reply can no longer put a scan off for
+  // as long as it streams.
+  const scheduleScan = Watch.idleDebounce(scan, { delay: 500, maxWait: 2000 });
+  const scheduleResolve = Watch.idleDebounce(() => {
+    if (resolveModel() && inputEl) analyzeDraft();
+    observeRegions();
+  }, { delay: 300, maxWait: 1500 });
+
+  // --------------------------------------------------------------------------
+  // What is observed (PLAN.md Step 14)
+  //
+  // While a composer is attached, only its region and the model picker's are
+  // observed, so a reply streaming into the transcript costs nothing. The
+  // whole body is observed only while no composer is attached (page load, a
+  // view without one), and a heartbeat in idle time notices a composer that
+  // left with its region, a hidden one, and SPA navigation.
+  // --------------------------------------------------------------------------
+
+  let pageObserver = null;
+  let composerObserver = null;
+  let pickerObserver = null;
+  let composerRegion = null;
+  let pickerRegion = null;
+
+  /** el's nth ancestor, stopping below <body>: a region is never the page. */
+  function ancestor(el, n) {
+    let node = el;
+    for (let i = 0; i < n; i++) {
+      const up = node.parentElement;
+      if (!up || up === document.body || up === document.documentElement) break;
+      node = up;
+    }
+    return node;
+  }
+
+  /** The composer's surroundings: its form, else the nearest ancestor with the send button. */
+  function composerRegionOf(el) {
+    const form = el.closest('form');
+    if (form && form !== document.body) return form;
+    let node = el.parentElement;
+    for (let depth = 0; depth < 8 && node && node !== document.body; depth++, node = node.parentElement) {
+      if (findSendButton(node)) return node;
+    }
+    return ancestor(el, 3);
+  }
+
+  function pickerRegionOf(el) {
+    const bar = el.closest('header, nav, form, [role="toolbar"], [role="menubar"], [role="banner"]');
+    return bar && bar !== document.body ? bar : ancestor(el, 2);
+  }
+
+  // Typing changes the composer's own nodes; that is not a re-render.
+  const outsideDraft = (records) => records.some((r) => !inputEl || !inputEl.contains(r.target));
+
+  function observeRegions() {
+    const nextComposer = inputEl ? composerRegionOf(inputEl) : null;
+    if (nextComposer !== composerRegion) {
+      if (composerObserver) composerObserver.disconnect();
+      composerObserver = null;
+      composerRegion = nextComposer;
+      if (composerRegion) {
+        composerObserver = new MutationObserver((records) => { if (outsideDraft(records)) scheduleScan(); });
+        composerObserver.observe(composerRegion, { childList: true, subtree: true });
       }
-      // The model switcher lives in the page chrome and re-renders on SPA
-      // navigation; re-read it whenever the DOM settles.
-      if (resolveModel() && inputEl) analyzeDraft();
-      positionUi();
-    }, 500);
+    }
+    const nextPicker = pickerEl && pickerEl.isConnected ? pickerRegionOf(pickerEl) : null;
+    if (nextPicker !== pickerRegion) {
+      if (pickerObserver) pickerObserver.disconnect();
+      pickerObserver = null;
+      pickerRegion = nextPicker;
+      if (pickerRegion) {
+        pickerObserver = new MutationObserver((records) => { if (outsideDraft(records)) scheduleResolve(); });
+        pickerObserver.observe(pickerRegion, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+          attributes: true,
+          attributeFilter: ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-label', 'class']
+        });
+      }
+    }
+    if (inputEl && pageObserver) {
+      pageObserver.disconnect();
+      pageObserver = null;
+    } else if (!inputEl && !pageObserver && document.body) {
+      pageObserver = new MutationObserver(scheduleScan);
+      pageObserver.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  const HEARTBEAT_MS = 2000;
+  let lastHref = location.href;
+  const whenIdle = (fn) =>
+    (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 1000 }) : fn());
+
+  function heartbeat() {
+    whenIdle(() => {
+      const navigated = location.href !== lastHref;
+      lastHref = location.href;
+      if (navigated || !inputEl || !inputEl.isConnected || !isVisible(inputEl) || (pickerEl && !pickerEl.isConnected)) {
+        scheduleScan();
+      } else if (adapter && inputVia !== 'adapter') {
+        // On a generic guess: the adapter's composer may have rendered since.
+        const own = adapterComposer();
+        if (own) attachTo(own, 'adapter');
+      } else if (!pickerEl) {
+        scheduleResolve(); // a picker that renders after the composer
+      }
+      setTimeout(heartbeat, HEARTBEAT_MS);
+    });
   }
 
   function applyPillVisibility() {
@@ -613,21 +799,26 @@
   // --------------------------------------------------------------------------
 
   async function init() {
-    const [models, grids, equivalents, saved] = await Promise.all([
-      fetchJson('vendor/data/models.json'),
-      fetchJson('vendor/data/grids.json'),
-      fetchJson('vendor/data/equivalents.json'),
-      loadSettings()
-    ]);
-    engine = new Core.ImpactEngine({ models, grids, equivalents });
-    settings = globalThis.EcoPromptSettings.resolve(saved, engine);
-    conv = Core.createConverters(equivalents);
+    // The bundle carries the data and its precomputed coefficients: no
+    // fetch, no fitting at start-up (PLAN.md Step 13).
+    ({ engine, converters: conv } = Core.createBundledEngine());
+    settings = globalThis.EcoPromptSettings.resolve(await loadSettings(), engine);
     catalogIds = engine.listModels({ includeReference: true }).map((m) => m.id);
     resolveModel();
 
     buildUi();
     applyPillVisibility();
-    attachTo(findPromptInput());
+    const found = findPromptInput();
+    attachTo(found.el, found.via);
+
+    // The popup asks whether EcoPrompt is attached on this page.
+    if (chrome.runtime.onMessage) {
+      chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (!msg || msg.type !== 'eco:status') return false;
+        sendResponse(attachStatus());
+        return false;
+      });
+    }
 
     // Live settings updates from the options page.
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -639,25 +830,19 @@
       }
     });
 
-    // SPA navigation / re-rendered composers: re-scan on DOM mutations.
-    const observer = new MutationObserver(scheduleScan);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Chat pages auto-scroll continuously while responses stream; coalesce
-    // to one reposition per frame so we never thrash the host page's layout.
-    let positionQueued = false;
-    const positionOnFrame = () => {
-      if (positionQueued) return;
-      positionQueued = true;
-      requestAnimationFrame(() => {
-        positionQueued = false;
-        positionUi();
-      });
-    };
+    // SPA navigation and re-rendered composers: the regions above, and the
+    // heartbeat. The pill and card reposition when they resize, and when
+    // the composer moves (watchMove, set in attachTo).
+    observeRegions();
+    setTimeout(heartbeat, HEARTBEAT_MS);
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(positionOnFrame);
+      ro.observe(pill);
+      ro.observe(card);
+    }
     window.addEventListener('resize', positionOnFrame);
-    window.addEventListener('scroll', positionOnFrame, { capture: true, passive: true });
     document.addEventListener('click', onDocumentClick, true);
-    document.addEventListener('focusin', scheduleScan);
+    document.addEventListener('focusin', () => scheduleScan());
   }
 
   init().catch((err) => {

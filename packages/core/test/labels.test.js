@@ -152,7 +152,7 @@ test('Wh ranges share their unit', () => {
   assert.strictEqual(formatWhRange(0.522, 16.7), '0.522–16.7 Wh');
   assert.strictEqual(formatWhRange(8.93, null), '≥ 8.93 Wh');
   assert.strictEqual(formatWhRange(1.234, 1.2341), '1.23 Wh');
-  assert.strictEqual(formatWhRange(850, 1200), '850.0 Wh – 1.20 kWh');
+  assert.strictEqual(formatWhRange(850, 1200), '850 Wh – 1.20 kWh');
 });
 
 test('a saving is a percentage only when the ranges do not overlap', () => {

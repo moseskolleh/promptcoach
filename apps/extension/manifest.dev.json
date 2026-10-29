@@ -57,11 +57,12 @@
         "http://127.0.0.1/*"
       ],
       "js": [
-        "vendor/calculator.js",
+        "vendor/core.bundle.js",
         "shared/defaults.js",
-        "vendor/analyzer.js",
-        "vendor/conversions.js",
         "shared/history.js",
+        "shared/watch.js",
+        "sites/adapters.js",
+        "shared/sites.js",
         "content.js"
       ],
       "css": [
@@ -73,7 +74,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "vendor/*",
         "assets/*"
       ],
       "matches": [

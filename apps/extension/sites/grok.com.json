@@ -1,0 +1,16 @@
+{
+  "site": "Grok",
+  "hosts": [
+    "grok.com"
+  ],
+  "composer": "div.tiptap.ProseMirror[contenteditable='true'], textarea[aria-label*='Grok' i]",
+  "sendButton": "button[type='submit'][aria-label='Submit']",
+  "stopButton": null,
+  "userMessage": null,
+  "assistantMessage": null,
+  "picker": "button[aria-label='Model select']",
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

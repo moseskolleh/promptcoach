@@ -1,0 +1,17 @@
+{
+  "site": "ChatGPT",
+  "hosts": [
+    "chatgpt.com",
+    "chat.openai.com"
+  ],
+  "composer": "#prompt-textarea[contenteditable], textarea#prompt-textarea",
+  "sendButton": "button[data-testid='send-button'], #composer-submit-button",
+  "stopButton": "button[data-testid='stop-button']",
+  "userMessage": "[data-message-author-role='user']",
+  "assistantMessage": "[data-message-author-role='assistant']",
+  "picker": "button[data-testid='model-switcher-dropdown-button']",
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

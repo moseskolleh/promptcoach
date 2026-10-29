@@ -1,5 +1,8 @@
 // Shared design tokens — keep in sync with apps/web/styles.css and the
-// extension popup. One brand across every surface.
+// extension popup. One brand across every surface. The grade palette comes
+// from the core, as on every surface (PLAN.md Step 13).
+
+import { GRADE_COLORS } from '@ecoprompt/core';
 
 export const colors = {
   primary: '#10B981',
@@ -11,13 +14,7 @@ export const colors = {
   amber: '#F59E0B',
   danger: '#EF4444',
   blue: '#3B82F6',
-  grades: {
-    A: '#10B981',
-    B: '#84CC16',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444'
-  } as Record<string, string>
+  grades: GRADE_COLORS as Record<string, string>
 };
 
 export const spacing = (n: number) => n * 8;

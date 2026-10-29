@@ -64,19 +64,18 @@
    */
   function requestFor(inputs) {
     const task = Core.TASK_TYPES && Core.TASK_TYPES[inputs.taskType];
-    return {
+    const flags = inputs.flags || {};
+    return Core.impactRequest({
       modelId: inputs.modelId,
-      inputTokens: inputs.inTokens,
-      outputTokens: isCount(inputs.outTokensObs) ? inputs.outTokensObs : inputs.outTokensEst,
-      options: {
-        taskMultiplier: task ? task.energyMultiplier : 1,
-        reasoningEffort: inputs.effort || undefined,
-        thinkingOn: !!(inputs.flags && inputs.flags.thinkingOn),
-        multiAgent: !!(inputs.flags && inputs.flags.multiAgent),
-        regionKey: inputs.region || undefined,
-        includeEmbodied: inputs.embodied !== false
-      }
-    };
+      inTokens: inputs.inTokens,
+      outTokens: isCount(inputs.outTokensObs) ? inputs.outTokensObs : inputs.outTokensEst,
+      taskMultiplier: task ? task.energyMultiplier : 1,
+      effort: inputs.effort,
+      thinkingOn: !!flags.thinkingOn,
+      multiAgent: !!flags.multiAgent,
+      region: inputs.region,
+      embodied: inputs.embodied
+    });
   }
 
   /** A v2 row from a send's inputs and its impact. */

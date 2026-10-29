@@ -146,6 +146,19 @@
     bubble.className = 'demo-bubble';
     bubble.textContent = text;
     row.append(avatar, bubble);
+    if (role === 'assistant') {
+      // Like the real sites' thumbs: labelled "send", sends nothing to the model.
+      const feedback = document.createElement('button');
+      feedback.type = 'button';
+      feedback.className = 'demo-feedback';
+      feedback.setAttribute('aria-label', 'Send feedback');
+      feedback.textContent = '👎';
+      feedback.addEventListener('click', () => {
+        feedback.textContent = '✓';
+        feedback.disabled = true;
+      });
+      row.appendChild(feedback);
+    }
     thread.appendChild(row);
     thread.scrollTop = thread.scrollHeight;
     return bubble;
@@ -187,14 +200,83 @@
     setTimeout(() => streamReply(pickResponse(text)), 350);
   }
 
+  // ---------------------------------------------------------------------
+  // Slash commands, as the real sites have them. Enter on an open menu
+  // picks a command and sends nothing: "/summarize" inserts a template,
+  // "/image" empties the composer and switches mode. The extension must
+  // record neither (PLAN.md Step 15).
+  // ---------------------------------------------------------------------
+
+  const composerRow = composer.closest('.demo-composer-row') || composer.parentElement;
+  const slashMenu = document.createElement('div');
+  slashMenu.className = 'demo-slash-menu';
+  slashMenu.setAttribute('role', 'listbox');
+  slashMenu.hidden = true;
+  composerRow.appendChild(slashMenu);
+
+  function setMode(label) {
+    let chip = composerRow.querySelector('.demo-mode-chip');
+    if (!chip) {
+      chip = document.createElement('span');
+      chip.className = 'demo-mode-chip';
+      composerRow.insertBefore(chip, composer);
+    }
+    chip.textContent = label;
+  }
+
+  const SLASH_COMMANDS = [
+    { name: '/summarize', hint: 'insert a summary request', apply: () => setText('Summarize the following text in three bullet points: ') },
+    { name: '/image', hint: 'switch to image mode', apply: () => { setText(''); setMode('🖼️ Image mode'); } }
+  ];
+
+  function slashMatches() {
+    const text = getText().trim();
+    return /^\/\w*$/.test(text) ? SLASH_COMMANDS.filter((c) => c.name.startsWith(text)) : [];
+  }
+
+  function pickCommand(command) {
+    slashMenu.hidden = true;
+    command.apply();
+    composer.focus();
+  }
+
+  function renderSlashMenu() {
+    const matches = slashMatches();
+    slashMenu.textContent = '';
+    slashMenu.hidden = !matches.length;
+    matches.forEach((command, i) => {
+      const option = document.createElement('div');
+      option.className = 'demo-slash-item';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(i === 0));
+      option.textContent = `${command.name} — ${command.hint}`;
+      option.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        pickCommand(command);
+      });
+      slashMenu.appendChild(option);
+    });
+  }
+
   sendBtn.addEventListener('click', send);
   composer.addEventListener('keydown', (event) => {
+    if (!slashMenu.hidden && (event.key === 'Enter' || event.key === 'Escape')) {
+      event.preventDefault();
+      const first = slashMatches()[0];
+      if (event.key === 'Enter' && first) pickCommand(first);
+      else slashMenu.hidden = true;
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
+      // While a reply streams, send() refuses: a blocked send.
       send();
     }
   });
-  composer.addEventListener('input', autoGrow);
+  composer.addEventListener('input', () => {
+    autoGrow();
+    renderSlashMenu();
+  });
 
   // ---------------------------------------------------------------------
   // Example-prompt drawer

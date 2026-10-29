@@ -1,0 +1,16 @@
+{
+  "site": "DeepSeek",
+  "hosts": [
+    "chat.deepseek.com"
+  ],
+  "composer": "textarea#chat-input",
+  "sendButton": null,
+  "stopButton": null,
+  "userMessage": null,
+  "assistantMessage": ".ds-markdown",
+  "picker": null,
+  "effortToggle": null,
+  "insertStrategy": "value",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

@@ -8,10 +8,13 @@
 │  analyzer.js     tokens, task detection, courtesy trimming, │
 │                  zero-AI alternatives, coaching tips        │
 │  conversions.js  relatable everyday equivalents             │
+│  present.js      grade palette, figures, labels, requests,  │
+│                  quick grades, coach tip actions            │
 │  data/           models.json · grids.json · equivalents.json│
+│                  precomputed.json (generated coefficients)  │
 │  test/           node --test (engine + analyzer)            │
 └──────────────┬───────────────┬───────────────┬──────────────┘
-               │ vendored copy │ vendored copy │ npm workspace
+               │ core bundle   │ core bundle   │ npm workspace
                ▼               ▼               ▼
       apps/extension       apps/web        apps/mobile
       Chrome MV3           static SPA      Expo RN (skeleton)
@@ -22,10 +25,21 @@
 ## Design decisions
 
 1. **One engine, three surfaces.** All numbers come from `packages/core`.
-   The extension and web app receive byte-identical vendored copies via
-   `node scripts/sync-core.js` (committed, so both work out of the box with
-   no build step); the future mobile app imports the package directly
-   through the npm workspace.
+   `node scripts/sync-core.js` builds one `vendor/core.bundle.js` for the
+   extension and the web app: the core's scripts, its data inlined, and each
+   model's coefficients precomputed (`data/precomputed.json`). It is
+   committed, so both work out of the box with no build step, and no surface
+   fetches data or fits a model at start-up (PLAN.md Step 13). The mobile
+   app imports the package directly through the npm workspace, and
+   `createDefaultEngine` starts from the same precomputed coefficients. CI
+   fails when the bundle or the coefficients are stale.
+
+   What the surfaces show is shared too: `present.js` holds the grade
+   palette, the formatters and their one rounding rule, an estimate's
+   labels, the `estimateImpact` request built from a surface's inputs,
+   quick per-model grades and the coach's tip actions. `check-apps` refuses
+   an app that maps grades to colours or rounds with `toFixed()` itself,
+   and holds the CSS `--grade-a…e` properties equal to core's palette.
 
 2. **No build toolchain.** Core modules are plain scripts that attach to
    `window.EcoPromptCore` in browsers and export CommonJS in Node. This
@@ -66,10 +80,20 @@
 1. `content.js` watches the chat input on supported sites, estimates tokens
    as you type, detects the model from the page's model switcher (labels are
    mapped to catalog ids by `detectModelFromLabels` in core; the hostname
-   default is the fallback), and renders the eco-grade pill.
+   default is the fallback), and renders the eco-grade pill. Once attached
+   it observes only the composer's region and the picker's, never the whole
+   page, so a streaming reply costs it nothing. It works in idle time with
+   a max wait, and repositions the pill only when the composer moves
+   (`shared/watch.js`, PLAN.md Step 14).
+   Each site has a declarative adapter (`sites/<host>.json`, PLAN.md Step
+   15) naming its composer, send button, turns and picker; the generic
+   heuristic is the fallback, and the popup says whether the adapter
+   attached.
 2. On send, it messages `background.js` with a v2 history row: the send's
    inputs (model, effort, task type, token counts, region) and the figures
-   they gave, never its text (`shared/history.js`).
+   they gave, never its text (`shared/history.js`). A send is recorded only
+   once it happened: the composer cleared and a new user turn appeared, so
+   Enter in a slash menu, a blocked send and "Send feedback" record nothing.
 3. `background.js` is history's only writer. One queue appends each row to
    that day's key (`h:2026-10-27`) and updates the day's totals in
    `agg:daily`, so tabs can't overwrite each other's sends. It updates the

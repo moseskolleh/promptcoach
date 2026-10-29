@@ -122,6 +122,7 @@ const TERM_SUBSETS = [
  * @returns {{eIn:number, eOut:number, eFixed:number, relStd:number}}
  */
 function fitCoefficients(bench) {
+  ENGINE_STATS.fits += 1;
   const points = bench.map((b) => ({
     x: b.input_tokens,
     y: b.output_tokens,
@@ -466,6 +467,7 @@ function activeParamsCoefficients(params, pue, cal) {
 
 /** Coefficients and band factors for one `estimate` block. */
 function estimateCoefficients(m, evidence, grids, hostKey) {
+  ENGINE_STATS.estimates += 1;
   const est = m.estimate || {};
   if (!ESTIMATE_METHODS.includes(est.method)) {
     throw new Error(`models.json: ${m.model_id} has unknown estimate method "${est.method}"`);
@@ -561,12 +563,74 @@ function resolveProxies(providers) {
   return out;
 }
 
+/**
+ * precompute()'s output when it fits this catalog: the right version, and
+ * exactly the catalog's model ids with every member and pair present.
+ * Anything else, and the engine fits as usual.
+ */
+function usablePrecomputed(pre, entries) {
+  if (!pre || pre.v !== PRECOMPUTED_VERSION || !pre.models || !Array.isArray(pre.pairs)) return null;
+  const ids = (entries || []).map((m) => m && m.model_id);
+  const stored = Object.keys(pre.models);
+  if (stored.length !== ids.length || !ids.every((id) => hasOwn(pre.models, id))) return null;
+  for (const id of ids) {
+    const p = pre.models[id];
+    if (!p || !p.coefficients) return null;
+    if (p.estimate && p.estimate.members && !p.estimate.members.every((m) => hasOwn(pre.models, m))) return null;
+  }
+  if (!pre.pairs.every((p) => p && hasOwn(pre.models, p.thinking) && p.base && p.base.coefficients)) return null;
+  return pre;
+}
+
+// How many fits and estimates have run, for the zero-at-start-up test
+// (PLAN.md Step 13).
+const ENGINE_STATS = { fits: 0, estimates: 0 };
+
+const PRECOMPUTED_VERSION = 1;
+
+/**
+ * What an engine worked out from the catalog, ready to store: each model's
+ * coefficients (fitted, or from Step 2's estimators) and the thinking pairs
+ * the estimates read at query time (PLAN.md Step 13). scripts/sync-core.js
+ * writes it to data/precomputed.json and into each app's bundle, and a test
+ * holds it equal to a fresh fit.
+ */
+function precompute(engine) {
+  const models = {};
+  for (const r of Object.values(engine.models)) {
+    models[r.id] = {
+      coefficients: r.coefficients,
+      benchMaxInput: r.benchMaxInput,
+      benchMaxOutput: r.benchMaxOutput,
+      estimate: r.estimate && {
+        method: r.estimate.method,
+        band: r.estimate.band,
+        members: r.estimate.tierMembers ? r.estimate.tierMembers.map((t) => t.id) : null,
+        inputs: r.estimate.inputs
+      }
+    };
+  }
+  return {
+    v: PRECOMPUTED_VERSION,
+    models,
+    // A pair's base can be a priced answer rather than a catalog entry
+    // (DeepSeek-R1's own plain answer), so it is stored whole.
+    pairs: engine.evidence.pairs.map((p) => ({
+      thinking: p.thinking.id,
+      base: { id: p.base.id, coefficients: p.base.coefficients, benchMaxInput: p.base.benchMaxInput }
+    }))
+  };
+}
+
 class ImpactEngine {
   /**
    * @param {Object} bundle
    * @param {Object} bundle.models     parsed models.json
    * @param {Object} bundle.grids      parsed grids.json
    * @param {Object} [bundle.equivalents] parsed equivalents.json (used by conversions)
+   * @param {Object} [bundle.precomputed] precompute()'s output for this same
+   *        catalog: start without fitting. Used only when it covers exactly
+   *        the catalog's model ids; the sync test keeps it current.
    */
   constructor(bundle) {
     if (!bundle || !bundle.models || !bundle.grids) {
@@ -580,6 +644,7 @@ class ImpactEngine {
 
     this.models = {};
     const pending = [];
+    const pre = usablePrecomputed(bundle.precomputed, bundle.models.models);
     for (const m of bundle.models.models || []) {
       if (!m || !m.model_id) throw new Error('models.json: every model needs a model_id');
       if (Object.prototype.hasOwnProperty.call(this.models, m.model_id)) {
@@ -639,6 +704,11 @@ class ImpactEngine {
         pending.push({ m: { ...m, thinking }, record });
         continue;
       }
+      if (pre) {
+        // Benchmark points stay as data; only their fit is precomputed.
+        record.bench = ['short', 'medium', 'long'].map((k) => (m.performance || {})[k]);
+        continue;
+      }
       const perf = m.performance || {};
       const bench = ['short', 'medium', 'long'].map((k) => {
         const p = perf[k];
@@ -653,6 +723,11 @@ class ImpactEngine {
         benchMaxOutput: Math.max(...bench.map((b) => b.output_tokens)),
         coefficients: fitCoefficients(bench)
       });
+    }
+
+    if (pre) {
+      this.applyPrecomputed(pre);
+      return;
     }
 
     const fitted = Object.values(this.models).filter((r) => r.bench);
@@ -672,6 +747,33 @@ class ImpactEngine {
         }
       });
     }
+  }
+
+  /** Coefficients and estimates from precompute(), with no fitting. */
+  applyPrecomputed(pre) {
+    for (const record of Object.values(this.models)) {
+      const p = pre.models[record.id];
+      Object.assign(record, {
+        coefficients: p.coefficients,
+        benchMaxInput: p.benchMaxInput,
+        benchMaxOutput: p.benchMaxOutput
+      });
+      if (p.estimate) {
+        record.bench = [];
+        record.estimate = {
+          method: p.estimate.method,
+          band: p.estimate.band,
+          tierMembers: p.estimate.members ? p.estimate.members.map((id) => this.models[id]) : null,
+          inputs: p.estimate.inputs
+        };
+      }
+    }
+    // Calibration and tiers only feed the estimators, which already ran.
+    this.evidence = {
+      calibration: null,
+      tiers: null,
+      pairs: pre.pairs.map((p) => ({ thinking: this.models[p.thinking], base: p.base }))
+    };
   }
 
   /**
@@ -1530,6 +1632,8 @@ const CalculatorModule = {
   MODEL_STATUSES,
   DEFAULT_MODEL_ID,
   THINKING_MODES,
+  precompute,
+  ENGINE_STATS,
   aggregateImpacts,
   ECOLOGITS,
   PRECISION_BITS,

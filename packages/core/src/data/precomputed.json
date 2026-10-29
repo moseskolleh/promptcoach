@@ -1,0 +1,1067 @@
+{
+  "v": 1,
+  "models": {
+    "gpt-5": {
+      "coefficients": {
+        "eIn": 0.00010974358974358986,
+        "eOut": 0.0013446153846153833,
+        "eFixed": 0.12564102564102625,
+        "relStd": 0.29850746268656714
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gpt-5-thinking": {
+      "coefficients": {
+        "eIn": 0.00009914529914529881,
+        "eOut": 0.01751538461538462,
+        "eFixed": 0.7354700854700842,
+        "relStd": 0.3954154727793696
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gpt-4o": {
+      "coefficients": {
+        "eIn": 9.059829059828169e-7,
+        "eOut": 0.0011316923076923082,
+        "eFixed": 0.08140170940170917,
+        "relStd": 0.2573765702600058
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gpt-4o-mini": {
+      "coefficients": {
+        "eIn": 0.000015641025641025657,
+        "eOut": 0.00045846153846153823,
+        "eFixed": 0.04589743589743615,
+        "relStd": 0.18934169278996865
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gpt-4.1-nano": {
+      "coefficients": {
+        "eIn": 0.0000075384615384615465,
+        "eOut": 0.0002303076923076922,
+        "eFixed": 0.03315384615384624,
+        "relStd": 0.4009661835748791
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "o4-mini": {
+      "coefficients": {
+        "eIn": 0.0005160248717550134,
+        "eOut": 0.004027281828073993,
+        "eFixed": 0,
+        "relStd": 0.39952857984678847
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "o3": {
+      "coefficients": {
+        "eIn": 0.00028205128205128176,
+        "eOut": 0.01392307692307693,
+        "eFixed": 9.794871794871788,
+        "relStd": 0.2825174825174825
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "claude-sonnet-5": {
+      "coefficients": {
+        "eIn": 0.00014820512820512793,
+        "eOut": 0.0017523076923076965,
+        "eFixed": 0.23948717948717643,
+        "relStd": 0.2517193947730399
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "claude-4.5-sonnet": {
+      "coefficients": {
+        "eIn": 0.00014820512820512793,
+        "eOut": 0.0017523076923076965,
+        "eFixed": 0.23948717948717643,
+        "relStd": 0.2517193947730399
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "claude-4.5-haiku": {
+      "coefficients": {
+        "eIn": 0.000019145299145299197,
+        "eOut": 0.00037538461538461483,
+        "eFixed": 0.025470085470085824,
+        "relStd": 0.19402985074626866
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "claude-3.7-sonnet": {
+      "coefficients": {
+        "eIn": 0.0001612649572649574,
+        "eOut": 0.002571230769230768,
+        "eFixed": 0.048504273504274255,
+        "relStd": 0.12370005473453749
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gemini-2.5-pro": {
+      "coefficients": {
+        "eIn": 0.00008820512820512814,
+        "eOut": 0.0009723076923076934,
+        "eFixed": 0.1194871794871787,
+        "relStd": 0.2536945812807882
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gemini-2.5-flash": {
+      "coefficients": {
+        "eIn": 0.00001863247863247859,
+        "eOut": 0.00040461538461538516,
+        "eFixed": 0.026752136752136373,
+        "relStd": 0.28169014084507044
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "gemini-2.0-flash": {
+      "coefficients": {
+        "eIn": 0.000011880341880341862,
+        "eOut": 0.0002561538461538465,
+        "eFixed": 0.016965811965811765,
+        "relStd": 0.17555555555555555
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "mistral-large": {
+      "coefficients": {
+        "eIn": 0.00011008547008546997,
+        "eOut": 0.0019584615384615404,
+        "eFixed": 0.08145299145299023,
+        "relStd": 0.13093525179856116
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "mistral-small": {
+      "coefficients": {
+        "eIn": 0.0000185470085470085,
+        "eOut": 0.00037615384615384664,
+        "eFixed": 0.030299145299145035,
+        "relStd": 0.17185185185185184
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "llama-4-scout": {
+      "coefficients": {
+        "eIn": 0.00004256410256410254,
+        "eOut": 0.00047384615384615423,
+        "eFixed": 0.043589743589743254,
+        "relStd": 0.25025906735751297
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "llama-3.3-70b": {
+      "coefficients": {
+        "eIn": 0.00004250178765739163,
+        "eOut": 0.000814010881392818,
+        "eFixed": 0,
+        "relStd": 0.13272727272727272
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "llama-3.2-1b": {
+      "coefficients": {
+        "eIn": 0.0000021880341880342053,
+        "eOut": 0.0002086153846153845,
+        "eFixed": 0.007196581196581279,
+        "relStd": 0.16190476190476188
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "deepseek-v3": {
+      "coefficients": {
+        "eIn": 0.00013111111111111095,
+        "eOut": 0.0011600000000000024,
+        "eFixed": 0.12888888888888736,
+        "relStd": 0.3005893909626719
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "deepseek-r1": {
+      "coefficients": {
+        "eIn": 0.0001113333333333336,
+        "eOut": 0.007264000000000005,
+        "eFixed": 21.62466666666666,
+        "relStd": 0.10441994702078683
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "grok-3": {
+      "coefficients": {
+        "eIn": 0.00015213675213675127,
+        "eOut": 0.002661538461538472,
+        "eFixed": 0.08632478632477927,
+        "relStd": 0.3000000000000001
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": null
+    },
+    "claude-fable-5-1": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "claude-opus-5-5": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "claude-sonnet-5-5": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "claude-haiku-5-5": {
+      "coefficients": {
+        "eIn": 0.0000185470085470085,
+        "eOut": 0.00037615384615384664,
+        "eFixed": 0.030299145299145035,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-4o-mini",
+          "gpt-4.1-nano",
+          "claude-4.5-haiku",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "mistral-small",
+          "llama-4-scout"
+        ],
+        "inputs": {
+          "tier": "small",
+          "members": [
+            "gpt-4o-mini",
+            "gpt-4.1-nano",
+            "claude-4.5-haiku",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "mistral-small",
+            "llama-4-scout"
+          ]
+        }
+      }
+    },
+    "gpt-6-astra": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "gpt-6.1-sol": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "gpt-6-luna": {
+      "coefficients": {
+        "eIn": 0.0000185470085470085,
+        "eOut": 0.00037615384615384664,
+        "eFixed": 0.030299145299145035,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-4o-mini",
+          "gpt-4.1-nano",
+          "claude-4.5-haiku",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "mistral-small",
+          "llama-4-scout"
+        ],
+        "inputs": {
+          "tier": "small",
+          "members": [
+            "gpt-4o-mini",
+            "gpt-4.1-nano",
+            "claude-4.5-haiku",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "mistral-small",
+            "llama-4-scout"
+          ]
+        }
+      }
+    },
+    "gpt-6-sol": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "muse-spark-1.3": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "muse-spark-open": {
+      "coefficients": {
+        "eIn": 0.0001744414707490456,
+        "eOut": 0.007454308476689165,
+        "eFixed": 0.12857521585898787,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 42,
+          "totalB": 816,
+          "bits": 16,
+          "gpus": 32,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "muse-glimmer-30b": {
+      "coefficients": {
+        "eIn": 0.000004842634695929761,
+        "eOut": 0.00020693756311714528,
+        "eFixed": 0.0035693507895902658,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 30,
+          "totalB": 30,
+          "bits": 16,
+          "gpus": 1,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "grok-4.7": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "kimi-k3": {
+      "coefficients": {
+        "eIn": 0.0003037767848083335,
+        "eOut": 0.012981121130741957,
+        "eFixed": 0.22390412963136797,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 104,
+          "totalB": 2800,
+          "bits": 4,
+          "gpus": 32,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "glm-5.3": {
+      "coefficients": {
+        "eIn": 0.00009452956618108876,
+        "eOut": 0.0040394783617432595,
+        "eFixed": 0.06967471281112474,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 40,
+          "totalB": 744,
+          "bits": 8,
+          "gpus": 16,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "glm-5.3-flash": {
+      "coefficients": {
+        "eIn": 0.00003740623483345285,
+        "eOut": 0.0015984594271231153,
+        "eFixed": 0.027570936529778746,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 18,
+          "totalB": 320,
+          "bits": 8,
+          "gpus": 8,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "qwen3.8-27b": {
+      "coefficients": {
+        "eIn": 0.0000051799096627828785,
+        "eOut": 0.0002213501430707112,
+        "eFixed": 0.003817945355324915,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 27,
+          "totalB": 27,
+          "bits": 16,
+          "gpus": 1,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "mistral-small-4": {
+      "coefficients": {
+        "eIn": 0.00001523759186927867,
+        "eOut": 0.0006511393749878444,
+        "eFixed": 0.011231140481394862,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 6.5,
+          "totalB": 119,
+          "bits": 16,
+          "gpus": 4,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "mistral-medium-3.5": {
+      "coefficients": {
+        "eIn": 0.00004096014619791047,
+        "eOut": 0.0017503267067081984,
+        "eFixed": 0.030190410665526073,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 128,
+          "totalB": 128,
+          "bits": 16,
+          "gpus": 4,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "nemotron-3-ultra": {
+      "coefficients": {
+        "eIn": 0.0001955417279349466,
+        "eOut": 0.00835597380504139,
+        "eFixed": 0.14412753900042885,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 55,
+          "totalB": 550,
+          "bits": 16,
+          "gpus": 32,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "gemini-4-argon": {
+      "coefficients": {
+        "eIn": 0.00012059829059829047,
+        "eOut": 0.0015484615384615398,
+        "eFixed": 0.102905982905979,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-5",
+          "gpt-4o",
+          "claude-4.5-sonnet",
+          "claude-3.7-sonnet",
+          "gemini-2.5-pro",
+          "mistral-large",
+          "deepseek-v3",
+          "grok-3"
+        ],
+        "inputs": {
+          "tier": "frontier",
+          "members": [
+            "gpt-5",
+            "gpt-4o",
+            "claude-4.5-sonnet",
+            "claude-3.7-sonnet",
+            "gemini-2.5-pro",
+            "mistral-large",
+            "deepseek-v3",
+            "grok-3"
+          ]
+        }
+      }
+    },
+    "gemini-3.8-flash": {
+      "coefficients": {
+        "eIn": 0.0000185470085470085,
+        "eOut": 0.00037615384615384664,
+        "eFixed": 0.030299145299145035,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-4o-mini",
+          "gpt-4.1-nano",
+          "claude-4.5-haiku",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "mistral-small",
+          "llama-4-scout"
+        ],
+        "inputs": {
+          "tier": "small",
+          "members": [
+            "gpt-4o-mini",
+            "gpt-4.1-nano",
+            "claude-4.5-haiku",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "mistral-small",
+            "llama-4-scout"
+          ]
+        }
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "coefficients": {
+        "eIn": 0.0000185470085470085,
+        "eOut": 0.00037615384615384664,
+        "eFixed": 0.030299145299145035,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "tier",
+        "band": null,
+        "members": [
+          "gpt-4o-mini",
+          "gpt-4.1-nano",
+          "claude-4.5-haiku",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "mistral-small",
+          "llama-4-scout"
+        ],
+        "inputs": {
+          "tier": "small",
+          "members": [
+            "gpt-4o-mini",
+            "gpt-4.1-nano",
+            "claude-4.5-haiku",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "mistral-small",
+            "llama-4-scout"
+          ]
+        }
+      }
+    },
+    "gemma-4-26b-a4b": {
+      "coefficients": {
+        "eIn": 0.000003340014606759944,
+        "eOut": 0.00014272695069886355,
+        "eFixed": 0.0024618176927328037,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 4,
+          "totalB": 26,
+          "bits": 16,
+          "gpus": 1,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    },
+    "gemma-4-31b": {
+      "coefficients": {
+        "eIn": 0.000004638050913158493,
+        "eOut": 0.00019819520030882586,
+        "eFixed": 0.0034185586418394253,
+        "relStd": 0
+      },
+      "benchMaxInput": 10000,
+      "benchMaxOutput": 1500,
+      "estimate": {
+        "method": "active-params",
+        "band": {
+          "low": 0.4803097346059862,
+          "high": 2.0819898660191276
+        },
+        "members": null,
+        "inputs": {
+          "activeB": 31,
+          "totalB": 31,
+          "bits": 16,
+          "gpus": 1,
+          "calibratedOn": [
+            "llama-3.3-70b",
+            "llama-3.2-1b"
+          ],
+          "ecologitsCommit": "d0b76e382442e63df688e9c37016f596223c8aff"
+        }
+      }
+    }
+  },
+  "pairs": [
+    {
+      "thinking": "gpt-5-thinking",
+      "base": {
+        "id": "gpt-5",
+        "coefficients": {
+          "eIn": 0.00010974358974358986,
+          "eOut": 0.0013446153846153833,
+          "eFixed": 0.12564102564102625,
+          "relStd": 0.29850746268656714
+        },
+        "benchMaxInput": 10000
+      }
+    },
+    {
+      "thinking": "deepseek-r1",
+      "base": {
+        "id": "deepseek-r1 (plain, estimated)",
+        "coefficients": {
+          "eIn": 0.00009184087120188199,
+          "eOut": 0.00392458388344821,
+          "eFixed": 0.06769296193591103,
+          "relStd": 0
+        },
+        "benchMaxInput": 10000
+      }
+    }
+  ]
+}

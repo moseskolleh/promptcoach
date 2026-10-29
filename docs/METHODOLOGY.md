@@ -382,9 +382,12 @@ How effort is applied:
 
 #### 2.5.8 How the apps show an estimate
 
-Every app labels a result through one function, `describeImpact()`, so the
-web app, the extension pill and card, the popup and (once built) the mobile
-screens say the same thing. A measured or benchmarked model keeps its single
+Every app labels a result through one function, `describeImpact()` in
+core's `present.js`, so the web app, the extension pill and card, the popup
+and (once built) the mobile screens say the same thing. Technical figures
+follow one rounding rule everywhere: three significant figures, never more
+than three decimals, and the next unit up from 1,000 ("0.052 Wh", "16.7 Wh",
+"412 Wh", "1.20 kWh"; the same for mL and g CO₂e). A measured or benchmarked model keeps its single
 figure and grade. A model nobody has measured shows:
 
 | What | Model that thinks | Model that doesn't think | Several agents (floor) |

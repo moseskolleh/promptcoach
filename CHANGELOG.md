@@ -5,6 +5,100 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Site adapters and attach health (PLAN.md Step 15)
+
+- **One adapter per supported site** in `apps/extension/sites/<host>.json`.
+  It names the site's composer, send button, stop button, user and assistant
+  turns, model picker, effort toggle and insert strategy. `scripts/sync-sites.js`
+  checks the adapters and builds them into `sites/adapters.js`, so nothing is
+  fetched.
+  - The real sites' selectors are not verified yet (`lastVerified: null`).
+    Only the demo adapter is.
+  - The generic heuristic stays as the fallback, and now finds
+    `contenteditable="plaintext-only"` composers too.
+- **Sends are confirmed before they are recorded.** A send counts only once
+  the composer cleared and a new user turn appeared. Nothing is recorded for:
+  - Enter in a slash menu;
+  - a send the page blocked while a reply streamed;
+  - a "Send feedback" button, which no longer counts as a send button.
+- **The popup says Attached / Not attached** on the current site. It names
+  the adapter and when it was last verified. When an adapter's selector
+  finds nothing, it says so and that EcoPrompt is using a generic guess.
+- **The demo has the cases:** a slash menu (`/summarize`, `/image`) and
+  "Send feedback" buttons. Its sends are still refused while a reply
+  streams.
+
+### A lighter runtime on every page (PLAN.md Step 14)
+
+- **The content script stays out of a streaming reply's way.**
+  - Once a composer is attached, it observes only the composer's region and
+    the model picker's, not the whole page. The page is observed only while
+    no composer is attached.
+  - A heartbeat in idle time notices a removed or hidden composer and SPA
+    navigation.
+  - The pill moves when the composer moves (an IntersectionObserver
+    inset to the composer's box, plus a ResizeObserver), with no layout read
+    on scroll.
+  - Scans and re-pricing run in idle time, with a max wait, so a reply
+    that never stops streaming can't put them off.
+  - Picker labels are read only when short.
+  - **Measured** during a 2,000-token streamed reply on the demo:
+    - observer callbacks went from 668 to 0;
+    - layout reads went from 169 to 7;
+    - the extension's CPU time went from 72 ms to 3.5 ms at 6× CPU
+      throttling.
+  - No long tasks in either run.
+- **The web app redraws only what changed.**
+  - Compare redraws only when its inputs change and only once it can be
+    seen. Typing in the coach no longer redraws it on every keystroke.
+  - A redraw moves the chart's bars from where they were instead of
+    replaying the intro.
+  - Tips and library cards are kept per tip or entry, so a focused button
+    keeps its focus.
+  - Each saved prompt is priced once, not on every search keystroke: a
+    library search keystroke went from about 17 ms to under 1 ms with 60
+    saved prompts.
+
+### One presentation layer (PLAN.md Step 13, second half)
+
+- **New `packages/core/src/present.js`**, holding what was copied across
+  the surfaces:
+  - the grade palette (`GRADE_COLORS`, `GRADE_DOTS`, `gradeBackground`),
+    which was defined five times;
+  - the formatters (`formatWh`, `formatMl`, `formatG`, `formatCif`,
+    `formatCount`);
+  - an estimate's labels (`describeImpact`, `savingClaim`), moved from
+    `conversions.js`, plus `chipText` for a single chip;
+  - `impactRequest`, the one request builder for the coach, the popup, the
+    pill, the library and history re-scoring;
+  - quick per-model grades (`quickGrades`, `QUICK_QUERY`);
+  - the coach's tip actions (`tipAction`, `greenerModel`, `withWordBudget`,
+    `changeNote`), moved from the web app so Step 23 can reuse them in the
+    extension.
+- **One rounding rule** for technical figures: three significant figures,
+  at most three decimals. Some figures read differently:
+  - 123 Wh, where it was 123.4 Wh;
+  - 1.23 kg CO₂e, where it was 1.234 kg CO₂e;
+  - 0.420 mL, where it was 0.4 mL.
+- **Grid intensity** reads "g CO₂e/kWh" on every surface.
+- **Gate:** `check-apps` refuses an app that maps grades to colours or rounds
+  with `toFixed()`. It also holds the CSS grade colours equal to core's.
+
+### One engine bootstrap (PLAN.md Step 13, first half)
+
+- **No fetch and no fitting at start-up, on every surface.**
+  - The extension and web app load one generated `vendor/core.bundle.js`:
+    the core's scripts, the catalog, and every model's coefficients worked
+    out in advance (`data/precomputed.json`).
+  - Node and mobile get the same coefficients through `createDefaultEngine()`.
+- **The web app works from `file://`.**
+- **Gates:**
+  - a test holds the precomputed coefficients equal to a fresh fit;
+  - the sync check covers the bundle;
+  - `check-apps` refuses `fetch(` in app scripts.
+- New engine API: `precompute()`, the `precomputed` constructor option, and
+  `ENGINE_STATS`.
+
 ### One analysis pass (PLAN.md Step 12)
 
 - **Prompt analysis is about 10× faster on long pastes:** an 86k-character

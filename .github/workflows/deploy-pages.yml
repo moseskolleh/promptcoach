@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify vendored core is in sync
+      - name: Verify the core bundle is in sync
         run: npm test
 
       - name: Assemble site

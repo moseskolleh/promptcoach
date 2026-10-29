@@ -17,9 +17,9 @@ npx serve apps/web
 python3 -m http.server -d apps/web 8000
 ```
 
-Then open the printed URL. Opening `index.html` via `file://` won't work —
-the app fetches its data files (`vendor/data/*.json`), which browsers block
-from the filesystem.
+Then open the printed URL. Opening `index.html` straight from disk
+(`file://`) works too: the core bundle carries the data, so nothing is
+fetched.
 
 ## Deploy
 
@@ -45,9 +45,10 @@ per-card add-to-compare.
 
 ## Updating the engine or data
 
-`vendor/` is a synced copy of `packages/core` — never edit it directly:
+`vendor/core.bundle.js` is generated from `packages/core` (the engine, its
+data and the precomputed coefficients) — never edit it directly:
 
 ```bash
 npm test                      # from repo root
-node scripts/sync-core.js     # refreshes vendor/ in web app and extension
+node scripts/sync-core.js     # rebuilds the bundle in the web app and extension
 ```
