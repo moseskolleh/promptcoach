@@ -5,6 +5,29 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### Site adapters and attach health (PLAN.md Step 15)
+
+- **One adapter per supported site** in `apps/extension/sites/<host>.json`.
+  It names the site's composer, send button, stop button, user and assistant
+  turns, model picker, effort toggle and insert strategy. `scripts/sync-sites.js`
+  checks the adapters and builds them into `sites/adapters.js`, so nothing is
+  fetched.
+  - The real sites' selectors are not verified yet (`lastVerified: null`).
+    Only the demo adapter is.
+  - The generic heuristic stays as the fallback, and now finds
+    `contenteditable="plaintext-only"` composers too.
+- **Sends are confirmed before they are recorded.** A send counts only once
+  the composer cleared and a new user turn appeared. Nothing is recorded for:
+  - Enter in a slash menu;
+  - a send the page blocked while a reply streamed;
+  - a "Send feedback" button, which no longer counts as a send button.
+- **The popup says Attached / Not attached** on the current site. It names
+  the adapter and when it was last verified. When an adapter's selector
+  finds nothing, it says so and that EcoPrompt is using a generic guess.
+- **The demo has the cases:** a slash menu (`/summarize`, `/image`) and
+  "Send feedback" buttons. Its sends are still refused while a reply
+  streams.
+
 ### A lighter runtime on every page (PLAN.md Step 14)
 
 - **The content script stays out of a streaming reply's way.**

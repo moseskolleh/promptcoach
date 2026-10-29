@@ -1,0 +1,18 @@
+{
+  "site": "EcoPrompt demo chats",
+  "hosts": [
+    "localhost",
+    "127.0.0.1",
+    "moseskolleh.github.io"
+  ],
+  "composer": "[data-demo-composer]",
+  "sendButton": "[data-demo-send]",
+  "stopButton": null,
+  "userMessage": ".demo-msg-user",
+  "assistantMessage": ".demo-msg-assistant",
+  "picker": "[data-demo-models]",
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": "2026-10-29",
+  "notes": "The mock chats in apps/demo. Checked by the Playwright demo tests, so its selectors are verified with every run."
+}

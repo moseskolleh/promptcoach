@@ -1353,6 +1353,52 @@ coach triggers no Compare re-render unless its inputs changed.
 selector shows "Not attached" instead of silently failing. No false records
 from slash-menus, "Send feedback" or blocked sends in the demo tests.
 
+> **Status (2026-10-29): built; the real sites' adapters wait for a check
+> on the live sites.**
+> - **Adapters.**
+>   - `apps/extension/sites/<host>.json` covers all 12 hosts the manifest
+>     matches, in 10 adapters (chatgpt.com covers chat.openai.com, and
+>     meta.ai covers www.meta.ai), plus the demo.
+>   - Each names the site's `composer`, `sendButton`, `stopButton`,
+>     `userMessage`, `assistantMessage`, `picker`, `effortToggle`,
+>     `insertStrategy` (`value`, `insertText` or `paste`) and `lastVerified`.
+>     `userMessage` is added because confirming a send needs it.
+>   - `scripts/sync-sites.js` checks each adapter and builds
+>     `sites/adapters.js`; nothing is fetched.
+>   - The real sites' selectors come from what is publicly known of their
+>     pages: `lastVerified: null`. This container can't reach the sites.
+>     The demo adapter is verified by the demo tests.
+> - **Fallback.**
+>   - The adapter's composer is tried first, then the generic heuristic.
+>     The generic heuristic now matches every contenteditable that isn't
+>     `false`, `plaintext-only` included.
+>   - The adapter's picker and effort toggle are read before the generic
+>     picker groups.
+>   - A malformed selector matches nothing instead of throwing.
+> - **Confirmed sends** (`createSendConfirmer`).
+>   - Enter or a send button only makes a candidate. It is recorded once
+>     the composer cleared and the user-turn count rose, within 4 s.
+>   - An unverified turn selector counts only after it has matched on the
+>     page, so a wrong guess can't stop every send from being recorded.
+>   - "Send feedback", "Share", "Regenerate" and the like are no longer
+>     send buttons.
+> - **Popup.** It shows *Attached / Not attached on {host}*, from the content
+>   script's `eco:status` reply. It names the adapter and its
+>   `lastVerified`, says when the generic guess is in use, and asks for a
+>   reload when no script answers.
+> - **Demo tests** (Playwright):
+>   - A real send by Enter, by click, and by both together each records
+>     once.
+>   - Recorded nothing for: a send refused while the reply streams,
+>     `/summarize` (Enter picks the command), `/image` (the composer
+>     empties, no turn appears), and "Send feedback" with a draft present.
+>   - With a deliberately broken composer selector, the generic guess still
+>     prices and records. The status says "Not attached … found no chat box,
+>     so EcoPrompt is using a generic guess", and so does the popup.
+>   - Every adapter selector parses in Chromium.
+> - **To do on the live sites:** check each adapter, fix what doesn't match,
+>   and set `lastVerified`. `npm test` keeps the file and dates honest.
+
 ### Step 16 — A test harness that matches the product · M
 - **Playwright on `apps/demo`** in CI (ROADMAP 2.6): inject the content
   script, type, send, assert the pill, the history write and the receipt

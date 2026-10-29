@@ -655,6 +655,38 @@
   // Pause on this site: no pill, nothing recorded (PLAN.md Step 11)
   // --------------------------------------------------------------------------
 
+  /**
+   * Attached / Not attached on the tab's site, as its content script reports
+   * it, with the site adapter's last check (PLAN.md Step 15). No reply means
+   * the script isn't running there yet.
+   */
+  function showAttachStatus(tab, host) {
+    const Sites = globalThis.EcoPromptSites;
+    if (!Sites.forHost(host) && !Core.hostDefault(host).known) return;
+    const render = (status) => {
+      const line = Sites.statusText(status, host);
+      const box = $('attach-status');
+      box.dataset.state = line.state;
+      $('attach-status-text').textContent = line.text;
+      $('attach-status-detail').textContent = line.detail;
+      // Paused is the site switch's to say.
+      box.hidden = line.state === 'paused';
+    };
+    if (!tab || tab.id === undefined || !chrome.tabs.sendMessage) {
+      render(null);
+      return;
+    }
+    try {
+      chrome.tabs.sendMessage(tab.id, { type: 'eco:status' }, (status) => {
+        // No content script on the page: Chrome reports it in lastError.
+        void (chrome.runtime && chrome.runtime.lastError);
+        render(status || null);
+      });
+    } catch (err) {
+      render(null);
+    }
+  }
+
   function initSiteSwitch() {
     if (!chrome.tabs || !chrome.tabs.query) return;
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -665,6 +697,7 @@
       } catch (err) {
         /* no page, or one the popup may not read */
       }
+      if (host) showAttachStatus(tabs[0], host);
       // Only on a chat site the content script runs on.
       if (!host || !Core.hostDefault(host).known) return;
       const box = $('site-switch');

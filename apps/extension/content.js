@@ -18,6 +18,10 @@
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const History = globalThis.EcoPromptHistory;
   const Watch = globalThis.EcoPromptWatch;
+  const Sites = globalThis.EcoPromptSites;
+  // Where this site keeps its composer, send button, turns and picker
+  // (sites/*.json, PLAN.md Step 15); null on a site without one.
+  const adapter = Sites.forHost(location.hostname);
 
   /** False on a site the user paused EcoPrompt on: no pill, nothing recorded. */
   function siteOn() {
@@ -38,6 +42,8 @@
   let catalogIds = []; // every catalog id, for detection's fail-closed check
 
   let inputEl = null; // the chat prompt input we're attached to
+  let inputVia = null; // 'adapter' | 'generic': how it was found
+  let turnsMissing = 0; // sends dropped because the adapter found no user turns
   let pill = null;
   let pillGrade = null;
   let pillText = null;
@@ -94,6 +100,11 @@
       'button[aria-selected="true"]'
     ].join(', ')
   ];
+  // The site adapter's picker and effort toggle are tried before either.
+  const PICKER_GROUPS = [
+    adapter ? [adapter.picker, adapter.effortToggle].filter(Boolean).join(', ') : '',
+    ...PICKER_SELECTOR_GROUPS
+  ].filter(Boolean);
 
   function collectModelLabels(selectors) {
     const labels = [];
@@ -141,7 +152,7 @@
     const family = pageModelFamily();
     pickerEl = null;
     if (!family) return null;
-    for (const selectors of PICKER_SELECTOR_GROUPS) {
+    for (const selectors of PICKER_GROUPS) {
       const labels = collectModelLabels(selectors);
       const hit = Core.detectModelFromLabels(location.hostname, labels, { family, modelIds: catalogIds });
       // A newer generation stops here: the looser group below could read an
@@ -253,21 +264,39 @@
     return style.display !== 'none' && style.visibility !== 'hidden';
   }
 
+  const GENERIC_SEND = [
+    'button[type="submit"]',
+    'button[aria-label*="send" i]',
+    'button[aria-label*="submit" i]',
+    'button[data-testid*="send" i]',
+    '[role="button"][aria-label*="send" i]'
+  ].join(', ');
+
   function findSendButton(root) {
-    const selectors = [
-      'button[type="submit"]',
-      'button[aria-label*="send" i]',
-      'button[aria-label*="submit" i]',
-      'button[data-testid*="send" i]',
-      '[role="button"][aria-label*="send" i]'
-    ];
-    return root.querySelector(selectors.join(', '));
+    return (adapter && Sites.queryAll(root, adapter.sendButton)[0]) || root.querySelector(GENERIC_SEND);
   }
 
+  // Every editable element: textareas and contenteditable, "plaintext-only"
+  // included (PLAN.md Step 15).
+  const EDITABLE = 'textarea, [contenteditable]:not([contenteditable="false"])';
+
+  /** The composer the site's adapter names, when it is on the page and visible. */
+  function adapterComposer() {
+    return adapter ? bestComposer(Sites.queryAll(document, adapter.composer).filter(isVisible)) : null;
+  }
+
+  /**
+   * The composer to attach to and how it was found: the adapter's first,
+   * else the generic guess, which a site redesign can't break.
+   */
   function findPromptInput() {
-    const candidates = Array.from(
-      document.querySelectorAll('textarea, [contenteditable="true"]')
-    ).filter(isVisible);
+    const own = adapterComposer();
+    if (own) return { el: own, via: 'adapter' };
+    const guess = bestComposer(Array.from(document.querySelectorAll(EDITABLE)).filter(isVisible));
+    return { el: guess, via: guess ? 'generic' : null };
+  }
+
+  function bestComposer(candidates) {
     if (!candidates.length) return null;
 
     // Prefer the editable nearest (by ancestor distance) to a send button.
@@ -521,19 +550,45 @@
   // Send detection + history recording
   // --------------------------------------------------------------------------
 
-  function recordSend() {
+  /** The composer is empty, or gone: a site may re-render it on send. */
+  function draftEmpty() {
+    return !inputEl || !inputEl.isConnected || !getDraftText(inputEl).trim();
+  }
+
+  /** The page's user turns, or null when this site's can't be counted. */
+  function userTurns() {
+    return adapter && adapter.userMessage ? Sites.queryAll(document, adapter.userMessage).length : null;
+  }
+
+  // A send is recorded only once it happened: the composer cleared and a
+  // new user turn appeared (PLAN.md Step 15). Enter in a slash menu, a send
+  // the page blocked while a reply streams and "Send feedback" do neither.
+  const sends = Sites.createSendConfirmer({
+    draftEmpty,
+    userTurns,
+    trusted: !!(adapter && adapter.lastVerified),
+    onConfirm: recordSend,
+    onDrop: (reason, snapshot, turns) => {
+      if (reason === 'no-new-turn' && turns === 0) turnsMissing++;
+    }
+  });
+
+  /** Enter or a send button: price the draft now, record it once the send is confirmed. */
+  function sendCandidate() {
     if (settings.recordHistory === false || !siteOn()) return;
-    const now = Date.now();
-    if (now - lastRecordTs < 1000) return; // Enter + click double-fire guard
     // Recompute synchronously so we record the final draft, not a stale one.
     scheduleAnalyze.cancel();
     analyzeDraft();
     if (!lastImpact || !lastInputs) return;
-    lastRecordTs = now;
+    sends.candidate({ inputs: lastInputs, impact: lastImpact, ts: Date.now() });
+  }
 
+  function recordSend({ inputs, impact, ts }) {
+    if (ts - lastRecordTs < 1000) return; // Enter + click double-fire guard
+    lastRecordTs = ts;
     // The service worker is the only writer (PLAN.md Step 11). The row holds
     // the send's inputs and figures, never its text.
-    const entry = History.makeEntry({ ...lastInputs, ts: now }, lastImpact);
+    const entry = History.makeEntry({ ...inputs, ts }, impact);
     try {
       chrome.runtime.sendMessage({ type: 'eco:record', entry }).catch(() => {});
     } catch (err) {
@@ -543,7 +598,7 @@
 
   function onKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-      recordSend();
+      sendCandidate();
     }
   }
 
@@ -551,15 +606,20 @@
     const button = event.target && event.target.closest
       ? event.target.closest('button, [role="button"]')
       : null;
-    if (!button) return;
-    const label = (
-      (button.getAttribute('aria-label') || '') +
-      ' ' + (button.getAttribute('data-testid') || '') +
-      ' ' + (button.type === 'submit' ? 'submit' : '')
-    ).toLowerCase();
-    if (/send|submit/.test(label) && getDraftText(inputEl).trim()) {
-      recordSend();
+    if (Sites.isSendButton(button, adapter) && getDraftText(inputEl).trim()) {
+      sendCandidate();
     }
+  }
+
+  /** What the popup shows: attached or not, how, and the adapter's age (PLAN.md Step 15). */
+  function attachStatus() {
+    return {
+      host: location.hostname,
+      adapter: adapter ? { site: adapter.site, lastVerified: adapter.lastVerified } : null,
+      via: inputEl ? inputVia : null,
+      paused: !siteOn(),
+      turnsMissing
+    };
   }
 
   // --------------------------------------------------------------------------
@@ -568,8 +628,11 @@
 
   let stopMoveWatch = null;
 
-  function attachTo(el) {
-    if (inputEl === el) return;
+  function attachTo(el, via) {
+    if (inputEl === el) {
+      inputVia = el ? via : null;
+      return;
+    }
     if (inputEl) {
       inputEl.removeEventListener('input', scheduleAnalyze);
       // Removed with the flag it was added with, or it stays attached and a
@@ -579,6 +642,7 @@
     if (stopMoveWatch) stopMoveWatch();
     stopMoveWatch = null;
     inputEl = el;
+    inputVia = el ? via : null;
     applyPillVisibility();
     observeRegions();
     if (!inputEl) return;
@@ -592,7 +656,12 @@
   /** Find the composer if ours is gone or hidden, and re-read the picker. */
   function scan() {
     if (!inputEl || !inputEl.isConnected || !isVisible(inputEl)) {
-      attachTo(findPromptInput());
+      const found = findPromptInput();
+      attachTo(found.el, found.via);
+    } else if (adapter && inputVia !== 'adapter') {
+      // On a generic guess: the adapter's composer may have rendered since.
+      const own = adapterComposer();
+      if (own) attachTo(own, 'adapter');
     }
     // The model switcher lives in the page chrome and re-renders on SPA
     // navigation; re-read it whenever the DOM settles.
@@ -703,6 +772,10 @@
       lastHref = location.href;
       if (navigated || !inputEl || !inputEl.isConnected || !isVisible(inputEl) || (pickerEl && !pickerEl.isConnected)) {
         scheduleScan();
+      } else if (adapter && inputVia !== 'adapter') {
+        // On a generic guess: the adapter's composer may have rendered since.
+        const own = adapterComposer();
+        if (own) attachTo(own, 'adapter');
       } else if (!pickerEl) {
         scheduleResolve(); // a picker that renders after the composer
       }
@@ -735,7 +808,17 @@
 
     buildUi();
     applyPillVisibility();
-    attachTo(findPromptInput());
+    const found = findPromptInput();
+    attachTo(found.el, found.via);
+
+    // The popup asks whether EcoPrompt is attached on this page.
+    if (chrome.runtime.onMessage) {
+      chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (!msg || msg.type !== 'eco:status') return false;
+        sendResponse(attachStatus());
+        return false;
+      });
+    }
 
     // Live settings updates from the options page.
     chrome.storage.onChanged.addListener((changes, area) => {

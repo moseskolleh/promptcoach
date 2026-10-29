@@ -85,9 +85,15 @@
    page, so a streaming reply costs it nothing. It works in idle time with
    a max wait, and repositions the pill only when the composer moves
    (`shared/watch.js`, PLAN.md Step 14).
+   Each site has a declarative adapter (`sites/<host>.json`, PLAN.md Step
+   15) naming its composer, send button, turns and picker; the generic
+   heuristic is the fallback, and the popup says whether the adapter
+   attached.
 2. On send, it messages `background.js` with a v2 history row: the send's
    inputs (model, effort, task type, token counts, region) and the figures
-   they gave, never its text (`shared/history.js`).
+   they gave, never its text (`shared/history.js`). A send is recorded only
+   once it happened: the composer cleared and a new user turn appeared, so
+   Enter in a slash menu, a blocked send and "Send feedback" record nothing.
 3. `background.js` is history's only writer. One queue appends each row to
    that day's key (`h:2026-10-27`) and updates the day's totals in
    `agg:daily`, so tabs can't overwrite each other's sends. It updates the

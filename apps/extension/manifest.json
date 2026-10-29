@@ -58,6 +58,8 @@
         "shared/defaults.js",
         "shared/history.js",
         "shared/watch.js",
+        "sites/adapters.js",
+        "shared/sites.js",
         "content.js"
       ],
       "css": [

@@ -1,0 +1,16 @@
+{
+  "site": "Gemini",
+  "hosts": [
+    "gemini.google.com"
+  ],
+  "composer": "rich-textarea .ql-editor[contenteditable='true']",
+  "sendButton": "button.send-button, button[aria-label='Send message']",
+  "stopButton": "button[aria-label='Stop response']",
+  "userMessage": "user-query",
+  "assistantMessage": "model-response",
+  "picker": "bard-mode-switcher button",
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

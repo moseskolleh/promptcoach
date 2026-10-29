@@ -45,6 +45,9 @@ Everything runs locally; prompts never leave your machine.
 | `shared/days.js` | calendar days for history buckets and the badge |
 | `shared/history.js` | history v2: row shape, day keys, daily totals, the single writer, re-scoring |
 | `shared/watch.js` | cheap page watching for the content script: idle scheduling with a max wait, bounded text reads, a move watcher |
+| `sites/<host>.json` | one adapter per supported site: where its composer, send button, turns and picker are, and when that was last checked |
+| `sites/adapters.js` | generated from `sites/*.json` by `scripts/sync-sites.js` — **do not edit here** |
+| `shared/sites.js` | adapter lookup, send-button test, send confirmation, the popup's Attached / Not attached line |
 | `vendor/core.bundle.js` | generated from `packages/core`: engine, data and precomputed coefficients — **do not edit here** |
 | `assets/` | icons |
 
@@ -56,6 +59,27 @@ Edit `packages/core` at the repo root, run its tests, then re-sync:
 npm test                      # from repo root
 node scripts/sync-core.js     # rebuilds vendor/core.bundle.js in extension and web app
 ```
+
+## Updating a site adapter
+
+When a chat site changes its page, edit its `sites/<host>.json`, check it on
+the live site, set `lastVerified` to that day, then rebuild:
+
+```bash
+node scripts/sync-sites.js    # checks every adapter, rebuilds sites/adapters.js
+npm test                      # fails if adapters.js is stale or an adapter is malformed
+```
+
+Each adapter holds:
+- `composer`, `sendButton`, `stopButton`, `userMessage`, `assistantMessage`,
+  `picker` and `effortToggle`, as CSS selectors (null where unknown);
+- `insertStrategy`: `value`, `insertText` or `paste`, for Step 23's Apply;
+- `lastVerified`: null until someone has checked it on the site.
+
+A selector that matches nothing is never fatal. The generic heuristic takes
+over and the popup says **Not attached**, naming the adapter. Only the demo
+adapter is verified so far: the real sites' selectors are written from what
+is publicly known of their pages and wait for a check on the live sites.
 
 ## Release vs dev manifest
 

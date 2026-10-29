@@ -1,0 +1,16 @@
+{
+  "site": "Claude",
+  "hosts": [
+    "claude.ai"
+  ],
+  "composer": "div.ProseMirror[contenteditable='true']",
+  "sendButton": "button[aria-label='Send message'], button[aria-label='Send Message']",
+  "stopButton": "button[aria-label='Stop response']",
+  "userMessage": "[data-testid='user-message']",
+  "assistantMessage": "[data-is-streaming]",
+  "picker": "button[data-testid='model-selector-dropdown']",
+  "effortToggle": null,
+  "insertStrategy": "insertText",
+  "lastVerified": null,
+  "notes": "Selectors written from what is publicly known of this site's page; not yet checked on the live site. Where one matches nothing, the generic heuristic takes over and the popup says Not attached."
+}

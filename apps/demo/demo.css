@@ -159,6 +159,45 @@ body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+/* Slash commands, a mode chip and feedback buttons: what the real sites
+   have that isn't a send (PLAN.md Step 15). */
+.demo-composer-row { position: relative; }
+.demo-slash-menu {
+  position: absolute;
+  left: 12px;
+  bottom: calc(100% + 6px);
+  min-width: 280px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--composer-bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  z-index: 5;
+}
+.demo-slash-menu[hidden] { display: none; }
+.demo-slash-item { padding: 6px 10px; border-radius: 8px; cursor: pointer; color: var(--ink); }
+.demo-slash-item[aria-selected="true"] { background: rgba(127, 127, 127, 0.14); }
+.demo-mode-chip {
+  align-self: center;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.demo-feedback {
+  align-self: flex-start;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.demo-feedback:hover, .demo-feedback:focus-visible { opacity: 1; }
+
 .demo-composer {
   flex: 1;
   border: 0;
