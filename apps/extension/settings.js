@@ -99,7 +99,7 @@ async function init() {
   for (const r of engine.listRegions()) {
     const option = document.createElement('option');
     option.value = r.key;
-    option.textContent = `${r.name} — ${Math.round(r.cif * 1000)} gCO₂e/kWh`;
+    option.textContent = `${r.name} — ${EcoPromptCore.formatCif(r.cif)}`;
     regionSelect.appendChild(option);
   }
 

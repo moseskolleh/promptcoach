@@ -15,23 +15,6 @@
   const Core = window.EcoPromptCore;
   if (!Core || !Core.ImpactEngine) return;
 
-  const GRADE_COLORS = {
-    A: '#10B981',
-    B: '#84CC16',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444'
-  };
-
-  // An estimate's grade range ("B–E") is coloured from its low grade to its
-  // high one (PLAN.md Step 8).
-  function gradeBackground(desc) {
-    const from = GRADE_COLORS[desc.gradeLow];
-    return desc.gradeHigh && desc.gradeHigh !== desc.gradeLow
-      ? `linear-gradient(135deg, ${from}, ${GRADE_COLORS[desc.gradeHigh]})`
-      : from;
-  }
-
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const History = globalThis.EcoPromptHistory;
 
@@ -376,7 +359,7 @@
     const grade = document.createElement('span');
     grade.className = 'epc-card-grade';
     grade.textContent = desc.gradeText;
-    grade.style.background = gradeBackground(desc);
+    grade.style.background = Core.gradeBackground(desc);
     grade.title = desc.gradeLabel;
     const title = document.createElement('span');
     title.className = 'epc-card-title';
@@ -390,7 +373,7 @@
     if (desc.estimated) {
       const est = document.createElement('p');
       est.className = 'epc-card-est';
-      est.textContent = `${desc.methodChip} · ${desc.note}`;
+      est.textContent = desc.chipText;
       est.title = desc.noteReason;
       card.appendChild(est);
     }
@@ -500,13 +483,13 @@
     const desc = Core.describeImpact(lastImpact);
     const range = lastImpact.energy.range;
     pillGrade.textContent = desc.gradeText;
-    pillGrade.style.background = gradeBackground(desc);
+    pillGrade.style.background = Core.gradeBackground(desc);
     pillGrade.title = desc.gradeLabel;
     pillText.textContent = range
       ? conv.energyRange(range.lowWh, range.highWh).primary
       : conv.energy(lastImpact.energy.wh).primary;
     pillEst.hidden = !desc.estimated;
-    pillEst.title = desc.estimated ? `${desc.methodChip} · ${desc.note}` : '';
+    pillEst.title = desc.chipText || '';
     if (cardOpen) renderCard();
     positionUi();
   }

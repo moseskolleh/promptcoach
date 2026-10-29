@@ -7,23 +7,9 @@
 (() => {
   const Core = window.EcoPromptCore;
 
-  const GRADE_COLORS = {
-    A: '#10B981',
-    B: '#84CC16',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444'
-  };
-
   // An estimate's grade range ("B–E") is coloured from its low grade to its
-  // high one (PLAN.md Step 8).
-  function gradeBackground(desc) {
-    if (!desc) return 'var(--muted)';
-    const from = GRADE_COLORS[desc.gradeLow];
-    return desc.gradeHigh && desc.gradeHigh !== desc.gradeLow
-      ? `linear-gradient(135deg, ${from}, ${GRADE_COLORS[desc.gradeHigh]})`
-      : from;
-  }
+  // high one (PLAN.md Step 8); a model with no grade yet is muted.
+  const gradeBackground = (desc) => Core.gradeBackground(desc) || 'var(--muted)';
 
   const DEFAULT_SETTINGS = globalThis.EcoPromptDefaults;
   const Days = globalThis.EcoPromptDays;
@@ -35,7 +21,7 @@
     conv: null,
     settings: { ...DEFAULT_SETTINGS },
     models: [],
-    modelDescs: {}, // modelId -> Core.describeImpact at a quick 100/300 query
+    modelDescs: {}, // modelId -> Core.describeImpact at Core.QUICK_QUERY
     prompt: '',
     analysis: null,
     inputTokens: 100,
@@ -87,11 +73,12 @@
     }
   }
 
-  function impactOptions(extra = {}) {
+  /** The popup's inputs for Core.impactRequest: effort, region, embodied. */
+  function popupInputs(extra = {}) {
     return {
-      reasoningEffort: $('effort-select').value || state.settings.reasoningEffort,
-      regionKey: state.settings.regionKey,
-      includeEmbodied: state.settings.includeEmbodied,
+      effort: $('effort-select').value || state.settings.reasoningEffort,
+      region: state.settings.regionKey,
+      embodied: state.settings.includeEmbodied,
       ...extra
     };
   }
@@ -119,17 +106,9 @@
   // Coach tab
   // --------------------------------------------------------------------------
 
-  /** Quick grade per model (typical short query: 100 in / 300 out), at the selected effort. */
+  /** Quick grade per model at the typical short query, at the selected effort. */
   function refreshQuickGrades() {
-    for (const m of state.models) {
-      const impact = state.engine.estimateImpact({
-        modelId: m.id,
-        inputTokens: 100,
-        outputTokens: 300,
-        options: impactOptions()
-      });
-      if (impact) state.modelDescs[m.id] = Core.describeImpact(impact);
-    }
+    state.modelDescs = Core.quickGrades(state.engine, state.models, popupInputs());
   }
 
   function populateModelSelect() {
@@ -197,12 +176,12 @@
     state.inputTokens = analysis.tokens;
     state.outputTokens = analysis.outputEstimate.estimated;
 
-    const impact = state.engine.estimateImpact({
+    const impact = state.engine.estimateImpact(Core.impactRequest(popupInputs({
       modelId: $('model-select').value,
-      inputTokens: analysis.tokens,
-      outputTokens: analysis.outputEstimate.estimated,
-      options: impactOptions({ taskMultiplier: analysis.energyMultiplier })
-    });
+      inTokens: analysis.tokens,
+      outTokens: analysis.outputEstimate.estimated,
+      taskMultiplier: analysis.energyMultiplier
+    })));
     if (!impact) return;
 
     // Header: grade + chips. An estimate shows a grade range, its method
@@ -215,7 +194,7 @@
     badge.title = desc.estimated ? desc.gradeLabel : `Eco-score ${impact.grade.score}/100`;
     const estChip = $('chip-est');
     estChip.classList.toggle('hidden', !desc.estimated);
-    estChip.textContent = desc.estimated ? `${desc.methodChip} · ${desc.note}` : '';
+    estChip.textContent = desc.chipText || '';
     estChip.title = desc.estimated ? desc.noteReason : '';
     $('chip-tokens').textContent = `${analysis.tokens} tokens in`;
     $('chip-task').textContent = analysis.taskType;
@@ -233,7 +212,7 @@
       range.textContent = desc.methodChip;
       range.title = desc.noteReason;
     } else {
-      range.textContent = `± ${conf.minWh.toFixed(2)}–${conf.maxWh.toFixed(2)} Wh`;
+      range.textContent = `± ${Core.formatWhRange(conf.minWh, conf.maxWh)}`;
       range.title = impact.energy.extrapolated
         ? 'Wider range: extrapolated beyond measured benchmark conditions'
         : 'Benchmark uncertainty range';
@@ -398,9 +377,9 @@
       modelIds: state.compareIds,
       inputTokens: state.inputTokens,
       outputTokens: state.outputTokens,
-      options: impactOptions(
+      options: Core.impactOptions(popupInputs(
         state.analysis ? { taskMultiplier: state.analysis.energyMultiplier } : {}
-      )
+      ))
     });
 
     // Savings banner: a percentage only where the ranges allow one
@@ -410,7 +389,7 @@
     if (claim) {
       banner.classList.remove('hidden');
       banner.textContent = claim.claim === 'percent'
-        ? `Save ${claim.atLeast ? 'at least ' : ''}${claim.percentage}% by switching from ${worst.model.name} ` +
+        ? `Save ${Core.savingPercent(claim)} by switching from ${worst.model.name} ` +
           `to ${best.model.name}`
         : `${best.model.name} probably uses less than ${worst.model.name}; their estimated ranges overlap`;
     } else {
@@ -432,7 +411,7 @@
       if (desc.estimated) {
         const est = document.createElement('span');
         est.className = 'cell-secondary cell-est';
-        est.textContent = `${desc.methodChip} · ${desc.note}`;
+        est.textContent = desc.chipText;
         est.title = desc.noteReason;
         nameTd.appendChild(est);
       }
@@ -553,7 +532,7 @@
       if (!day.queries) bar.classList.add('is-empty');
       if (day.today) bar.classList.add('is-today');
       bar.title = day.queries
-        ? `${day.queries} queries · ${day.energyWh.toFixed(2)} Wh`
+        ? `${day.queries} queries · ${Core.formatWh(day.energyWh)}`
         : 'No queries';
       const label = document.createElement('span');
       label.className = 'chart-day';

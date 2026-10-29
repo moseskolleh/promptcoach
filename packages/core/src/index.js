@@ -1,12 +1,13 @@
 // EcoPrompt Coach Core — entry point (Node / bundlers)
-// Browser consumers load calculator.js / analyzer.js / conversions.js as
-// plain scripts; everything attaches to window.EcoPromptCore.
+// Browser consumers load the core bundle (scripts/sync-core.js) as a plain
+// script; everything attaches to window.EcoPromptCore.
 
 'use strict';
 
 const calculator = require('./calculator');
 const analyzer = require('./analyzer');
 const conversions = require('./conversions');
+const present = require('./present');
 
 const models = require('./data/models.json');
 const grids = require('./data/grids.json');
@@ -29,6 +30,7 @@ module.exports = {
   ...calculator,
   ...analyzer,
   ...conversions,
+  ...present,
   data: { models, grids, equivalents },
   createDefaultEngine
 };

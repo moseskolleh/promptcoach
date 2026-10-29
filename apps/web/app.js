@@ -42,16 +42,10 @@ function debounce(fn, ms) {
   };
 }
 
-// formatWh, describeImpact and savingClaim are top-level functions in
-// the core bundle (vendor/core.bundle.js), which shares this page's global scope.
-
-function formatMl(ml) {
-  return ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : `${ml.toFixed(1)} mL`;
-}
-
-function formatG(g) {
-  return g >= 1000 ? `${(g / 1000).toFixed(2)} kg CO₂e` : `${g.toFixed(2)} g CO₂e`;
-}
+// formatWh, formatMl, formatG, describeImpact, savingClaim and savingPhrase
+// are top-level functions in the core bundle (vendor/core.bundle.js), which
+// shares this page's global scope. Every figure, grade colour and tip action
+// comes from there (PLAN.md Step 13).
 
 function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
@@ -92,8 +86,6 @@ function setTokenSlider(id, tokens) {
   paintSlider(slider);
 }
 
-const GRADE_DOTS = { A: '🟢', B: '🟢', C: '🟡', D: '🟠', E: '🔴' };
-
 /**
  * Paint a grade element for an impact: one letter for a measured model, a
  * range ("B–E") or a floor ("≥ C") for an estimate (PLAN.md Step 8). A range
@@ -128,14 +120,6 @@ function estimateChips(desc) {
   note.title = desc.noteReason;
   chips.push(note);
   return chips;
-}
-
-/**
- * A percentage saving that never claims more than the ranges allow:
- * "57% less energy" or "at least 54% less energy" (PLAN.md Step 27).
- */
-function savingPhrase(claim) {
-  return `${claim.atLeast ? 'at least ' : ''}${claim.percentage}% less energy`;
 }
 
 /* ============================ 2. Theme ============================ */
@@ -259,9 +243,10 @@ function referenceImpact(modelId, inputTokens, outputTokens) {
   return referenceImpactCache.get(key);
 }
 
-/** Grade at the standard short query (100 in / 300 out) — used for dots/cards. */
+/** Grade at the standard short query (core's QUICK_QUERY) — used for dots/cards. */
 function shortQueryImpact(modelId) {
-  return referenceImpact(modelId, 100, 300);
+  const q = EcoPromptCore.QUICK_QUERY;
+  return referenceImpact(modelId, q.inTokens, q.outTokens);
 }
 
 /* ============================ 5. Hero live demo ============================ */
@@ -300,7 +285,7 @@ function buildDemoFacts() {
   const engine = state.engine;
   const conv = state.conv;
   const facts = [];
-  const short = { inputTokens: 100, outputTokens: 300 };
+  const short = { inputTokens: EcoPromptCore.QUICK_QUERY.inTokens, outputTokens: EcoPromptCore.QUICK_QUERY.outTokens };
   const tag = (impact) => (impact.estimate ? ', estimated' : '');
 
   // Fact 1: a thinking model's answer, in everyday units (computed live).
@@ -386,7 +371,7 @@ function populateModelSelect() {
     const desc = impact ? describeImpact(impact) : null;
     const opt = document.createElement('option');
     opt.value = m.id;
-    opt.textContent = `${(desc && GRADE_DOTS[impact.grade.grade]) || '⚪'} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
+    opt.textContent = `${EcoPromptCore.gradeDot(desc && impact.grade.grade)} ${m.name} — grade ${desc ? desc.gradeText : '?'}` +
       `${m.isReasoning ? ' · reasoning' : ''}${desc && desc.estimated ? ' · estimated' : ''}`;
     return opt;
   };
@@ -455,7 +440,7 @@ function populateRegionSelect() {
   for (const r of regions) {
     const opt = document.createElement('option');
     opt.value = r.key;
-    opt.textContent = `${r.name} (${Math.round(r.cif * 1000)} g CO₂/kWh)`;
+    opt.textContent = `${r.name} (${EcoPromptCore.formatCif(r.cif)})`;
     select.appendChild(opt);
   }
   select.value = state.regionKey;
@@ -486,7 +471,7 @@ function setSegmentWidths(impact) {
   $('legend-input').textContent = label(inputWh);
   $('legend-output').textContent = label(outputWh);
   const thinking = impact.estimate && impact.estimate.rangeOnly ? impact.estimate.thinkingTokens : null;
-  const n = (x) => Math.round(x).toLocaleString('en-US');
+  const n = EcoPromptCore.formatCount;
   $('breakdown-note').textContent = thinking
     ? `visible answer only · thinking adds ${thinking.lowTokens > 0 ? `${n(thinking.lowTokens)}–` : 'up to '}${n(thinking.highTokens)} hidden tokens`
     : 'output tokens dominate';
@@ -502,23 +487,13 @@ function setSegmentWidths(impact) {
  */
 function applyPromptChange(newText, toastPrefix) {
   const prevText = $('prompt-input').value;
-  const beforeWh = state.impact ? state.impact.energy.wh : null;
-  const beforeGrade = state.impact ? describeImpact(state.impact).gradeText : null;
+  const before = state.impact;
 
   $('prompt-input').value = newText;
   state.outputTouched = false; // let the analyzer re-estimate the output
   updateCoach();
 
-  let msg = toastPrefix;
-  if (beforeWh && state.impact && state.impact.energy.wh < beforeWh) {
-    const pct = Math.round((1 - state.impact.energy.wh / beforeWh) * 100);
-    if (pct > 0) msg += ` — ${pct}% less energy`;
-    const afterGrade = describeImpact(state.impact).gradeText;
-    if (beforeGrade && afterGrade !== beforeGrade) {
-      msg += ` (${beforeGrade} → ${afterGrade})`;
-    }
-  }
-  showToast(msg, {
+  showToast(toastPrefix + EcoPromptCore.changeNote(before, state.impact), {
     label: 'Undo',
     onClick: () => {
       $('prompt-input').value = prevText;
@@ -529,71 +504,27 @@ function applyPromptChange(newText, toastPrefix) {
   });
 }
 
-function switchModelAction(bestModel, claim) {
-  state.modelId = bestModel.id;
-  $('model-select').value = bestModel.id;
+function switchModelAction(model, toast) {
+  state.modelId = model.id;
+  $('model-select').value = model.id;
   syncReasoningControl();
   updateCoach();
-  showToast(`🔁 Switched to ${bestModel.name} — ${savingPhrase(claim)} on this prompt`);
+  showToast(toast);
 }
 
 /**
- * Map a coach tip to a one-click action button, or null when the tip is
- * informational only.
+ * A coach tip's one-click button from core's tipAction, wired to the coach,
+ * or null when the tip is informational only.
  */
-function tipAction(tip, analysis) {
-  if (tip.kind === 'polite_words') {
-    return {
-      label: '✂️ Trim it for me',
-      onClick: () => applyPromptChange(
-        EcoPromptCore.generateOptimizedPrompt($('prompt-input').value),
-        '✂️ Courtesy phrases trimmed'
-      )
-    };
-  }
-  if (tip.kind === 'output_budget') {
-    return {
-      label: '➕ Add "≤100 words"',
-      onClick: () => {
-        const text = $('prompt-input').value.trim();
-        const sep = /[.!?]$/.test(text) ? ' ' : '. ';
-        applyPromptChange(`${text}${sep}Answer in ≤100 words.`, '📏 Output budget added');
-      }
-    };
-  }
-  if (tip.kind === 'model') {
-    // Offer a switch only when a meaningfully greener model exists. Nano-class
-    // models are excluded — "switch to a 1B model" isn't credible advice for
-    // general tasks; Small (Haiku/mini/Flash class) is the floor the tip text
-    // itself recommends. Thinking models count too: every 2026 model thinks,
-    // and savingClaim offers a switch only when the ranges don't overlap.
-    const candidates = state.engine.listModels()
-      .filter((m) => m.sizeClass !== 'Nano')
-      .map((m) => m.id);
-    if (!candidates.includes(state.modelId)) candidates.push(state.modelId);
-    const cmp = state.engine.compareModels({
-      modelIds: candidates,
-      inputTokens: analysis.tokens,
-      outputTokens: state.outputTokens,
-      options: {
-        taskMultiplier: analysis.energyMultiplier,
-        reasoningEffort: state.reasoningEffort,
-        regionKey: state.regionKey === 'default' ? undefined : state.regionKey
-      }
-    });
-    const best = cmp.best;
-    const current = cmp.results.find((r) => r.model.id === state.modelId);
-    if (!best || !current || best.model.id === state.modelId) return null;
-    // Only a saving the ranges support: never a percentage between
-    // overlapping estimates, and never a switch for "probably less".
-    const claim = savingClaim(best, current);
-    if (!claim || claim.claim !== 'percent' || claim.percentage < 15) return null;
-    return {
-      label: `🔁 Switch to ${best.model.name} (${claim.atLeast ? `at least ${claim.percentage}% less` : `−${claim.percentage}%`})`,
-      onClick: () => switchModelAction(best.model, claim)
-    };
-  }
-  return null;
+function tipButton(tip, analysis) {
+  const action = EcoPromptCore.tipAction(tip, { engine: state.engine, ...coachInputs(analysis) });
+  if (!action) return null;
+  return {
+    label: action.label,
+    onClick: action.kind === 'model'
+      ? () => switchModelAction(action.model, action.toast)
+      : () => applyPromptChange(action.apply($('prompt-input').value), action.toast)
+  };
 }
 
 function renderTips(analysis) {
@@ -609,7 +540,7 @@ function renderTips(analysis) {
     body.appendChild(title);
     body.appendChild(el('p', 'tip-desc', tip.description));
     if (tip.impact) body.appendChild(el('p', 'tip-impact', `→ ${tip.impact}`));
-    const action = tipAction(tip, analysis);
+    const action = tipButton(tip, analysis);
     if (action) {
       const btn = el('button', 'btn btn-secondary tip-action', action.label);
       btn.type = 'button';
@@ -687,8 +618,8 @@ function updateCoach() {
   $('energy-primary').textContent = rel.energy.primary;
   $('energy-secondary').textContent = rel.energy.secondary;
   $('energy-range').textContent = desc.estimated
-    ? `${desc.methodChip} · ${desc.note}`
-    : `range ${formatWh(impact.energy.confidence.minWh)} – ${formatWh(impact.energy.confidence.maxWh)}`;
+    ? desc.chipText
+    : `range ${EcoPromptCore.formatWhRange(impact.energy.confidence.minWh, impact.energy.confidence.maxWh)}`;
 
   $('water-primary').textContent = rel.water.primary;
   $('water-secondary').textContent = rel.water.secondary;
@@ -703,7 +634,7 @@ function updateCoach() {
   // A host with no published figures borrows another's, and says so.
   const proxy = impact.factors.hostProxyOf && state.engine.grids.providers[impact.factors.hostProxyOf];
   $('carbon-detail').textContent =
-    `${Math.round(impact.factors.cif * 1000)} g CO₂/kWh · ${cifLabel} · incl. 15% embodied` +
+    `${EcoPromptCore.formatCif(impact.factors.cif)} · ${cifLabel} · incl. 15% embodied` +
     (proxy ? ` · borrowed from ${proxy.name} until ${impact.model.provider}'s own figures are read` : '');
 
   setSegmentWidths(impact);
@@ -805,16 +736,26 @@ function buildShareLink() {
  * give the same number everywhere.
  */
 function coachImpact(analysis, { modelId, region, effort, outTokens }) {
-  return state.engine.estimateImpact({
+  return state.engine.estimateImpact(EcoPromptCore.impactRequest({
     modelId,
-    inputTokens: analysis.tokens,
-    outputTokens: outTokens,
-    options: {
-      taskMultiplier: analysis.energyMultiplier,
-      reasoningEffort: effort,
-      regionKey: region === 'default' ? undefined : region
-    }
-  });
+    inTokens: analysis.tokens,
+    outTokens,
+    taskMultiplier: analysis.energyMultiplier,
+    effort,
+    region
+  }));
+}
+
+/** The coach's current inputs, as core's impactRequest takes them. */
+function coachInputs(analysis) {
+  return {
+    modelId: state.modelId,
+    inTokens: analysis.tokens,
+    outTokens: state.outputTokens,
+    taskMultiplier: analysis.energyMultiplier,
+    effort: state.reasoningEffort,
+    region: state.regionKey
+  };
 }
 
 /** Valid coach inputs, or their defaults: a bad value never reaches the engine. */
@@ -1040,11 +981,11 @@ function renderCompare() {
     modelIds: state.compareIds,
     inputTokens: state.compareInput,
     outputTokens: state.compareOutput,
-    options: {
+    options: EcoPromptCore.impactOptions({
       taskMultiplier: state.compareTaskMultiplier,
-      reasoningEffort: state.reasoningEffort,
-      regionKey: state.regionKey === 'default' ? undefined : state.regionKey
-    }
+      effort: state.reasoningEffort,
+      region: state.regionKey
+    })
   });
 
   // Savings banner: only what the ranges support (PLAN.md Step 27).
@@ -1163,10 +1104,6 @@ function renderCompare() {
   renderCompareChart(cmp.results);
 }
 
-const GRADE_COLORS = {
-  A: '#10B981', B: '#84CC16', C: '#F59E0B', D: '#F97316', E: '#EF4444'
-};
-
 function renderCompareChart(results) {
   const wrap = $('compare-chart');
   clearChildren(wrap);
@@ -1226,7 +1163,7 @@ function renderCompareChart(results) {
       rangeBar.setAttribute('height', String(barH));
       rangeBar.setAttribute('rx', '8');
       rangeBar.setAttribute('class', 'chart-span');
-      rangeBar.setAttribute('fill', GRADE_COLORS[d.gradeHigh || d.gradeLow] || '#10B981');
+      rangeBar.setAttribute('fill', EcoPromptCore.gradeColor(d.gradeHigh || d.gradeLow));
       svg.appendChild(rangeBar);
     }
     const bar = document.createElementNS(NS, 'rect');
@@ -1236,7 +1173,7 @@ function renderCompareChart(results) {
     bar.setAttribute('height', String(barH));
     bar.setAttribute('rx', '8');
     bar.setAttribute('class', 'chart-bar');
-    bar.setAttribute('fill', GRADE_COLORS[d.gradeLow] || '#10B981');
+    bar.setAttribute('fill', EcoPromptCore.gradeColor(d.gradeLow));
     svg.appendChild(bar);
     bars.push({ bar, targetW, value: solidWh, y: y + labelH });
 

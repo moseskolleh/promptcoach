@@ -17,146 +17,11 @@ function plural(n, singular, pluralForm) {
   return n === 1 ? singular : pluralForm || `${singular}s`;
 }
 
-/** Wh as a short technical figure: 0.052 Wh, 1.23 Wh, 16.7 Wh, 1.20 kWh. */
-function formatWh(wh) {
-  if (wh >= 1000) return `${(wh / 1000).toFixed(2)} kWh`;
-  if (wh >= 10) return `${wh.toFixed(1)} Wh`;
-  if (wh >= 1) return `${wh.toFixed(2)} Wh`;
-  return `${wh.toFixed(3)} Wh`;
-}
-
-/**
- * Two formatted ends as one range, sharing the unit when both ends have it:
- * "0.520 Wh" and "16.7 Wh" make "0.520–16.7 Wh". A missing high end is a
- * floor, "≥ 0.520 Wh".
- */
-function joinRange(lowText, highText) {
-  if (highText === null || highText === undefined) return `≥ ${lowText}`;
-  if (lowText === highText) return lowText;
-  const lo = /^(\S+) (.+)$/.exec(lowText);
-  const hi = /^(\S+) (.+)$/.exec(highText);
-  if (lo && hi && lo[2] === hi[2]) return `${lo[1]}–${hi[1]} ${lo[2]}`;
-  return `${lowText} – ${highText}`;
-}
-
-function formatWhRange(lowWh, highWh) {
-  return joinRange(formatWh(lowWh), highWh === null ? null : formatWh(highWh));
-}
-
-// What each estimator is called on screen (PLAN.md Step 8).
-const METHOD_CHIPS = {
-  tier: 'estimated · tier',
-  'active-params': 'estimated · from parameters'
-};
-
-/**
- * How to label an impact from ImpactEngine.estimateImpact (PLAN.md Step 8).
- * A measured or benchmarked model keeps its single number and grade. A model
- * nobody has measured shows its range, its method, a grade range whenever the
- * range crosses a band, and "likely high": the estimates are built from 2025
- * models on 2025 hardware, the chosen direction of error (PLAN.md Step 2).
- *
- * whText is the figure to show: the range for a model that thinks, "≥ …" for
- * a floor, the point otherwise (with rangeText beside it). gradeLow and
- * gradeHigh are for colour; gradeHigh is null for a floor.
- */
-function describeImpact(impact) {
-  const grade = impact.grade;
-  const range = impact.energy.range;
-  if (!range) {
-    const wh = impact.energy.wh;
-    return {
-      estimated: false,
-      method: null,
-      methodChip: null,
-      rangeOnly: false,
-      floor: false,
-      lowWh: wh,
-      highWh: wh,
-      whText: formatWh(wh),
-      rangeText: null,
-      gradeText: grade.grade,
-      gradeLow: grade.grade,
-      gradeHigh: grade.grade,
-      gradeLabel: `Eco-grade ${grade.grade}`,
-      note: null,
-      noteReason: null
-    };
-  }
-  const low = grade.range.low;
-  const high = grade.range.high;
-  const method = impact.estimate ? impact.estimate.method : null;
-  const rangeText = formatWhRange(range.lowWh, range.highWh);
-  const thinks = !!(impact.estimate && impact.estimate.thinkingTokens && impact.estimate.thinkingTokens.highTokens > 0);
-  let gradeText;
-  let gradeLabel;
-  if (range.floor) {
-    gradeText = `≥ ${low}`;
-    gradeLabel = `Eco-grade ${low} or worse`;
-  } else if (low === high) {
-    gradeText = low;
-    gradeLabel = `Eco-grade ${low}`;
-  } else {
-    gradeText = `${low}–${high}`;
-    gradeLabel = `Eco-grade ${low} to ${high}`;
-  }
-  return {
-    estimated: true,
-    method,
-    methodChip: METHOD_CHIPS[method] || 'estimated',
-    rangeOnly: range.rangeOnly,
-    floor: range.floor,
-    lowWh: range.lowWh,
-    highWh: range.highWh,
-    whText: range.rangeOnly ? rangeText : formatWh(impact.energy.wh),
-    rangeText,
-    gradeText,
-    gradeLow: low,
-    gradeHigh: high,
-    gradeLabel,
-    note: 'likely high',
-    noteReason: range.floor
-      ? 'Several agents answer at once and nobody publishes how many, so this is one agent\'s least.'
-      : thinks
-        ? 'Hidden thinking is priced from 2025 models on 2025 hardware; newer hardware likely costs less.'
-        : 'Built from 2025 models on 2025 hardware; newer hardware likely costs less.'
-  };
-}
-
-/**
- * What can honestly be said when `better` replaces `worse` on the same
- * query. Two single numbers give a percentage, as compareModels does. With
- * an estimate on either side, a percentage only when better's dearest end
- * is below worse's cheapest, and then "at least" that much; overlapping
- * ranges give "probably less", never a number (PLAN.md Step 27).
- * Returns null when there is no saving to claim.
- *
- * @returns {{claim: 'percent'|'probably', percentage: number|null, atLeast: boolean, energyWh: number|null}|null}
- */
-function savingClaim(better, worse) {
-  const a = describeImpact(better);
-  const b = describeImpact(worse);
-  if (!a.estimated && !b.estimated) {
-    const aWh = better.energy.wh;
-    const bWh = worse.energy.wh;
-    if (!(bWh > 0) || aWh >= bWh) return null;
-    return {
-      claim: 'percent',
-      // Never round a real saving up to "100% less energy".
-      percentage: Math.min(aWh > 0 ? 99 : 100, Math.round(((bWh - aWh) / bWh) * 100)),
-      atLeast: false,
-      energyWh: bWh - aWh
-    };
-  }
-  // A floor has no dearest end, so nothing is certain about it.
-  if (a.highWh !== null && b.lowWh > 0 && a.highWh < b.lowWh) {
-    const percentage = Math.floor(((b.lowWh - a.highWh) / b.lowWh) * 100);
-    if (percentage > 0) return { claim: 'percent', percentage, atLeast: true, energyWh: b.lowWh - a.highWh };
-  }
-  if (!a.floor && better.energy.wh < worse.energy.wh) {
-    return { claim: 'probably', percentage: null, atLeast: false, energyWh: null };
-  }
-  return null;
+// Technical figures and ranges follow present.js's one rounding rule.
+// Node requires it; in the browser bundle present.js runs after this file,
+// so it is looked up when first used.
+function presentation() {
+  return typeof module !== 'undefined' && module.exports ? require('./present.js') : globalThis.EcoPromptCore;
 }
 
 /**
@@ -267,9 +132,8 @@ function createConverters(equivalents) {
 
   function energy(wh) {
     const pick = pickEquivalent(wh, energyCandidates());
-    const primary = pick ? pick.item.label(pick.n) : `${round(wh)} Wh`;
-    const secondary = wh < 1 ? `${wh.toFixed(3)} Wh` : wh < 1000 ? `${wh.toFixed(2)} Wh` : `${(wh / 1000).toFixed(3)} kWh`;
-    return { primary, secondary };
+    const primary = pick ? pick.item.label(pick.n) : presentation().formatWh(wh);
+    return { primary, secondary: presentation().formatWh(wh) };
   }
 
   function waterCandidates() {
@@ -286,9 +150,8 @@ function createConverters(equivalents) {
 
   function water(ml) {
     const pick = pickEquivalent(ml, waterCandidates());
-    const primary = pick ? pick.item.label(pick.n) : `${round(ml)} mL`;
-    const secondary = ml < 1000 ? `${ml.toFixed(1)} mL` : `${(ml / 1000).toFixed(2)} L`;
-    return { primary, secondary };
+    const primary = pick ? pick.item.label(pick.n) : presentation().formatMl(ml);
+    return { primary, secondary: presentation().formatMl(ml) };
   }
 
   function carbonCandidates() {
@@ -306,9 +169,8 @@ function createConverters(equivalents) {
 
   function carbon(g) {
     const pick = pickEquivalent(g, carbonCandidates());
-    const primary = pick ? pick.item.label(pick.n) : `${round(g)} g CO₂e`;
-    const secondary = g < 1000 ? `${g.toFixed(2)} g CO₂e` : `${(g / 1000).toFixed(3)} kg CO₂e`;
-    return { primary, secondary };
+    const primary = pick ? pick.item.label(pick.n) : presentation().formatG(g);
+    return { primary, secondary: presentation().formatG(g) };
   }
 
   /**
@@ -316,6 +178,7 @@ function createConverters(equivalents) {
    * high end is null. Equal ends read as the single figure.
    */
   function inRange(convert, low, high) {
+    const { joinRange } = presentation();
     const lo = convert(low);
     if (high === null) return { primary: `at least ${lo.primary}`, secondary: joinRange(lo.secondary, null) };
     const hi = convert(high);
@@ -397,7 +260,7 @@ function createConverters(equivalents) {
   return { energy, water, carbon, energyRange, waterRange, carbonRange, forImpact, forTotals, factors: f };
 }
 
-const ConversionsModule = { createConverters, describeImpact, savingClaim, formatWh, formatWhRange, METHOD_CHIPS };
+const ConversionsModule = { createConverters };
 
 if (typeof globalThis !== 'undefined') {
   globalThis.EcoPromptCore = globalThis.EcoPromptCore || {};

@@ -8,6 +8,8 @@
 │  analyzer.js     tokens, task detection, courtesy trimming, │
 │                  zero-AI alternatives, coaching tips        │
 │  conversions.js  relatable everyday equivalents             │
+│  present.js      grade palette, figures, labels, requests,  │
+│                  quick grades, coach tip actions            │
 │  data/           models.json · grids.json · equivalents.json│
 │                  precomputed.json (generated coefficients)  │
 │  test/           node --test (engine + analyzer)            │
@@ -31,6 +33,13 @@
    app imports the package directly through the npm workspace, and
    `createDefaultEngine` starts from the same precomputed coefficients. CI
    fails when the bundle or the coefficients are stale.
+
+   What the surfaces show is shared too: `present.js` holds the grade
+   palette, the formatters and their one rounding rule, an estimate's
+   labels, the `estimateImpact` request built from a surface's inputs,
+   quick per-model grades and the coach's tip actions. `check-apps` refuses
+   an app that maps grades to colours or rounds with `toFixed()` itself,
+   and holds the CSS `--grade-a…e` properties equal to core's palette.
 
 2. **No build toolchain.** Core modules are plain scripts that attach to
    `window.EcoPromptCore` in browsers and export CommonJS in Node. This

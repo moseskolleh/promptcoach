@@ -5,6 +5,31 @@ the ones in [PLAN.md](PLAN.md).
 
 ## Unreleased
 
+### One presentation layer (PLAN.md Step 13, second half)
+
+- **New `packages/core/src/present.js`**, holding what was copied across
+  the surfaces:
+  - the grade palette (`GRADE_COLORS`, `GRADE_DOTS`, `gradeBackground`),
+    which was defined five times;
+  - the formatters (`formatWh`, `formatMl`, `formatG`, `formatCif`,
+    `formatCount`);
+  - an estimate's labels (`describeImpact`, `savingClaim`), moved from
+    `conversions.js`, plus `chipText` for a single chip;
+  - `impactRequest`, the one request builder for the coach, the popup, the
+    pill, the library and history re-scoring;
+  - quick per-model grades (`quickGrades`, `QUICK_QUERY`);
+  - the coach's tip actions (`tipAction`, `greenerModel`, `withWordBudget`,
+    `changeNote`), moved from the web app so Step 23 can reuse them in the
+    extension.
+- **One rounding rule** for technical figures: three significant figures,
+  at most three decimals. Some figures read differently:
+  - 123 Wh, where it was 123.4 Wh;
+  - 1.23 kg CO₂e, where it was 1.234 kg CO₂e;
+  - 0.420 mL, where it was 0.4 mL.
+- **Grid intensity** reads "g CO₂e/kWh" on every surface.
+- **Gate:** `check-apps` refuses an app that maps grades to colours or rounds
+  with `toFixed()`. It also holds the CSS grade colours equal to core's.
+
 ### One engine bootstrap (PLAN.md Step 13, first half)
 
 - **No fetch and no fitting at start-up, on every surface.**

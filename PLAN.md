@@ -288,6 +288,7 @@ pill shows a confident grade for a model it cannot see.
   `shared/defaults.js`.
 - Grade colors are defined in five places. Engine start-up is written four
   times. The web formatters round differently from core's `conversions.js`.
+  *(Fixed in Step 13.)*
 - `analyzer.js` contains five literal NUL bytes (lines 111, 657, 692), so
   `grep` and `file` treat the engine's main source file as binary.
 
@@ -1219,8 +1220,8 @@ scanning raw rows.
 No grade color or formatter is defined outside core. The sync gate in CI
 covers the bundle.
 
-> **Status (2026-10-29): the bootstrap half is built; the presentation layer
-> follows in its own PR.**
+> **Status (2026-10-29): built.** The bootstrap half and the presentation
+> layer shipped as separate PRs.
 > - **The bundle.** `scripts/sync-core.js` writes one
 >   `vendor/core.bundle.js` per app, which replaces the separate scripts and
 >   data files. It holds:
@@ -1248,6 +1249,23 @@ covers the bundle.
 >     requests on any surface.
 > - **Settings** loads the one bundle; the separate analyzer and conversions
 >   scripts are gone everywhere.
+> - **The presentation layer.** `packages/core/src/present.js` holds:
+>   - the grade palette, as colours, dots and `gradeBackground()`;
+>   - the formatters, with one rounding rule: three significant figures,
+>     at most three decimals. The relatable figures' technical numbers now
+>     use it too, where they rounded their own way;
+>   - `describeImpact()` and `savingClaim()`, moved from `conversions.js`,
+>     with a `chipText` for the method chip and the note together;
+>   - `impactRequest()`, used by the coach, the library, the popup, the pill
+>     and history re-scoring;
+>   - `quickGrades()` at `QUICK_QUERY`;
+>   - the web app's tip actions as `tipAction()`: trim, "≤100 words" and
+>     the greener-model switch, with `changeNote()` for their toasts.
+> - **Gate.** `check-apps` rule 10 refuses an app script that maps a grade
+>   to a colour or calls `toFixed()`. It also holds every CSS `--grade-a…e`
+>   equal to core's `GRADE_COLORS`, since CSS can't read the core.
+>   `present.test.js` holds the relatable figures to the formatters, the
+>   palette to the grade bands, and each tip action to its result.
 
 ### Step 14 — A lighter runtime on every page · M
 Content script:

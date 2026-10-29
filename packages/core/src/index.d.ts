@@ -597,6 +597,8 @@ export interface ImpactDescription {
   method: EstimateMethod | null;
   /** "estimated · tier" or "estimated · from parameters"; null when measured or benchmarked. */
   methodChip: string | null;
+  /** The method chip and the note as one chip: "estimated · tier · likely high"; null when measured or benchmarked. */
+  chipText: string | null;
   rangeOnly: boolean;
   floor: boolean;
   lowWh: number;
@@ -627,11 +629,88 @@ export interface SavingClaim {
   energyWh: number | null;
 }
 
-export function describeImpact(impact: Impact): ImpactDescription;
-export function savingClaim(better: Impact, worse: Impact): SavingClaim | null;
+// ---------------------------------------------------------------- present.js
+// What every surface shows the same way (PLAN.md Step 13).
+
+/** Each grade's colour; the CSS --grade-a…e properties must match. */
+export const GRADE_COLORS: Readonly<Record<Grade, string>>;
+/** Each grade as a dot, for text-only places such as a <select>. */
+export const GRADE_DOTS: Readonly<Record<Grade, string>>;
+export function gradeColor(grade: string | null | undefined): string | null;
+/** The grade's dot, or "⚪" without a grade. */
+export function gradeDot(grade: string | null | undefined): string;
+/** A CSS background: the grade's colour, or a gradient across a grade range. Null without a description. */
+export function gradeBackground(desc: ImpactDescription | null | undefined): string | null;
+
+/** The one rounding rule: three significant figures, at most three decimals. */
+export function figure(value: number): string;
+/** 0.052 Wh, 1.23 Wh, 16.7 Wh, 1.20 kWh. */
 export function formatWh(wh: number): string;
+/** 0.420 mL, 42.0 mL, 1.20 L. */
+export function formatMl(ml: number): string;
+/** 0.231 g CO₂e, 1.20 kg CO₂e. */
+export function formatG(g: number): string;
+/** A grid's intensity from kg CO₂e/kWh: "353 g CO₂e/kWh". */
+export function formatCif(cifKgPerKwh: number): string;
+/** "12,400". */
+export function formatCount(n: number): string;
+/** Two formatted ends as one range, sharing their unit; a null high end is a floor ("≥ …"). */
+export function joinRange(lowText: string, highText: string | null | undefined): string;
 export function formatWhRange(lowWh: number, highWh: number | null): string;
 export const METHOD_CHIPS: Record<EstimateMethod, string>;
+
+export function describeImpact(impact: Impact): ImpactDescription;
+export function savingClaim(better: Impact, worse: Impact): SavingClaim | null;
+/** "57%" or "at least 54%". */
+export function savingPercent(claim: SavingClaim): string;
+/** "57% less energy" or "at least 54% less energy". */
+export function savingPhrase(claim: SavingClaim): string;
+
+/** A surface's inputs for a query, as impactRequest takes them. */
+export interface QueryInputs {
+  modelId?: string;
+  inTokens?: number;
+  outTokens?: number;
+  taskMultiplier?: number;
+  effort?: ReasoningEffort | string | null;
+  thinkingOn?: boolean;
+  multiAgent?: boolean;
+  /** A grid region key; 'default' or empty keeps the host's grid. */
+  region?: string | null;
+  /** False leaves out the embodied uplift. */
+  embodied?: boolean;
+}
+export function impactOptions(inputs?: QueryInputs): ImpactOptions;
+/** The estimateImpact request for a surface's inputs: the same inputs give the same number everywhere. */
+export function impactRequest(inputs: QueryInputs & { modelId: string; inTokens: number; outTokens: number }): ImpactRequest;
+
+/** The typical short query a model's quick grade is taken at: 100 in, 300 out. */
+export const QUICK_QUERY: Readonly<{ inTokens: number; outTokens: number }>;
+export function quickImpact(engine: ImpactEngine, modelId: string, inputs?: QueryInputs): Impact | null;
+/** describeImpact at QUICK_QUERY for each model, by id; null when a model can't be priced. */
+export function quickGrades(engine: ImpactEngine, models: Array<{ id: string }>, inputs?: QueryInputs): Record<string, ImpactDescription | null>;
+
+/** The least saving, in percent, worth offering a model switch for. */
+export const SWITCH_MIN_PERCENT: number;
+/** "… Answer in ≤100 words." */
+export function withWordBudget(text: string, words?: number): string;
+/** A meaningfully greener, non-Nano model for the same query, with the saving the ranges support. */
+export function greenerModel(
+  engine: ImpactEngine,
+  inputs: QueryInputs & { modelId: string; inTokens: number; outTokens: number },
+  minPercent?: number
+): { model: ModelSummary; claim: SavingClaim } | null;
+
+export type TipAction =
+  | { kind: 'text'; label: string; toast: string; apply(text: string): string }
+  | { kind: 'model'; label: string; toast: string; model: ModelSummary; claim: SavingClaim };
+/** The one-click action for a coach tip, or null when the tip is advice only. */
+export function tipAction(
+  tip: Tip,
+  ctx?: QueryInputs & { engine: ImpactEngine; modelId: string; inTokens: number; outTokens: number }
+): TipAction | null;
+/** A text action's effect for its toast: " — 12% less energy (C → B)", or ''. */
+export function changeNote(before: Impact | null | undefined, after: Impact | null | undefined): string;
 
 // --------------------------------------------------------------------- entry
 

@@ -14,6 +14,8 @@
 //   7. a model id written into an app or core that models.json doesn't have
 //   8. an app defining a default model of its own instead of core's
 //   9. an app script calling fetch(): the core bundle carries the data
+//  10. an app defining grade colours or rounding figures of its own instead
+//      of core's present.js, or CSS grade colours that differ from core's
 //
 // Run:  node scripts/check-apps.js      (also part of `npm test`)
 'use strict';
@@ -275,6 +277,38 @@ for (const file of appSources.filter((f) => /\.(js|ts|tsx)$/.test(f))) {
   fs.readFileSync(file, 'utf8').split('\n').forEach((text, i) => {
     if (/(?<!\w)fetch\s*\(/.test(text.replace(/\/\/.*$/, ''))) {
       fail(`${rel(file)}:${i + 1}: the core bundle carries the data; no app script fetches at start-up`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 10. One presentation layer (PLAN.md Step 13): grade colours and technical
+//     figures come from core's present.js. An app script may not map a grade
+//     to a colour or round with toFixed(); a CSS --grade-a…e property must
+//     equal core's GRADE_COLORS, since CSS can't read them.
+// ---------------------------------------------------------------------------
+const { GRADE_COLORS } = require(path.join(root, 'packages', 'core', 'src', 'present.js'));
+const OWN_PALETTE = /(^|[\s{,])['"]?[A-E]['"]?\s*:\s*['"]#[0-9a-f]{3,8}['"]/i;
+for (const file of appSources.filter((f) => /\.(js|ts|tsx)$/.test(f))) {
+  checks++;
+  fs.readFileSync(file, 'utf8').split('\n').forEach((text, i) => {
+    const code = text.replace(/\/\/.*$/, '');
+    if (OWN_PALETTE.test(code)) {
+      fail(`${rel(file)}:${i + 1}: grade colours are defined once, in core — use EcoPromptCore.GRADE_COLORS or gradeColor()`);
+    }
+    if (/\.toFixed\s*\(/.test(code)) {
+      fail(`${rel(file)}:${i + 1}: figures follow core's one rounding rule — use formatWh/formatMl/formatG or figure()`);
+    }
+  });
+}
+for (const file of walk(path.join(root, 'apps'), (f) => f.endsWith('.css'))) {
+  fs.readFileSync(file, 'utf8').split('\n').forEach((text, i) => {
+    const m = /--grade-([a-e])\s*:\s*([^;]+);/i.exec(text);
+    if (!m) return;
+    checks++;
+    const want = GRADE_COLORS[m[1].toUpperCase()];
+    if (m[2].trim().toLowerCase() !== want.toLowerCase()) {
+      fail(`${rel(file)}:${i + 1}: --grade-${m[1]} is ${m[2].trim()}, but core's GRADE_COLORS.${m[1].toUpperCase()} is ${want}`);
     }
   });
 }

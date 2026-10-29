@@ -8,8 +8,8 @@
 'use strict';
 
 // vendor/core.bundle.js attaches the engine to globalThis.EcoPromptCore, so
-// the badge uses the exact same grade bands as the popup and the pill — it
-// can never drift when the bands are recalibrated in core.
+// the badge uses the exact same grade bands and colours as the popup and the
+// pill — it can never drift when they change in core.
 //
 // This worker and the imported scripts share ONE global scope, so nothing
 // here may redeclare a top-level name from them. A previous
@@ -24,14 +24,6 @@ const History = globalThis.EcoPromptHistory;
 const store = History.chromeStore(chrome.storage.local);
 const writer = History.createWriter(store);
 
-const GRADE_COLORS = {
-  A: '#10B981',
-  B: '#84CC16',
-  C: '#F59E0B',
-  D: '#F97316',
-  E: '#EF4444'
-};
-
 function gradeForWh(wh) {
   return Core.GRADE_BANDS.find((b) => wh <= b.maxWh).grade;
 }
@@ -45,7 +37,7 @@ function renderBadge(agg) {
   }
   const grade = gradeForWh(today.energyWh / today.queries);
   chrome.action.setBadgeText({ text: String(today.queries) });
-  chrome.action.setBadgeBackgroundColor({ color: GRADE_COLORS[grade] });
+  chrome.action.setBadgeBackgroundColor({ color: Core.gradeColor(grade) });
   if (chrome.action.setBadgeTextColor) {
     chrome.action.setBadgeTextColor({ color: '#ffffff' });
   }
